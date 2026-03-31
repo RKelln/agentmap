@@ -1,0 +1,53 @@
+version: "2"
+
+linters:
+  enable:
+    # Already enabled by default: errcheck, govet, staticcheck, unused, ineffassign
+    - misspell        # spelling in comments and strings
+    - goconst         # repeated strings that should be constants
+    - unconvert       # unnecessary type conversions
+    - unparam         # unused function parameters
+    - errname         # error type naming (ErrFoo)
+    - nilerr          # returning nil after checking err != nil
+    - revive          # extensible linter (replaces golint)
+    - bodyclose       # unclosed HTTP response bodies
+    - prealloc        # slice preallocation hints
+    - gocritic        # bugs, performance, and style checks
+    - errorlint       # proper error wrapping (Go 1.13+)
+
+linters-settings:
+  gofumpt:
+    extra-rules: true
+  goconst:
+    min-len: 3
+    min-occurrences: 3
+  revive:
+    rules:
+      - name: exported
+        arguments:
+          - "checkPrivateReceivers"
+      - name: blank-imports
+      - name: context-as-argument
+      - name: error-return
+      - name: error-strings
+      - name: increment-decrement
+      - name: var-naming
+      - name: unreachable-code
+  misspell:
+    locale: US
+
+formatters:
+  enable:
+    - gofumpt
+
+exclusions:
+  rules:
+    # Allow unused parameters in test helpers
+    - linters:
+        - unparam
+      path: _test\.go
+    # Allow dot imports in tests
+    - linters:
+        - revive
+      path: _test\.go
+      text: "dot-imports"
