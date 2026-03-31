@@ -1,0 +1,19 @@
+# Minimum file size to generate full nav block (lines)
+# Files under this threshold get purpose-only block
+min_lines: 50
+
+# Minimum section size to include subsection info (lines)
+# Sections under this get no subsection hints or entries
+sub_threshold: 50
+
+# Section size at which full h3 entries replace inline > hints (lines)
+# Between sub_threshold and expand_threshold: > hints only
+# Above expand_threshold: full h3 entries with own line ranges
+expand_threshold: 150
+
+# Maximum heading depth to track
+max_depth: 3
+
+# Files/directories to exclude (in addition to .gitignore)
+exclude:
+  - "CHANGELOG.md"
