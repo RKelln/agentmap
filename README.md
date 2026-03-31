@@ -24,6 +24,12 @@ This gives AI coding agents:
 2. Section index with line ranges (which section do I need, and exactly which lines?)
 3. Cross-references to related files (is the answer actually somewhere else?)
 
+## Why
+
+Code files have LSPs, treesitter, go-to-definition, and symbol search. Markdown has none of these. When an agent needs information from a 500-line markdown file, it typically reads the entire file (~2000 tokens) even if it only needs a 20-line section (~80 tokens).
+
+`agentmap` closes that gap with a compact nav block that collapses multi-step navigation into a single precise `Read(offset=s, limit=e-s)` call.
+
 ## Commands
 
 | Command | Purpose |
@@ -77,4 +83,17 @@ expand_threshold: 150
 max_depth: 3
 ```
 
-See `agentmap-design.md` for the full specification.
+## Design
+
+See [agentmap-design.md](agentmap-design.md) for the full specification including nav block format, CLI behavior, parser rules, keyword extraction, and token budget analysis.
+
+## Contributing
+
+1. Fork the repo and create a feature branch
+2. Write tests first (table-driven, stdlib only)
+3. Run `make ci` -- test + lint + build must all pass
+4. Open a pull request
+
+## License
+
+MIT. See [LICENSE](LICENSE).
