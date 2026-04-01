@@ -1,0 +1,1 @@
+go build -ldflags "-X main.version=451b82e-dirty" -o agentmap ./cmd/agentmap

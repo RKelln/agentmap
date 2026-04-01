@@ -126,7 +126,7 @@ Token lifecycle management for the platform...
 This example shows all three tiers from section 3.8:
 - `##Overview` (36 lines) and `##Migration Guide` (19 lines) — under `sub_threshold`; no subsection info even if they had h3 children.
 - `##Token Exchange` (79 lines) — between `sub_threshold` and `expand_threshold`; `>` hints list its three h3 children without giving them their own entries.
-- `##Token Lifecycle` (199 lines) — over `expand_threshold`; its h3 children (`###Refresh`, `###Revocation`, `###Introspection`) appear as full nav entries with their own `s,e` ranges.
+- `##Token Lifecycle` (199 lines) — over `expand_threshold`; its h3 children (`###Refresh`, `###Revocation`, `###Introspection`) appear as full nav entries with their own `s,n` ranges.
 
 ### 3.5 Placement Rules
 
@@ -175,7 +175,7 @@ The generator uses a three-tier threshold based on parent section line count:
 |---|---|---|
 | Under `sub_threshold` (default 50 lines) | No subsection info | Section is cheap to read in full |
 | `sub_threshold` to `expand_threshold` (default 150 lines) | `>` hints only | Agent reads parent section; hints help scan |
-| Over `expand_threshold` | Full h3 entries with own `s,e` ranges | Section too large to scan; agent needs precise offsets |
+| Over `expand_threshold` | Full h3 entries with own `s,n` ranges | Section too large to scan; agent needs precise offsets |
 
 This keeps the nav block compact for most files. A file with ten 40-line sections produces 10 nav entries with no hints. A file with three 80-line sections produces 3 entries with `>` hints. A file with one 200-line section produces 1 parent entry plus its h3 children as full entries.
 
@@ -209,7 +209,7 @@ This keeps the nav block compact for most files. A file with ten 40-line section
 - `--llm` — Use an LLM to generate descriptions instead of keyword extraction. Requires LLM configuration (see section 7).
 - `--min-lines N` — Override minimum file size threshold (default: 50).
 - `--sub-threshold N` — Override subheading inclusion threshold (default: 50 lines). Sections under this size get no subsection info.
-- `--expand-threshold N` — Override full-expansion threshold (default: 150 lines). Sections over this size get full h3 entries with own `s,e` ranges. Sections between `sub-threshold` and `expand-threshold` get `>` hints instead (see section 3.8).
+- `--expand-threshold N` — Override full-expansion threshold (default: 150 lines). Sections over this size get full h3 entries with own `s,n` ranges. Sections between `sub-threshold` and `expand-threshold` get `>` hints instead (see section 3.8).
 - `--dry-run` — Print what would be generated without writing files.
 
 **Output:**
@@ -230,7 +230,7 @@ Skipped: README.md (under 50 lines; purpose-only)
    a. Parse the existing nav block (extract entries with their `name` and `about` fields).
    b. Reparse the markdown to get current headings and line numbers.
    c. Match existing nav entries to current headings by heading text (`name` field, ignoring `#` prefixes).
-   d. **Matched headings:** Update `s,e` values. Preserve `about` description unchanged.
+   d. **Matched headings:** Update `s,n` values. Preserve `about` description unchanged.
    e. **New headings** (in document but not in nav): Add entry with empty `about`.
    f. **Deleted headings** (in nav but not in document): Remove entry.
    g. **Renamed headings:** Appear as a deletion + a new entry. This is correct — a renamed section likely needs a new description.
@@ -361,7 +361,7 @@ This requires LLM configuration (API key, model selection). It's optional and ne
 ### 5.5 Description Preservation Rules
 
 - `generate` writes descriptions (overwrites existing).
-- `update` never writes descriptions. Never. It only modifies `s,e` values and `[N]` counts.
+- `update` never writes descriptions. Never. It only modifies `s,n` values and `[N]` counts.
 - `check` never writes anything.
 - Descriptions are anchored to heading text. If a heading is renamed, the old description is lost and the new heading gets an empty description.
 
@@ -372,7 +372,7 @@ This requires LLM configuration (API key, model selection). It's optional and ne
 `agentmap update` uses git to determine which sections have modified content:
 
 1. Run `git diff HEAD -- <file>` to get changed line ranges.
-2. Map each changed line range to the section(s) it falls within (using the newly computed `s,e` values).
+2. Map each changed line range to the section(s) it falls within (using the newly computed `s,n` values).
 3. Mark those sections as `content-changed` in the report.
 
 If the file is untracked (new file), all sections are marked as `new`.
@@ -637,7 +637,7 @@ All configuration is optional. Sensible defaults:
 
 ### 11.1 Duplicate Headings
 
-If a document has multiple headings with the same text (e.g., two `## Examples` sections), match by order of appearance. The nav block lists them in document order, and the `s,e` line ranges disambiguate.
+If a document has multiple headings with the same text (e.g., two `## Examples` sections), match by order of appearance. The nav block lists them in document order, and the `s,n` line ranges disambiguate.
 
 ### 11.2 Headings with Special Characters
 

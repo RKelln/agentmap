@@ -1,0 +1,10 @@
+goos: linux
+goarch: amd64
+pkg: github.com/ryankelln/agentmap/internal/keywords
+cpu: 12th Gen Intel(R) Core(TM) i5-1240P
+BenchmarkExtractKeywords/small-16         	  303468	      3335 ns/op	    1552 B/op	      36 allocs/op
+BenchmarkExtractKeywords/medium-16        	   54723	     20491 ns/op	   11216 B/op	     207 allocs/op
+BenchmarkExtractKeywords/large-16         	   16036	     76984 ns/op	   41680 B/op	     785 allocs/op
+BenchmarkExtractPurpose-16                	   27128	     44672 ns/op	   23280 B/op	     464 allocs/op
+PASS
+ok  	github.com/ryankelln/agentmap/internal/keywords	6.062s

@@ -111,7 +111,7 @@ Token lifecycle management for the platform...
 This example shows all three tiers from section 3.8:
 - `##Overview` (36 lines) and `##Migration Guide` (19 lines) — under `sub_threshold`; no subsection info even if they had h3 children.
 - `##Token Exchange` (79 lines) — between `sub_threshold` and `expand_threshold`; `>` hints list its three h3 children without giving them their own entries.
-- `##Token Lifecycle` (199 lines) — over `expand_threshold`; its h3 children (`###Refresh`, `###Revocation`, `###Introspection`) appear as full nav entries with their own `s,e` ranges.
+- `##Token Lifecycle` (199 lines) — over `expand_threshold`; its h3 children (`###Refresh`, `###Revocation`, `###Introspection`) appear as full nav entries with their own `s,n` ranges.
 
 ### 3.5 Placement Rules
 
@@ -142,7 +142,7 @@ The generator uses a three-tier threshold based on parent section line count:
 |---|---|---|
 | Under `sub_threshold` (default 50 lines) | No subsection info | Section is cheap to read in full |
 | `sub_threshold` to `expand_threshold` (default 150 lines) | `>` hints only | Agent reads parent section; hints help scan |
-| Over `expand_threshold` | Full h3 entries with own `s,e` ranges | Section too large to scan; agent needs precise offsets |
+| Over `expand_threshold` | Full h3 entries with own `s,n` ranges | Section too large to scan; agent needs precise offsets |
 
 This keeps the nav block compact for most files. A file with ten 40-line sections produces 10 nav entries with no hints. A file with three 80-line sections produces 3 entries with `>` hints. A file with one 200-line section produces 1 parent entry plus its h3 children as full entries.
 
@@ -176,7 +176,7 @@ This keeps the nav block compact for most files. A file with ten 40-line section
 - `--llm` — Use an LLM to generate descriptions instead of keyword extraction. Requires LLM configuration (see section 7).
 - `--min-lines N` — Override minimum file size threshold (default: 50).
 - `--sub-threshold N` — Override subheading inclusion threshold (default: 50 lines). Sections under this size get no subsection info.
-- `--expand-threshold N` — Override full-expansion threshold (default: 150 lines). Sections over this size get full h3 entries with own `s,e` ranges. Sections between `sub-threshold` and `expand-threshold` get `>` hints instead (see section 3.8).
+- `--expand-threshold N` — Override full-expansion threshold (default: 150 lines). Sections over this size get full h3 entries with own `s,n` ranges. Sections between `sub-threshold` and `expand-threshold` get `>` hints instead (see section 3.8).
 - `--dry-run` — Print what would be generated without writing files.
 
 **Output:**

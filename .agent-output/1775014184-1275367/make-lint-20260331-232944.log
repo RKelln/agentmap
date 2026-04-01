@@ -1,0 +1,7 @@
+/home/ryankelln/go/bin/golangci-lint run ./...
+internal/generate/generate_test.go:829:3: QF1012: Use fmt.Fprintf(...) instead of WriteString(fmt.Sprintf(...)) (staticcheck)
+		b.WriteString(fmt.Sprintf("### Child %d\n\n", i+1))
+		^
+1 issues:
+* staticcheck: 1
+make: *** [Makefile:15: lint] Error 1

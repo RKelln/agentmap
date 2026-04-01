@@ -102,7 +102,7 @@ Product catalog endpoints.
 	// File with existing nav block
 	existingNavContent := `<!-- AGENT:NAV
 purpose:old purpose
-nav[1]{s,e,name,about}:
+nav[1]{s,n,name,about}:
 1,10,#Old Heading,old description
 -->
 # New Document

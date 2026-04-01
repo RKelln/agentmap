@@ -106,7 +106,7 @@ Some helper utilities.
 func TestFile_ReplacesExistingNavBlock(t *testing.T) {
 	content := `<!-- AGENT:NAV
 purpose:old purpose
-nav[1]{s,e,name,about}:
+nav[1]{s,n,name,about}:
 1,10,#Old Heading,old description
 -->
 # Authentication
@@ -236,7 +236,7 @@ Even more content.
 func TestInsertNavBlock_ReplacesExisting(t *testing.T) {
 	content := `<!-- AGENT:NAV
 purpose:old
-nav[1]{s,e,name,about}:
+nav[1]{s,n,name,about}:
 1,10,#Old,old desc
 -->
 # Heading
@@ -464,7 +464,7 @@ Some content here.
 ` + "```markdown" + `
 <!-- AGENT:NAV
 purpose:this is inside a code fence
-nav[1]{s,e,name,about}:
+nav[1]{s,n,name,about}:
 1,10,#Fake,fake entry
 -->
 ` + "```" + `
@@ -482,7 +482,7 @@ func TestFindNavBlock_FindsRealBlock(t *testing.T) {
 	// Valid nav block comes before any heading
 	content := `<!-- AGENT:NAV
 purpose:real nav block
-nav[1]{s,e,name,about}:
+nav[1]{s,n,name,about}:
 1,10,#Real,real entry
 -->
 
@@ -507,7 +507,7 @@ func TestFindNavBlock_CodeFenceThenRealBlock(t *testing.T) {
 	// Nav block at start, code fence example later in file (should find nav block)
 	content := `<!-- AGENT:NAV
 purpose:real
-nav[1]{s,e,name,about}:
+nav[1]{s,n,name,about}:
 10,20,#Real,real
 -->
 
@@ -538,7 +538,7 @@ func TestInsertNavBlock_SkipsCodeFenceNavBlocks(t *testing.T) {
 ` + "```markdown" + `
 <!-- AGENT:NAV
 purpose:fake
-nav[1]{s,e,name,about}:
+nav[1]{s,n,name,about}:
 1,5,#Fake,fake
 -->
 ` + "```" + `

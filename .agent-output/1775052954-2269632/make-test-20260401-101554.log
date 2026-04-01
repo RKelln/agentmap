@@ -1,0 +1,195 @@
+go test ./... -v -race
+# github.com/ryankelln/agentmap/internal/check
+internal/check/check.go:111:36: e.End undefined (type navblock.NavEntry has no field or method End)
+internal/check/check.go:113:30: e.End undefined (type navblock.NavEntry has no field or method End)
+# github.com/ryankelln/agentmap/internal/generate
+internal/generate/generate.go:125:4: unknown field End in struct literal of type navblock.NavEntry
+internal/generate/generate.go:356:6: unknown field End in struct literal of type navblock.NavEntry
+internal/generate/generate.go:366:7: unknown field End in struct literal of type navblock.NavEntry
+internal/generate/generate.go:394:4: unknown field End in struct literal of type navblock.NavEntry
+# github.com/ryankelln/agentmap/internal/update
+internal/update/update.go:187:44: oldEntry.End undefined (type navblock.NavEntry has no field or method End)
+internal/update/update.go:210:28: oldEntry.End undefined (type navblock.NavEntry has no field or method End)
+internal/update/update.go:249:5: unknown field End in struct literal of type navblock.NavEntry
+internal/update/update.go:256:5: unknown field End in struct literal of type navblock.NavEntry
+FAIL	github.com/ryankelln/agentmap/cmd/agentmap [build failed]
+FAIL	github.com/ryankelln/agentmap/internal/check [build failed]
+=== RUN   TestDefaults
+--- PASS: TestDefaults (0.00s)
+=== RUN   TestLoadMissingFile
+--- PASS: TestLoadMissingFile (0.00s)
+=== RUN   TestLoad
+=== RUN   TestLoad/empty_file_returns_defaults
+=== RUN   TestLoad/partial_config_merges_with_defaults
+=== RUN   TestLoad/full_config_overrides_all_defaults
+=== RUN   TestLoad/exclude_only_overrides
+--- PASS: TestLoad (0.00s)
+    --- PASS: TestLoad/empty_file_returns_defaults (0.00s)
+    --- PASS: TestLoad/partial_config_merges_with_defaults (0.00s)
+    --- PASS: TestLoad/full_config_overrides_all_defaults (0.00s)
+    --- PASS: TestLoad/exclude_only_overrides (0.00s)
+=== RUN   TestFindConfig
+=== RUN   TestFindConfig/finds_in_current_directory
+=== RUN   TestFindConfig/searches_upward
+=== RUN   TestFindConfig/returns_empty_when_not_found
+--- PASS: TestFindConfig (0.00s)
+    --- PASS: TestFindConfig/finds_in_current_directory (0.00s)
+    --- PASS: TestFindConfig/searches_upward (0.00s)
+    --- PASS: TestFindConfig/returns_empty_when_not_found (0.00s)
+PASS
+ok  	github.com/ryankelln/agentmap/internal/config	(cached)
+=== RUN   TestDiscoverFilesFindsAllMdFiles
+--- PASS: TestDiscoverFilesFindsAllMdFiles (0.00s)
+=== RUN   TestDiscoverFilesExcludesNonMdFiles
+--- PASS: TestDiscoverFilesExcludesNonMdFiles (0.00s)
+=== RUN   TestDiscoverFilesWithExcludePatterns
+--- PASS: TestDiscoverFilesWithExcludePatterns (0.00s)
+=== RUN   TestDiscoverFilesEmptyDirectory
+--- PASS: TestDiscoverFilesEmptyDirectory (0.00s)
+=== RUN   TestDiscoverFilesNonExistentRoot
+--- PASS: TestDiscoverFilesNonExistentRoot (0.00s)
+=== RUN   TestIsGitRepo
+--- PASS: TestIsGitRepo (0.00s)
+=== RUN   TestGitLsFiles
+--- PASS: TestGitLsFiles (0.02s)
+=== RUN   TestMatchesExclude
+=== RUN   TestMatchesExclude/CHANGELOG.md
+=== RUN   TestMatchesExclude/docs/guide.md
+=== RUN   TestMatchesExclude/docs/internal/secret.md
+=== RUN   TestMatchesExclude/docs/public/guide.md
+=== RUN   TestMatchesExclude/README.md
+=== RUN   TestMatchesExclude/dist/build.md
+=== RUN   TestMatchesExclude/src/test.md
+--- PASS: TestMatchesExclude (0.00s)
+    --- PASS: TestMatchesExclude/CHANGELOG.md (0.00s)
+    --- PASS: TestMatchesExclude/docs/guide.md (0.00s)
+    --- PASS: TestMatchesExclude/docs/internal/secret.md (0.00s)
+    --- PASS: TestMatchesExclude/docs/public/guide.md (0.00s)
+    --- PASS: TestMatchesExclude/README.md (0.00s)
+    --- PASS: TestMatchesExclude/dist/build.md (0.00s)
+    --- PASS: TestMatchesExclude/src/test.md (0.00s)
+PASS
+ok  	github.com/ryankelln/agentmap/internal/discovery	1.038s
+FAIL	github.com/ryankelln/agentmap/internal/generate [build failed]
+?   	github.com/ryankelln/agentmap/internal/gitutil	[no test files]
+=== RUN   TestExtractKeywords_Basic
+=== RUN   TestExtractKeywords_Basic/simple_authentication_text
+=== RUN   TestExtractKeywords_Basic/all_stopwords_returns_empty
+=== RUN   TestExtractKeywords_Basic/empty_text_returns_empty
+=== RUN   TestExtractKeywords_Basic/short_tokens_filtered_out
+=== RUN   TestExtractKeywords_Basic/respects_max_keywords
+=== RUN   TestExtractKeywords_Basic/deduplicates_and_counts_frequency
+=== RUN   TestExtractKeywords_Basic/handles_punctuation
+=== RUN   TestExtractKeywords_Basic/case_insensitive
+--- PASS: TestExtractKeywords_Basic (0.00s)
+    --- PASS: TestExtractKeywords_Basic/simple_authentication_text (0.00s)
+    --- PASS: TestExtractKeywords_Basic/all_stopwords_returns_empty (0.00s)
+    --- PASS: TestExtractKeywords_Basic/empty_text_returns_empty (0.00s)
+    --- PASS: TestExtractKeywords_Basic/short_tokens_filtered_out (0.00s)
+    --- PASS: TestExtractKeywords_Basic/respects_max_keywords (0.00s)
+    --- PASS: TestExtractKeywords_Basic/deduplicates_and_counts_frequency (0.00s)
+    --- PASS: TestExtractKeywords_Basic/handles_punctuation (0.00s)
+    --- PASS: TestExtractKeywords_Basic/case_insensitive (0.00s)
+=== RUN   TestExtractKeywords_Stopwords
+=== RUN   TestExtractKeywords_Stopwords/english:_the
+=== RUN   TestExtractKeywords_Stopwords/english:_and
+=== RUN   TestExtractKeywords_Stopwords/english:_because
+=== RUN   TestExtractKeywords_Stopwords/english:_therefore
+=== RUN   TestExtractKeywords_Stopwords/markdown:_section
+=== RUN   TestExtractKeywords_Stopwords/markdown:_overview
+=== RUN   TestExtractKeywords_Stopwords/markdown:_describes
+=== RUN   TestExtractKeywords_Stopwords/markdown:_provides
+=== RUN   TestExtractKeywords_Stopwords/markdown:_including
+--- PASS: TestExtractKeywords_Stopwords (0.00s)
+    --- PASS: TestExtractKeywords_Stopwords/english:_the (0.00s)
+    --- PASS: TestExtractKeywords_Stopwords/english:_and (0.00s)
+    --- PASS: TestExtractKeywords_Stopwords/english:_because (0.00s)
+    --- PASS: TestExtractKeywords_Stopwords/english:_therefore (0.00s)
+    --- PASS: TestExtractKeywords_Stopwords/markdown:_section (0.00s)
+    --- PASS: TestExtractKeywords_Stopwords/markdown:_overview (0.00s)
+    --- PASS: TestExtractKeywords_Stopwords/markdown:_describes (0.00s)
+    --- PASS: TestExtractKeywords_Stopwords/markdown:_provides (0.00s)
+    --- PASS: TestExtractKeywords_Stopwords/markdown:_including (0.00s)
+=== RUN   TestExtractPurpose
+=== RUN   TestExtractPurpose/multi-section_document
+=== RUN   TestExtractPurpose/empty_document
+--- PASS: TestExtractPurpose (0.00s)
+    --- PASS: TestExtractPurpose/multi-section_document (0.00s)
+    --- PASS: TestExtractPurpose/empty_document (0.00s)
+=== RUN   TestTokenize
+=== RUN   TestTokenize/simple_words
+=== RUN   TestTokenize/with_punctuation
+=== RUN   TestTokenize/mixed_case
+=== RUN   TestTokenize/with_numbers
+=== RUN   TestTokenize/empty
+=== RUN   TestTokenize/only_punctuation
+--- PASS: TestTokenize (0.00s)
+    --- PASS: TestTokenize/simple_words (0.00s)
+    --- PASS: TestTokenize/with_punctuation (0.00s)
+    --- PASS: TestTokenize/mixed_case (0.00s)
+    --- PASS: TestTokenize/with_numbers (0.00s)
+    --- PASS: TestTokenize/empty (0.00s)
+    --- PASS: TestTokenize/only_punctuation (0.00s)
+PASS
+ok  	github.com/ryankelln/agentmap/internal/keywords	(cached)
+=== RUN   TestParseNavBlock_Full
+--- PASS: TestParseNavBlock_Full (0.00s)
+=== RUN   TestParseNavBlock_PurposeOnly
+--- PASS: TestParseNavBlock_PurposeOnly (0.00s)
+=== RUN   TestParseNavBlock_NotFound
+--- PASS: TestParseNavBlock_NotFound (0.00s)
+=== RUN   TestParseNavBlock_EmptyAbout
+--- PASS: TestParseNavBlock_EmptyAbout (0.00s)
+=== RUN   TestRenderNavBlock
+--- PASS: TestRenderNavBlock (0.00s)
+=== RUN   TestRenderPurposeOnly
+--- PASS: TestRenderPurposeOnly (0.00s)
+=== RUN   TestParseNavBlock_RoundTrip
+--- PASS: TestParseNavBlock_RoundTrip (0.00s)
+PASS
+ok  	github.com/ryankelln/agentmap/internal/navblock	1.011s
+=== RUN   TestParseHeadings_Basic
+=== RUN   TestParseHeadings_Basic/single_h1
+=== RUN   TestParseHeadings_Basic/h1_and_h2
+=== RUN   TestParseHeadings_Basic/three_levels
+=== RUN   TestParseHeadings_Basic/respects_maxDepth
+=== RUN   TestParseHeadings_Basic/heading_with_extra_spaces
+=== RUN   TestParseHeadings_Basic/no_headings
+=== RUN   TestParseHeadings_Basic/empty_input
+--- PASS: TestParseHeadings_Basic (0.00s)
+    --- PASS: TestParseHeadings_Basic/single_h1 (0.00s)
+    --- PASS: TestParseHeadings_Basic/h1_and_h2 (0.00s)
+    --- PASS: TestParseHeadings_Basic/three_levels (0.00s)
+    --- PASS: TestParseHeadings_Basic/respects_maxDepth (0.00s)
+    --- PASS: TestParseHeadings_Basic/heading_with_extra_spaces (0.00s)
+    --- PASS: TestParseHeadings_Basic/no_headings (0.00s)
+    --- PASS: TestParseHeadings_Basic/empty_input (0.00s)
+=== RUN   TestParseHeadings_CodeFences
+=== RUN   TestParseHeadings_CodeFences/heading_inside_backtick_fence
+=== RUN   TestParseHeadings_CodeFences/heading_inside_tilde_fence
+=== RUN   TestParseHeadings_CodeFences/fence_with_language_hint
+=== RUN   TestParseHeadings_CodeFences/multiple_fences
+--- PASS: TestParseHeadings_CodeFences (0.00s)
+    --- PASS: TestParseHeadings_CodeFences/heading_inside_backtick_fence (0.00s)
+    --- PASS: TestParseHeadings_CodeFences/heading_inside_tilde_fence (0.00s)
+    --- PASS: TestParseHeadings_CodeFences/fence_with_language_hint (0.00s)
+    --- PASS: TestParseHeadings_CodeFences/multiple_fences (0.00s)
+=== RUN   TestParseHeadings_HTMLComments
+--- PASS: TestParseHeadings_HTMLComments (0.00s)
+=== RUN   TestParseHeadings_Frontmatter
+--- PASS: TestParseHeadings_Frontmatter (0.00s)
+=== RUN   TestParseHeadings_DuplicateHeadings
+--- PASS: TestParseHeadings_DuplicateHeadings (0.00s)
+=== RUN   TestComputeSections_DesignDocScenario
+--- PASS: TestComputeSections_DesignDocScenario (0.00s)
+=== RUN   TestParseHeadings_DesignDocStripped
+--- PASS: TestParseHeadings_DesignDocStripped (0.00s)
+=== RUN   TestComputeSections_H3ContainedWithinH2
+--- PASS: TestComputeSections_H3ContainedWithinH2 (0.00s)
+=== RUN   TestParseAndCompute_DesignDocEndToEnd
+--- PASS: TestParseAndCompute_DesignDocEndToEnd (0.00s)
+PASS
+ok  	github.com/ryankelln/agentmap/internal/parser	(cached)
+FAIL	github.com/ryankelln/agentmap/internal/update [build failed]
+FAIL
+make: *** [Makefile:12: test] Error 1

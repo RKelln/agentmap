@@ -247,14 +247,14 @@ func buildUpdatedBlock(oldBlock navblock.NavBlock, sections []parser.Section, _ 
 		if found {
 			newNav = append(newNav, navblock.NavEntry{
 				Start: s.Start,
-				N:     s.End - s.Start + 1,
+				N:     s.Len(),
 				Name:  prefix + s.Text,
 				About: oldEntry.About,
 			})
 		} else {
 			newNav = append(newNav, navblock.NavEntry{
 				Start: s.Start,
-				N:     s.End - s.Start + 1,
+				N:     s.Len(),
 				Name:  prefix + s.Text,
 				About: "",
 			})

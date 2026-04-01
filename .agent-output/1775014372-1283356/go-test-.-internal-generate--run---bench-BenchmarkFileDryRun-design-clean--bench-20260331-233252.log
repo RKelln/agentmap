@@ -1,0 +1,7 @@
+goos: linux
+goarch: amd64
+pkg: github.com/ryankelln/agentmap/internal/generate
+cpu: 12th Gen Intel(R) Core(TM) i5-1240P
+BenchmarkFileDryRun/design-clean-16         	       1	   3901355 ns/op	 2291072 B/op	   23234 allocs/op
+PASS
+ok  	github.com/ryankelln/agentmap/internal/generate	0.008s
