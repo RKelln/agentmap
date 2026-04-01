@@ -40,6 +40,12 @@ make build
 
 **Always wrap build/test/lint/long output commands with `scripts/agent-run.sh`** — captures verbose output to `.agent-output/`, shows only summary.
 
+## Benchmarks
+
+- Run `make bench` for a concise throughput summary.
+- Run `make bench-update` to refresh `benchmarks.md` with the current baseline and raw data.
+- Use `benchmarks.md` as the comparison point for future regressions.
+
 ## Debugging
 
 When nav output looks wrong, use `generate -D <file>` to see what the parser found:

@@ -182,3 +182,47 @@ func TestTokenize(t *testing.T) {
 		})
 	}
 }
+
+func BenchmarkExtractKeywords(b *testing.B) {
+	tests := []struct {
+		name string
+		text string
+		max  int
+	}{
+		{
+			name: "small",
+			text: strings.Repeat("token exchange pkce refresh auth flow. ", 4),
+			max:  5,
+		},
+		{
+			name: "medium",
+			text: strings.Repeat("token exchange pkce refresh auth flow. ", 32),
+			max:  5,
+		},
+		{
+			name: "large",
+			text: strings.Repeat("token exchange pkce refresh auth flow. ", 128),
+			max:  5,
+		},
+	}
+
+	for _, tt := range tests {
+		b.Run(tt.name, func(b *testing.B) {
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				_ = ExtractKeywords(tt.text, tt.max)
+			}
+		})
+	}
+}
+
+func BenchmarkExtractPurpose(b *testing.B) {
+	text := strings.Repeat("authentication token oauth2 pkce refresh revoke. ", 64)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = ExtractPurpose(text)
+	}
+}

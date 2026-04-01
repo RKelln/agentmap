@@ -1,6 +1,7 @@
 package generate
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -816,4 +817,61 @@ a1 content
 			}
 		})
 	}
+}
+
+func benchmarkMarkdown(sectionLines, childSections, childLines int) string {
+	var b strings.Builder
+	b.WriteString("# Benchmark\n\n")
+	b.WriteString("Intro text for benchmark.\n\n")
+	b.WriteString("## Section\n\n")
+	b.WriteString(strings.Repeat("Section line.\n", sectionLines))
+	for i := 0; i < childSections; i++ {
+		fmt.Fprintf(&b, "### Child %d\n\n", i+1)
+		b.WriteString(strings.Repeat("Child line.\n", childLines))
+	}
+	return b.String()
+}
+
+func BenchmarkFileDryRun(b *testing.B) {
+	tests := []struct {
+		name    string
+		content string
+	}{
+		{name: "small", content: benchmarkMarkdown(12, 0, 0)},
+		{name: "medium", content: benchmarkMarkdown(64, 2, 4)},
+		{name: "large", content: benchmarkMarkdown(180, 3, 8)},
+		{name: "design-clean", content: mustReadBenchmarkFixture(b, filepath.Join("..", "..", "testdata", "design-clean.md"))},
+	}
+
+	for _, tt := range tests {
+		b.Run(tt.name, func(b *testing.B) {
+			dir := b.TempDir()
+			path := filepath.Join(dir, "bench.md")
+			if err := os.WriteFile(path, []byte(tt.content), 0o644); err != nil {
+				b.Fatal(err)
+			}
+
+			cfg := config.Defaults()
+			cfg.MinLines = 1
+			cfg.SubThreshold = 40
+			cfg.ExpandThreshold = 120
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				if _, err := File(path, cfg, true); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	}
+}
+
+func mustReadBenchmarkFixture(b *testing.B, path string) string {
+	b.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		b.Fatalf("read benchmark fixture %s: %v", path, err)
+	}
+	return string(data)
 }

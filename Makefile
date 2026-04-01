@@ -1,4 +1,4 @@
-.PHONY: build test lint fmt install clean check-sample
+.PHONY: build test lint fmt install clean check-sample bench bench-update
 
 BINARY := agentmap
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
@@ -48,3 +48,9 @@ check-sample: build
 
 # CI gate: all three must pass before merge
 ci: test lint build
+
+bench:
+	scripts/agent-bench.sh
+
+bench-update:
+	scripts/agent-bench.sh --write benchmarks.md
