@@ -65,8 +65,8 @@ var updateCmd = &cobra.Command{
 	Short: "Refresh line numbers in existing nav blocks",
 	Long:  "Fast line-number refresh. Preserves all descriptions.",
 	Args:  cobra.MaximumNArgs(1),
-	RunE: func(_ *cobra.Command, _ []string) error {
-		fmt.Println("update: not yet implemented")
+	RunE: func(cmd *cobra.Command, _ []string) error {
+		cmd.Println("update: not yet implemented")
 		return nil
 	},
 }
@@ -76,8 +76,8 @@ var checkCmd = &cobra.Command{
 	Short: "Validate nav blocks are in sync with headings",
 	Long:  "Verify nav blocks match current headings and line numbers. Never modifies files.",
 	Args:  cobra.MaximumNArgs(1),
-	RunE: func(_ *cobra.Command, _ []string) error {
-		fmt.Println("check: not yet implemented")
+	RunE: func(cmd *cobra.Command, _ []string) error {
+		cmd.Println("check: not yet implemented")
 		return nil
 	},
 }
@@ -85,8 +85,8 @@ var checkCmd = &cobra.Command{
 var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Print version",
-	Run: func(_ *cobra.Command, _ []string) {
-		fmt.Println(version)
+	Run: func(cmd *cobra.Command, _ []string) {
+		cmd.Println(version)
 	},
 }
 
