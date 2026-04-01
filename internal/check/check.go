@@ -9,6 +9,7 @@ import (
 
 	"github.com/ryankelln/agentmap/internal/config"
 	"github.com/ryankelln/agentmap/internal/discovery"
+	"github.com/ryankelln/agentmap/internal/generate"
 	"github.com/ryankelln/agentmap/internal/navblock"
 	"github.com/ryankelln/agentmap/internal/parser"
 )
@@ -84,11 +85,26 @@ func CheckFile(path string, cfg config.Config) (bool, string, error) {
 	headings := parser.ParseHeadings(string(content), cfg.MaxDepth)
 	sections := parser.ComputeSections(headings, totalLines)
 
+	// §W1: Apply the same large-file cap as generate: if the document would produce
+	// more than MaxNavEntries entries, only h1/h2 sections are tracked in nav.
+	// Check must apply the same filter to avoid false "in document but not in nav" failures.
+	navSections := sections
+	if len(sections) > generate.MaxNavEntries {
+		var filtered []parser.Section
+		for _, s := range sections {
+			if s.Depth <= 2 {
+				filtered = append(filtered, s)
+			}
+		}
+		navSections = filtered
+	}
+
 	// Build queues of section indices by heading text so duplicates match in order.
+	// §C1: strip commas when building keys to match generate's comma-stripping behavior.
 	sectionQueues := make(map[string][]int)
-	matched := make([]bool, len(sections))
-	for i, s := range sections {
-		key := stripHash(s.Text)
+	matched := make([]bool, len(navSections))
+	for i, s := range navSections {
+		key := strings.ReplaceAll(stripHash(s.Text), ",", "")
 		sectionQueues[key] = append(sectionQueues[key], i)
 	}
 
@@ -96,7 +112,7 @@ func CheckFile(path string, cfg config.Config) (bool, string, error) {
 
 	// Check: headings in nav should exist in document with matching line numbers
 	for _, e := range oldBlock.Nav {
-		key := stripHash(e.Name)
+		key := strings.ReplaceAll(stripHash(e.Name), ",", "")
 		queue := sectionQueues[key]
 		if len(queue) == 0 {
 			failures = append(failures, fmt.Sprintf("  %s: in nav but not in document", e.Name))
@@ -106,7 +122,7 @@ func CheckFile(path string, cfg config.Config) (bool, string, error) {
 		idx := queue[0]
 		sectionQueues[key] = queue[1:]
 		matched[idx] = true
-		section := sections[idx]
+		section := navSections[idx]
 
 		prefix := strings.Repeat("#", section.Depth)
 		expectedName := prefix + section.Text
@@ -119,7 +135,7 @@ func CheckFile(path string, cfg config.Config) (bool, string, error) {
 	}
 
 	// Check: headings in document should exist in nav
-	for i, s := range sections {
+	for i, s := range navSections {
 		if matched[i] {
 			continue
 		}

@@ -9,6 +9,7 @@ import (
 
 	"github.com/ryankelln/agentmap/internal/config"
 	"github.com/ryankelln/agentmap/internal/discovery"
+	"github.com/ryankelln/agentmap/internal/generate"
 	"github.com/ryankelln/agentmap/internal/gitutil"
 	"github.com/ryankelln/agentmap/internal/navblock"
 	"github.com/ryankelln/agentmap/internal/parser"
@@ -70,7 +71,10 @@ func Update(root string, cfg config.Config, dryRun, quiet bool) error {
 	}
 
 	// §12.4: one git diff call for the whole repo, not one per file.
-	repoChanges, _ := gitutil.RepoChanges()
+	repoChanges, err := gitutil.RepoChanges()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "warning: git diff: %v; content-change detection disabled\n", err)
+	}
 
 	var anyChanged bool
 	for _, f := range files {
@@ -283,7 +287,7 @@ func buildUpdatedBlock(oldBlock navblock.NavBlock, sections []parser.Section, _ 
 
 	return navblock.NavBlock{
 		Purpose: oldBlock.Purpose,
-		Nav:     newNav,
+		Nav:     generate.FilterNavEntries(newNav),
 		See:     oldBlock.See,
 	}
 }

@@ -17,7 +17,9 @@ import (
 const (
 	frontmatterDelim = "---"
 	navBlockEnd      = "-->"
-	maxNavEntries    = 20
+	// MaxNavEntries is the maximum number of nav entries before the large-file cap
+	// filters to h1/h2 only. Exported so check and update can apply the same cap.
+	MaxNavEntries = 20
 )
 
 // Generate discovers markdown files under root and generates nav blocks for each.
@@ -75,17 +77,25 @@ func File(path string, cfg config.Config, dryRun bool, outputPath ...string) (st
 		report = fmt.Sprintf("Skipped: %s (purpose-only)", path)
 	} else {
 		purpose := keywords.ExtractPurpose(string(content))
-		// Build nav entries with keyword descriptions from original content
+		// Build nav entries with keyword descriptions from original content (uncapped).
+		// buildNavEntries always returns one entry per section, preserving index alignment.
 		originalEntries := buildNavEntries(sections, string(content), cfg)
-		// Compute line offset: new block will shift headings down
-		placeholder := navblock.NavBlock{Purpose: purpose, Nav: originalEntries}
+		// Compute line offset using the capped entries (what will actually be written),
+		// so the block size estimate matches reality.
+		cappedForOffset := FilterNavEntries(originalEntries)
+		placeholder := navblock.NavBlock{Purpose: purpose, Nav: cappedForOffset}
 		placeholderText := navblock.RenderNavBlock(placeholder)
 		newBlockLines := len(strings.Split(placeholderText, "\n"))
 		offset := newBlockLines - oldBlockLines
 
+		// Adjust section line numbers by the offset (applied to full/uncapped list so
+		// applyAdjustedLines can align by index with originalEntries).
 		adjusted := adjustSections(sections, offset)
-		// Apply adjusted line numbers to entries (preserve keyword descriptions)
-		entries := applyAdjustedLines(originalEntries, adjusted)
+		// Apply adjusted line numbers to entries (preserves About/keyword descriptions).
+		// applyAdjustedLines requires len(entries) == len(adjusted); both are uncapped here.
+		adjustedEntries := applyAdjustedLines(originalEntries, adjusted)
+		// Apply the large-file cap AFTER adjusting line numbers so kept entries are correct.
+		entries := FilterNavEntries(adjustedEntries)
 		block := navblock.NavBlock{
 			Purpose: purpose,
 			Nav:     entries,
@@ -398,26 +408,33 @@ func buildNavEntries(sections []parser.Section, content string, cfg config.Confi
 		})
 	}
 
-	// §11.4: if more than maxNavEntries entries, filter to h1/h2 only.
-	if len(entries) > maxNavEntries {
-		var filtered []navblock.NavEntry
-		for _, e := range entries {
-			depth := 0
-			for _, ch := range e.Name {
-				if ch == '#' {
-					depth++
-				} else {
-					break
-				}
-			}
-			if depth <= 2 {
-				filtered = append(filtered, e)
+	// §11.4: large-file cap is applied after applyAdjustedLines (in Generate/File),
+	// not here, so line numbers are adjusted first.
+	return entries
+}
+
+// FilterNavEntries applies the §11.4 large-file cap: if more than MaxNavEntries
+// entries, filter to h1/h2 only. This is exported so check and update can apply
+// the same cap for consistency.
+func FilterNavEntries(entries []navblock.NavEntry) []navblock.NavEntry {
+	if len(entries) <= MaxNavEntries {
+		return entries
+	}
+	var filtered []navblock.NavEntry
+	for _, e := range entries {
+		depth := 0
+		for _, ch := range e.Name {
+			if ch == '#' {
+				depth++
+			} else {
+				break
 			}
 		}
-		entries = filtered
+		if depth <= 2 {
+			filtered = append(filtered, e)
+		}
 	}
-
-	return entries
+	return filtered
 }
 
 // getSectionContent extracts the text content between start and end line numbers (1-indexed).

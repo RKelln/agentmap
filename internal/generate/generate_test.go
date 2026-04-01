@@ -342,9 +342,10 @@ func TestBuildNavEntries_LargeFileCap(t *testing.T) {
 	// Build dummy content (just newlines)
 	content := strings.Repeat("\n", line+1)
 
-	got := buildNavEntries(sections, content, cfg)
+	// §C3: buildNavEntries no longer caps internally; FilterNavEntries applies the cap.
+	got := FilterNavEntries(buildNavEntries(sections, content, cfg))
 
-	// With 25 headings (5 h1 + 5 h2 + 15 h3) > maxNavEntries (20),
+	// With 25 headings (5 h1 + 5 h2 + 15 h3) > MaxNavEntries (20),
 	// should filter to h1 and h2 only = 10 entries
 	for _, e := range got {
 		depth := 0
@@ -369,6 +370,87 @@ func TestBuildNavEntries_LargeFileCap(t *testing.T) {
 	}
 	if len(got) != wantCount {
 		t.Errorf("len(entries) = %d, want %d (h1+h2 only)", len(got), wantCount)
+	}
+}
+
+// TestFile_LargeFileCapLineNumbers verifies that when the large-file cap fires
+// (>20 entries), the kept h1/h2 entries have correct adjusted line numbers — i.e.
+// applyAdjustedLines runs on the full list BEFORE the cap, so the offset is applied.
+func TestFile_LargeFileCapLineNumbers(t *testing.T) {
+	dir := t.TempDir()
+
+	// Build a file that will produce >20 entries (h1 + many h2 + some h3).
+	// The h3 headings should cause the cap to fire and be filtered out.
+	// After generate, the h1/h2 entries should have s values > nav block size (offset applied).
+	var b strings.Builder
+	b.WriteString("# Overview\n\n")
+	b.WriteString(strings.Repeat("Intro line.\n", 5))
+	// Add 20 h2 sections (each with an h3) to force the cap (1 h1 + 20 h2 + 20 h3 = 41 entries)
+	for i := 1; i <= 20; i++ {
+		fmt.Fprintf(&b, "\n## Section %d\n\n", i)
+		b.WriteString(strings.Repeat("Section content.\n", 3))
+		fmt.Fprintf(&b, "\n### Sub %d\n\n", i)
+		b.WriteString("Subsection content.\n")
+	}
+
+	content := b.String()
+	path := filepath.Join(dir, "large-cap.md")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := config.Defaults()
+	cfg.MinLines = 10
+	// Set expand threshold low so h3s get included before the cap, testing the cap
+	cfg.SubThreshold = 1
+	cfg.ExpandThreshold = 1
+
+	_, err := File(path, cfg, false)
+	if err != nil {
+		t.Fatalf("File() error = %v", err)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := string(data)
+
+	// Verify no h3 entries were written (cap fired)
+	if strings.Contains(got, "###Sub") {
+		t.Error("h3 entries should be filtered by large-file cap")
+	}
+
+	// Parse the nav block and verify line numbers are sane
+	block, _, navEndLine, found, _ := navblock.ParseNavBlock(got)
+	if !found {
+		t.Fatal("nav block not found after generate")
+	}
+
+	// Verify all entries have s values AFTER the nav block (offset was applied)
+	for _, entry := range block.Nav {
+		if entry.Start <= navEndLine {
+			t.Errorf("entry %q: s=%d should be after nav block end (line %d); offset not applied",
+				entry.Name, entry.Start, navEndLine)
+		}
+	}
+
+	// Verify entries have monotonically increasing s values
+	for i := 1; i < len(block.Nav); i++ {
+		if block.Nav[i].Start <= block.Nav[i-1].Start {
+			t.Errorf("entry[%d] %q: s=%d should be after entry[%d] %q s=%d",
+				i, block.Nav[i].Name, block.Nav[i].Start,
+				i-1, block.Nav[i-1].Name, block.Nav[i-1].Start)
+		}
+	}
+
+	// Verify each entry's s value actually points to a heading line in the file
+	fileLines := strings.Split(got, "\n")
+	for _, entry := range block.Nav {
+		if entry.Start < 1 || entry.Start > len(fileLines) {
+			t.Errorf("entry %q: s=%d out of range (file has %d lines)", entry.Name, entry.Start, len(fileLines))
+		}
 	}
 }
 

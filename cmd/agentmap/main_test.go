@@ -49,8 +49,9 @@ func TestHookCommand_YAMLFlag(t *testing.T) {
 		"repos:",
 		"agentmap-check",
 		"Validate AGENT:NAV blocks",
-		"agentmap check",
+		"agentmap check .",
 		"markdown",
+		"pass_filenames: false",
 	}
 	for _, want := range wantFragments {
 		if !strings.Contains(output, want) {

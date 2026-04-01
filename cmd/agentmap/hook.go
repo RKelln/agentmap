@@ -18,9 +18,10 @@ const hookYAML = `repos:
     hooks:
       - id: agentmap-check
         name: Validate AGENT:NAV blocks
-        entry: agentmap check
+        entry: agentmap check .
         language: system
         types: [markdown]
+        pass_filenames: false
 `
 
 var hookCmd = &cobra.Command{

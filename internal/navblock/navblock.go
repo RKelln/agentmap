@@ -85,7 +85,7 @@ func ParseNavBlock(content string) (block NavBlock, startLine, endLine int, foun
 	// Validate N >= 1 for all nav entries; invalid N means corruption.
 	for i := range block.Nav {
 		if block.Nav[i].N <= 0 {
-			fmt.Fprintf(os.Stderr, "warning: nav entry %q has invalid line count %d, treating as 0\n", block.Nav[i].Name, block.Nav[i].N)
+			fmt.Fprintf(os.Stderr, "warning: nav entry %q has invalid line count %d — treating as no block\n", block.Nav[i].Name, block.Nav[i].N)
 			block.Nav[i].N = 0
 			parseCorrupted = true
 		}
