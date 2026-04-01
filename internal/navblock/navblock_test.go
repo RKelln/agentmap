@@ -464,6 +464,50 @@ func TestNavBlockRoundTrip_EmptyAbout(t *testing.T) {
 	}
 }
 
+func TestCountWords(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  int
+	}{
+		{name: "empty string", input: "", want: 0},
+		{name: "whitespace only", input: "  ", want: 0},
+		{name: "single word", input: "hello", want: 1},
+		{name: "two words", input: "hello world", want: 2},
+		{name: "heading prefix stripped", input: "# My Heading", want: 2},
+		{name: "multiline string", input: "# My Heading\nsome content here", want: 5},
+		{name: "blank lines ignored", input: "hello\n\nworld", want: 2},
+		{name: "extra whitespace", input: "  foo   bar  ", want: 2},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := CountWords(tt.input)
+			if got != tt.want {
+				t.Errorf("CountWords(%q) = %d, want %d", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestNavEntry_WordCountNotSerialized(t *testing.T) {
+	entry := NavEntry{Start: 10, N: 5, Name: "#Section", About: "desc", WordCount: 42}
+	block := NavBlock{
+		Purpose: "test",
+		Nav:     []NavEntry{entry},
+	}
+	rendered := RenderNavBlock(block)
+	pr := ParseNavBlock(rendered)
+	if !pr.Found {
+		t.Fatal("expected nav block to be found after render")
+	}
+	if len(pr.Block.Nav) != 1 {
+		t.Fatalf("expected 1 nav entry, got %d", len(pr.Block.Nav))
+	}
+	if pr.Block.Nav[0].WordCount != 0 {
+		t.Errorf("WordCount after round-trip = %d, want 0 (must not be serialized)", pr.Block.Nav[0].WordCount)
+	}
+}
+
 func TestParseNavBlock_InvalidLineCount(t *testing.T) {
 	tests := []struct {
 		name    string

@@ -17,10 +17,11 @@ type NavBlock struct {
 
 // NavEntry is a single line in the nav section.
 type NavEntry struct {
-	Start int    // start line (1-indexed, inclusive)
-	N     int    // line count (length of section)
-	Name  string // heading with # prefix (e.g. "##Section")
-	About string // short description; may be empty
+	Start     int    // start line (1-indexed, inclusive)
+	N         int    // line count (length of section)
+	Name      string // heading with # prefix (e.g. "##Section")
+	About     string // short description; may be empty
+	WordCount int    // words in section content (heading line excluded); not serialized
 }
 
 // SeeEntry is a single line in the see section.
@@ -47,6 +48,14 @@ func NormalizeHeading(text string) string {
 	// Strip commas
 	text = strings.ReplaceAll(text, ",", "")
 	return text
+}
+
+// CountWords returns the number of whitespace-separated tokens in s,
+// ignoring markdown heading prefixes (leading # chars) and blank lines.
+func CountWords(s string) int {
+	// Strip leading # characters from each line (heading prefix removal)
+	stripped := strings.TrimLeft(s, "#")
+	return len(strings.Fields(stripped))
 }
 
 // ParseResult holds the result of parsing an AGENT:NAV block.

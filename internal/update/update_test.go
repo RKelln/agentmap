@@ -38,7 +38,7 @@ func TestBuildUpdatedBlock_CommaStripping(t *testing.T) {
 		},
 	}
 
-	updated := buildUpdatedBlock(oldBlock, sections, nil)
+	updated := buildUpdatedBlock(oldBlock, sections, nil, nil, config.Defaults())
 	if len(updated.Nav) != 1 {
 		t.Fatalf("nav count = %d, want 1", len(updated.Nav))
 	}

@@ -15,6 +15,8 @@ type Config struct {
 	SubThreshold    int      `yaml:"sub_threshold"`
 	ExpandThreshold int      `yaml:"expand_threshold"`
 	MaxDepth        int      `yaml:"max_depth"`
+	MaxNavEntries   int      `yaml:"max_nav_entries"` // default 20
+	NavStubWords    int      `yaml:"nav_stub_words"`  // default 20
 	Exclude         []string `yaml:"exclude"`
 }
 
@@ -25,6 +27,8 @@ func Defaults() Config {
 		SubThreshold:    50,
 		ExpandThreshold: 150,
 		MaxDepth:        3,
+		MaxNavEntries:   20,
+		NavStubWords:    20,
 		Exclude:         []string{},
 	}
 }

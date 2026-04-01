@@ -153,7 +153,7 @@ func File(path string, cfg config.Config, dryRun, quiet bool, changedLines ...[]
 		return noChanges, nil
 	}
 
-	block := buildUpdatedBlock(oldBlock, sections, entryReports)
+	block := buildUpdatedBlock(oldBlock, sections, entryReports, lines, cfg)
 	blockText := navblock.RenderNavBlock(block)
 
 	if dryRun {
@@ -254,7 +254,7 @@ func buildEntryReports(oldNav []navblock.NavEntry, sections []parser.Section, ch
 	return reports
 }
 
-func buildUpdatedBlock(oldBlock navblock.NavBlock, sections []parser.Section, _ []ReportEntry) navblock.NavBlock {
+func buildUpdatedBlock(oldBlock navblock.NavBlock, sections []parser.Section, _ []ReportEntry, lines []string, cfg config.Config) navblock.NavBlock {
 	oldByName := make(map[string]navblock.NavEntry)
 	for _, e := range oldBlock.Nav {
 		key := navblock.NormalizeHeading(e.Name)
@@ -268,29 +268,51 @@ func buildUpdatedBlock(oldBlock navblock.NavBlock, sections []parser.Section, _ 
 		oldEntry, found := oldByName[key]
 
 		prefix := strings.Repeat("#", s.Depth)
+		wc := sectionWordCount(lines, s.Start, s.Len())
 
 		if found {
 			newNav = append(newNav, navblock.NavEntry{
-				Start: s.Start,
-				N:     s.Len(),
-				Name:  prefix + navblock.NormalizeHeading(s.Text),
-				About: oldEntry.About,
+				Start:     s.Start,
+				N:         s.Len(),
+				Name:      prefix + navblock.NormalizeHeading(s.Text),
+				About:     oldEntry.About,
+				WordCount: wc,
 			})
 		} else {
 			newNav = append(newNav, navblock.NavEntry{
-				Start: s.Start,
-				N:     s.Len(),
-				Name:  prefix + navblock.NormalizeHeading(s.Text),
-				About: "",
+				Start:     s.Start,
+				N:         s.Len(),
+				Name:      prefix + navblock.NormalizeHeading(s.Text),
+				About:     "",
+				WordCount: wc,
 			})
 		}
 	}
 
 	return navblock.NavBlock{
 		Purpose: oldBlock.Purpose,
-		Nav:     generate.FilterNavEntries(newNav),
+		Nav:     generate.FilterNavEntries(newNav, cfg.MaxNavEntries, cfg.NavStubWords),
 		See:     oldBlock.See,
 	}
+}
+
+// sectionWordCount counts words in the content lines of a section (heading line excluded).
+// start is 1-indexed, n is the line count. lines is 0-indexed.
+func sectionWordCount(lines []string, start, n int) int {
+	// 0-indexed: heading is at lines[start-1], content starts at lines[start]
+	// content lines are lines[start : start+n-1] (skip heading, 0-indexed)
+	contentEnd := start + n - 1
+	if contentEnd > len(lines) {
+		contentEnd = len(lines)
+	}
+	if start >= contentEnd {
+		return 0
+	}
+	var words int
+	for _, line := range lines[start:contentEnd] {
+		words += navblock.CountWords(line)
+	}
+	return words
 }
 
 func formatReport(path string, reports []ReportEntry) string {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/ryankelln/agentmap/internal/config"
@@ -17,9 +18,6 @@ import (
 const (
 	frontmatterDelim = "---"
 	navBlockEnd      = "-->"
-	// MaxNavEntries is the maximum number of nav entries before the large-file cap
-	// filters to h1/h2 only. Exported so check and update can apply the same cap.
-	MaxNavEntries = 20
 )
 
 // Generate discovers markdown files under root and generates nav blocks for each.
@@ -82,7 +80,7 @@ func File(path string, cfg config.Config, dryRun bool, outputPath ...string) (st
 		originalEntries := buildNavEntries(sections, string(content), cfg)
 		// Compute line offset using the capped entries (what will actually be written),
 		// so the block size estimate matches reality.
-		cappedForOffset := FilterNavEntries(originalEntries)
+		cappedForOffset := FilterNavEntries(originalEntries, cfg.MaxNavEntries, cfg.NavStubWords)
 		placeholder := navblock.NavBlock{Purpose: purpose, Nav: cappedForOffset}
 		placeholderText := navblock.RenderNavBlock(placeholder)
 		newBlockLines := len(strings.Split(placeholderText, "\n"))
@@ -95,7 +93,7 @@ func File(path string, cfg config.Config, dryRun bool, outputPath ...string) (st
 		// applyAdjustedLines requires len(entries) == len(adjusted); both are uncapped here.
 		adjustedEntries := applyAdjustedLines(originalEntries, adjusted)
 		// Apply the large-file cap AFTER adjusting line numbers so kept entries are correct.
-		entries := FilterNavEntries(adjustedEntries)
+		entries := FilterNavEntries(adjustedEntries, cfg.MaxNavEntries, cfg.NavStubWords)
 		block := navblock.NavBlock{
 			Purpose: purpose,
 			Nav:     entries,
@@ -124,7 +122,7 @@ func File(path string, cfg config.Config, dryRun bool, outputPath ...string) (st
 }
 
 // applyAdjustedLines copies Start/End line numbers from adjusted sections to entries.
-// Preserves the About field (keyword descriptions) from the original entries.
+// Preserves the About field (keyword descriptions) and WordCount from the original entries.
 func applyAdjustedLines(entries []navblock.NavEntry, adjusted []parser.Section) []navblock.NavEntry {
 	if len(entries) != len(adjusted) {
 		return entries
@@ -132,10 +130,11 @@ func applyAdjustedLines(entries []navblock.NavEntry, adjusted []parser.Section) 
 	result := make([]navblock.NavEntry, len(entries))
 	for i := range entries {
 		result[i] = navblock.NavEntry{
-			Start: adjusted[i].Start,
-			N:     adjusted[i].Len(),
-			Name:  entries[i].Name,
-			About: entries[i].About,
+			Start:     adjusted[i].Start,
+			N:         adjusted[i].Len(),
+			Name:      entries[i].Name,
+			About:     entries[i].About,
+			WordCount: entries[i].WordCount,
 		}
 	}
 	return result
@@ -335,6 +334,25 @@ func cleanBlankLines(content string) string {
 	return content
 }
 
+// sectionWordCount counts words in the content lines of a section (heading line excluded).
+// start is 1-indexed, n is the line count. lines is 0-indexed.
+func sectionWordCount(lines []string, start, n int) int {
+	// 0-indexed: heading is at lines[start-1], content starts at lines[start]
+	// content lines are lines[start : start+n-1] (skip heading, 0-indexed)
+	contentEnd := start + n - 1
+	if contentEnd > len(lines) {
+		contentEnd = len(lines)
+	}
+	if start >= contentEnd {
+		return 0
+	}
+	var words int
+	for _, line := range lines[start:contentEnd] {
+		words += navblock.CountWords(line)
+	}
+	return words
+}
+
 // buildNavEntries converts parser sections to nav entries with keyword descriptions.
 // Applies three-tier subsection logic:
 //   - Under subThreshold: no subsection info (h3 children skipped)
@@ -363,20 +381,22 @@ func buildNavEntries(sections []parser.Section, content string, cfg config.Confi
 			if sectionSize >= cfg.ExpandThreshold {
 				// Full expansion: add h3 children as separate entries
 				entries = append(entries, navblock.NavEntry{
-					Start: s.Start,
-					N:     s.Len(),
-					Name:  prefix + navblock.NormalizeHeading(s.Text),
-					About: about,
+					Start:     s.Start,
+					N:         s.Len(),
+					Name:      prefix + navblock.NormalizeHeading(s.Text),
+					About:     about,
+					WordCount: sectionWordCount(lines, s.Start, s.Len()),
 				})
 				for _, child := range h3Children {
 					childContent := getSectionContent(lines, child.Start, child.End)
 					childAbout := keywords.ExtractKeywords(childContent, 5)
 					childPrefix := strings.Repeat("#", child.Depth)
 					entries = append(entries, navblock.NavEntry{
-						Start: child.Start,
-						N:     child.Len(),
-						Name:  childPrefix + navblock.NormalizeHeading(child.Text),
-						About: childAbout,
+						Start:     child.Start,
+						N:         child.Len(),
+						Name:      childPrefix + navblock.NormalizeHeading(child.Text),
+						About:     childAbout,
+						WordCount: sectionWordCount(lines, child.Start, child.Len()),
 					})
 				}
 				// Skip past h3 children so they're not processed again as standalone entries
@@ -401,10 +421,11 @@ func buildNavEntries(sections []parser.Section, content string, cfg config.Confi
 		}
 
 		entries = append(entries, navblock.NavEntry{
-			Start: s.Start,
-			N:     s.Len(),
-			Name:  prefix + navblock.NormalizeHeading(s.Text),
-			About: about,
+			Start:     s.Start,
+			N:         s.Len(),
+			Name:      prefix + navblock.NormalizeHeading(s.Text),
+			About:     about,
+			WordCount: sectionWordCount(lines, s.Start, s.Len()),
 		})
 	}
 
@@ -413,28 +434,74 @@ func buildNavEntries(sections []parser.Section, content string, cfg config.Confi
 	return entries
 }
 
-// FilterNavEntries applies the §11.4 large-file cap: if more than MaxNavEntries
-// entries, filter to h1/h2 only. This is exported so check and update can apply
-// the same cap for consistency.
-func FilterNavEntries(entries []navblock.NavEntry) []navblock.NavEntry {
-	if len(entries) <= MaxNavEntries {
-		return entries
-	}
-	var filtered []navblock.NavEntry
+// FilterNavEntries applies the §11.4 large-file cap using a two-pass soft algorithm:
+//
+// Pass 1 (stub): remove h3+ candidates with WordCount < stubWords (trivially empty sections).
+// Pass 2 (budget): if candidates still exceed budget (maxEntries - len(fixed)),
+// keep only the longest `budget` candidates.
+//
+// Entries at depth ≤ 2 (h1/h2) are always kept (fixed). If fixed alone exceed
+// maxEntries, the overrun is accepted and all entries are returned unchanged.
+// The result is always returned in document order (ascending Start line).
+//
+// This is exported so check and update can apply the same cap for consistency.
+func FilterNavEntries(entries []navblock.NavEntry, maxEntries, stubWords int) []navblock.NavEntry {
+	var fixed, candidates []navblock.NavEntry
 	for _, e := range entries {
-		depth := 0
+		d := 0
 		for _, ch := range e.Name {
 			if ch == '#' {
-				depth++
+				d++
 			} else {
 				break
 			}
 		}
-		if depth <= 2 {
-			filtered = append(filtered, e)
+		if d <= 2 {
+			fixed = append(fixed, e)
+		} else {
+			candidates = append(candidates, e)
 		}
 	}
-	return filtered
+
+	// No cap needed
+	if len(fixed)+len(candidates) <= maxEntries {
+		return entries
+	}
+
+	// Pass 1: remove stubs (candidates with WordCount < stubWords)
+	kept := candidates[:0]
+	for _, c := range candidates {
+		if c.WordCount >= stubWords {
+			kept = append(kept, c)
+		}
+	}
+	candidates = kept
+
+	// Recheck after stub pass
+	if len(fixed)+len(candidates) <= maxEntries {
+		// Reconstruct in document order
+		merged := append(fixed, candidates...) //nolint:gocritic
+		sort.Slice(merged, func(i, j int) bool { return merged[i].Start < merged[j].Start })
+		return merged
+	}
+
+	// Pass 2: budget pass — keep the longest `budget` candidates
+	budget := maxEntries - len(fixed)
+	if budget <= 0 {
+		// h1/h2 already at or over cap; drop all candidates
+		sort.Slice(fixed, func(i, j int) bool { return fixed[i].Start < fixed[j].Start })
+		return fixed
+	}
+	if len(candidates) > budget {
+		// Sort by n ascending, keep the last `budget` (longest)
+		sort.Slice(candidates, func(i, j int) bool { return candidates[i].N < candidates[j].N })
+		candidates = candidates[len(candidates)-budget:]
+	}
+
+	// Reconstruct in document order
+	merged := append(fixed, candidates...) //nolint:gocritic
+	sort.Slice(merged, func(i, j int) bool { return merged[i].Start < merged[j].Start })
+	return merged
 }
 
 // getSectionContent extracts the text content between start and end line numbers (1-indexed).

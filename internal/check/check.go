@@ -86,18 +86,30 @@ func CheckFile(path string, cfg config.Config) (bool, string, error) {
 	headings := parser.ParseHeadings(string(content), cfg.MaxDepth)
 	sections := parser.ComputeSections(headings, totalLines)
 
-	// §W1: Apply the same large-file cap as generate: if the document would produce
-	// more than MaxNavEntries entries, only h1/h2 sections are tracked in nav.
-	// Check must apply the same filter to avoid false "in document but not in nav" failures.
-	navSections := sections
-	if len(sections) > generate.MaxNavEntries {
-		var filtered []parser.Section
-		for _, s := range sections {
-			if s.Depth <= 2 {
-				filtered = append(filtered, s)
-			}
+	// §W1: Apply the same large-file cap as generate: build lightweight NavEntry slice
+	// with WordCount, pass through FilterNavEntries for consistent filtering.
+	navEntries := make([]navblock.NavEntry, len(sections))
+	for i, s := range sections {
+		prefix := strings.Repeat("#", s.Depth)
+		navEntries[i] = navblock.NavEntry{
+			Start:     s.Start,
+			N:         s.End - s.Start + 1,
+			Name:      prefix + navblock.NormalizeHeading(s.Text),
+			WordCount: sectionWordCount(lines, s.Start, s.End-s.Start+1),
 		}
-		navSections = filtered
+	}
+	filteredEntries := generate.FilterNavEntries(navEntries, cfg.MaxNavEntries, cfg.NavStubWords)
+
+	// Rebuild navSections from filtered entries (match by start line).
+	navSections := make([]parser.Section, 0, len(filteredEntries))
+	sectionByStart := make(map[int]parser.Section, len(sections))
+	for _, s := range sections {
+		sectionByStart[s.Start] = s
+	}
+	for _, e := range filteredEntries {
+		if s, ok := sectionByStart[e.Start]; ok {
+			navSections = append(navSections, s)
+		}
 	}
 
 	// Build queues of section indices by heading text so duplicates match in order.
@@ -151,4 +163,23 @@ func CheckFile(path string, cfg config.Config) (bool, string, error) {
 	}
 
 	return false, "", nil
+}
+
+// sectionWordCount counts words in the content lines of a section (heading line excluded).
+// start is 1-indexed, n is the line count. lines is 0-indexed.
+func sectionWordCount(lines []string, start, n int) int {
+	// 0-indexed: heading is at lines[start-1], content starts at lines[start]
+	// content lines are lines[start : start+n-1] (skip heading, 0-indexed)
+	contentEnd := start + n - 1
+	if contentEnd > len(lines) {
+		contentEnd = len(lines)
+	}
+	if start >= contentEnd {
+		return 0
+	}
+	var words int
+	for _, line := range lines[start:contentEnd] {
+		words += navblock.CountWords(line)
+	}
+	return words
 }
