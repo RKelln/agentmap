@@ -4,9 +4,12 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/ryankelln/agentmap/internal/config"
 	"github.com/ryankelln/agentmap/internal/generate"
+	"github.com/ryankelln/agentmap/internal/navblock"
+	"github.com/ryankelln/agentmap/internal/parser"
 	"github.com/spf13/cobra"
 )
 
@@ -56,10 +59,39 @@ var generateCmd = &cobra.Command{
 
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		output, _ := cmd.Flags().GetString("output")
+		debug, _ := cmd.Flags().GetBool("debug")
 
 		// If path is a single file, process it directly
 		info, err := os.Stat(root)
 		if err == nil && !info.IsDir() {
+			if debug {
+				content, err := os.ReadFile(root)
+				if err != nil {
+					return fmt.Errorf("read file: %w", err)
+				}
+				lines := strings.Split(string(content), "\n")
+				headings := parser.ParseHeadings(string(content), cfg.MaxDepth)
+				sections := parser.ComputeSections(headings, len(lines))
+				existingBlock, _, _, found := navblock.ParseNavBlock(string(content))
+
+				fmt.Printf("File: %s (%d lines)\n\n", root, len(lines))
+
+				fmt.Printf("Found %d headings, %d sections\n", len(headings), len(sections))
+				if found {
+					fmt.Printf("Existing nav block: purpose=%q, %d nav entries, %d see entries\n",
+						existingBlock.Purpose, len(existingBlock.Nav), len(existingBlock.See))
+				} else {
+					fmt.Println("No existing nav block")
+				}
+				fmt.Println()
+
+				for _, s := range sections {
+					prefix := strings.Repeat("#", s.Depth)
+					size := s.End - s.Start + 1
+					fmt.Printf("  %d-%d (%3d lines)  %s%s\n", s.Start, s.End, size, prefix, s.Text)
+				}
+				return nil
+			}
 			report, err := generate.File(root, cfg, dryRun, output)
 			if err != nil {
 				return err
@@ -109,6 +141,7 @@ func init() {
 	generateCmd.Flags().Int("expand-threshold", 150, "Section size for full h3 entries")
 	generateCmd.Flags().Bool("dry-run", false, "Print without writing files")
 	generateCmd.Flags().StringP("output", "o", "", "Write output to file instead of modifying source")
+	generateCmd.Flags().BoolP("debug", "D", false, "Show parsed headings and section ranges instead of generating")
 
 	// update flags
 	updateCmd.Flags().Bool("quiet", false, "Suppress report output")
