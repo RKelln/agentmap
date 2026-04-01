@@ -35,15 +35,16 @@ func FileChanges(path string) ([]LineRange, error) {
 	return ranges, nil
 }
 
-// RepoChanges runs a single git diff HEAD -U0 and returns a map of relative file
-// path → changed line ranges for all modified files in the repository.
+// RepoChanges runs a single git diff HEAD -U0 in dir and returns a map of relative
+// file path → changed line ranges for all modified files in the repository.
 // Returns nil, nil if not in a git repo.
-func RepoChanges() (map[string][]LineRange, error) {
-	if !isGitRepo(".") {
+func RepoChanges(dir string) (map[string][]LineRange, error) {
+	if !isGitRepo(dir) {
 		return nil, nil
 	}
 
 	cmd := exec.Command("git", "diff", "HEAD", "-U0")
+	cmd.Dir = dir
 	output, err := cmd.Output()
 	if err != nil {
 		// If HEAD doesn't exist yet (empty repo) or other issue, return empty map

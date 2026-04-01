@@ -125,14 +125,8 @@ func TestRepoChanges_TempRepo(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// RepoChanges should work from dir
-	origDir, _ := os.Getwd()
-	defer func() { _ = os.Chdir(origDir) }()
-	if err := os.Chdir(dir); err != nil {
-		t.Fatal(err)
-	}
-
-	changes, err := RepoChanges()
+	// RepoChanges should work by passing dir directly — no os.Chdir needed.
+	changes, err := RepoChanges(dir)
 	if err != nil {
 		t.Fatalf("RepoChanges() error = %v", err)
 	}

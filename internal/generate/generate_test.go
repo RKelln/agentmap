@@ -423,7 +423,10 @@ func TestFile_LargeFileCapLineNumbers(t *testing.T) {
 	}
 
 	// Parse the nav block and verify line numbers are sane
-	block, _, navEndLine, found, _ := navblock.ParseNavBlock(got)
+	pr := navblock.ParseNavBlock(got)
+	block := pr.Block
+	navEndLine := pr.End
+	found := pr.Found
 	if !found {
 		t.Fatal("nav block not found after generate")
 	}

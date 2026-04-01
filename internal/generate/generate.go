@@ -365,7 +365,7 @@ func buildNavEntries(sections []parser.Section, content string, cfg config.Confi
 				entries = append(entries, navblock.NavEntry{
 					Start: s.Start,
 					N:     s.Len(),
-					Name:  prefix + strings.ReplaceAll(s.Text, ",", ""),
+					Name:  prefix + navblock.NormalizeHeading(s.Text),
 					About: about,
 				})
 				for _, child := range h3Children {
@@ -375,7 +375,7 @@ func buildNavEntries(sections []parser.Section, content string, cfg config.Confi
 					entries = append(entries, navblock.NavEntry{
 						Start: child.Start,
 						N:     child.Len(),
-						Name:  childPrefix + strings.ReplaceAll(child.Text, ",", ""),
+						Name:  childPrefix + navblock.NormalizeHeading(child.Text),
 						About: childAbout,
 					})
 				}
@@ -403,7 +403,7 @@ func buildNavEntries(sections []parser.Section, content string, cfg config.Confi
 		entries = append(entries, navblock.NavEntry{
 			Start: s.Start,
 			N:     s.Len(),
-			Name:  prefix + strings.ReplaceAll(s.Text, ",", ""),
+			Name:  prefix + navblock.NormalizeHeading(s.Text),
 			About: about,
 		})
 	}

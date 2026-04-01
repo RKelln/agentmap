@@ -99,7 +99,8 @@ Silent rotation and sliding-window expiry.
 	}
 
 	data, _ := os.ReadFile(path)
-	newBlock, _, _, found, _ := navblock.ParseNavBlock(string(data))
+	pr := navblock.ParseNavBlock(string(data))
+	newBlock, found := pr.Block, pr.Found
 	if !found {
 		t.Fatal("file should still have nav block after update")
 	}
@@ -162,7 +163,8 @@ Logout and forced invalidation.
 	}
 
 	data, _ := os.ReadFile(path)
-	newBlock, _, _, found, _ := navblock.ParseNavBlock(string(data))
+	pr := navblock.ParseNavBlock(string(data))
+	newBlock, found := pr.Block, pr.Found
 	if !found {
 		t.Fatal("file should have nav block after update")
 	}
@@ -221,7 +223,8 @@ OAuth2 code-for-token flow.
 	}
 
 	data, _ := os.ReadFile(path)
-	newBlock, _, _, found, _ := navblock.ParseNavBlock(string(data))
+	pr := navblock.ParseNavBlock(string(data))
+	newBlock, found := pr.Block, pr.Found
 	if !found {
 		t.Fatal("file should have nav block after update")
 	}
@@ -347,7 +350,8 @@ Silent rotation.
 	}
 
 	data, _ := os.ReadFile(path)
-	block, _, _, found, _ := navblock.ParseNavBlock(string(data))
+	pr2 := navblock.ParseNavBlock(string(data))
+	block, found := pr2.Block, pr2.Found
 	if !found {
 		t.Fatal("nav block should exist after update")
 	}
@@ -445,7 +449,8 @@ Second examples section.
 	}
 
 	data, _ := os.ReadFile(path)
-	block, _, _, found, _ := navblock.ParseNavBlock(string(data))
+	pr2 := navblock.ParseNavBlock(string(data))
+	block, found := pr2.Block, pr2.Found
 	if !found {
 		t.Fatal("nav block should exist")
 	}
@@ -490,7 +495,8 @@ Content.
 	}
 
 	data, _ := os.ReadFile(path)
-	block, _, _, found, _ := navblock.ParseNavBlock(string(data))
+	pr2 := navblock.ParseNavBlock(string(data))
+	block, found := pr2.Block, pr2.Found
 	if !found {
 		t.Fatal("nav block should be updated")
 	}
@@ -533,7 +539,8 @@ Content.
 	}
 
 	data, _ := os.ReadFile(path)
-	block, _, _, found, _ := navblock.ParseNavBlock(string(data))
+	pr2 := navblock.ParseNavBlock(string(data))
+	block, found := pr2.Block, pr2.Found
 	if !found {
 		t.Fatal("nav block should exist")
 	}
@@ -586,7 +593,8 @@ New content.
 	}
 
 	data, _ := os.ReadFile(path)
-	block, _, _, found, _ := navblock.ParseNavBlock(string(data))
+	pr2 := navblock.ParseNavBlock(string(data))
+	block, found := pr2.Block, pr2.Found
 	if !found {
 		t.Fatal("nav block should exist")
 	}
@@ -634,7 +642,8 @@ Description here.
 	}
 
 	data, _ := os.ReadFile(path)
-	block, _, _, found, _ := navblock.ParseNavBlock(string(data))
+	pr2 := navblock.ParseNavBlock(string(data))
+	block, found := pr2.Block, pr2.Found
 	if !found {
 		t.Fatal("nav block should exist")
 	}
@@ -683,7 +692,8 @@ Description here.
 	}
 
 	data, _ := os.ReadFile(path)
-	block, _, _, found, _ := navblock.ParseNavBlock(string(data))
+	pr2 := navblock.ParseNavBlock(string(data))
+	block, found := pr2.Block, pr2.Found
 	if !found {
 		t.Fatal("nav block should exist")
 	}
@@ -730,7 +740,8 @@ Content.
 	}
 
 	data, _ := os.ReadFile(path)
-	block, _, _, found, _ := navblock.ParseNavBlock(string(data))
+	pr2 := navblock.ParseNavBlock(string(data))
+	block, found := pr2.Block, pr2.Found
 	if !found {
 		t.Fatal("nav block should exist")
 	}

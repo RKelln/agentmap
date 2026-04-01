@@ -67,7 +67,8 @@ func CheckFile(path string, cfg config.Config) (bool, string, error) {
 	lines := strings.Split(string(content), "\n")
 	totalLines := len(lines)
 
-	oldBlock, _, _, hasBlock, corrupted := navblock.ParseNavBlock(string(content))
+	pr := navblock.ParseNavBlock(string(content))
+	oldBlock, hasBlock, corrupted := pr.Block, pr.Found, pr.Corrupted
 	if corrupted {
 		fmt.Fprintf(os.Stderr, "warning: %s: nav block is corrupted — run 'agentmap generate' to regenerate\n", path)
 		return false, "", nil
@@ -104,7 +105,7 @@ func CheckFile(path string, cfg config.Config) (bool, string, error) {
 	sectionQueues := make(map[string][]int)
 	matched := make([]bool, len(navSections))
 	for i, s := range navSections {
-		key := strings.ReplaceAll(stripHash(s.Text), ",", "")
+		key := navblock.NormalizeHeading(s.Text)
 		sectionQueues[key] = append(sectionQueues[key], i)
 	}
 
@@ -112,7 +113,7 @@ func CheckFile(path string, cfg config.Config) (bool, string, error) {
 
 	// Check: headings in nav should exist in document with matching line numbers
 	for _, e := range oldBlock.Nav {
-		key := strings.ReplaceAll(stripHash(e.Name), ",", "")
+		key := navblock.NormalizeHeading(e.Name)
 		queue := sectionQueues[key]
 		if len(queue) == 0 {
 			failures = append(failures, fmt.Sprintf("  %s: in nav but not in document", e.Name))
@@ -150,12 +151,4 @@ func CheckFile(path string, cfg config.Config) (bool, string, error) {
 	}
 
 	return false, "", nil
-}
-
-func stripHash(name string) string {
-	name = strings.TrimSpace(name)
-	for strings.HasPrefix(name, "#") {
-		name = strings.TrimPrefix(name, "#")
-	}
-	return strings.TrimSpace(name)
 }

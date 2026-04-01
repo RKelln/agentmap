@@ -74,7 +74,8 @@ var generateCmd = &cobra.Command{
 				lines := strings.Split(string(content), "\n")
 				headings := parser.ParseHeadings(string(content), cfg.MaxDepth)
 				sections := parser.ComputeSections(headings, len(lines))
-				existingBlock, _, _, found, _ := navblock.ParseNavBlock(string(content))
+				pr := navblock.ParseNavBlock(string(content))
+				existingBlock, found := pr.Block, pr.Found
 
 				fmt.Printf("File: %s (%d lines)\n\n", root, len(lines))
 

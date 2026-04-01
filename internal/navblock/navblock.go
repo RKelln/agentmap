@@ -29,11 +29,40 @@ type SeeEntry struct {
 	Why  string // reason to read it
 }
 
+// NormalizeHeading converts a raw heading name (with optional leading # characters
+// and commas) into a canonical lookup key: strips leading '#' chars, strips
+// leading/trailing whitespace, and removes all commas.
+//
+// Examples:
+//
+//	"##Setup, Configuration" → "Setup Configuration"
+//	"#Authentication"        → "Authentication"
+func NormalizeHeading(text string) string {
+	// Strip leading # characters
+	for strings.HasPrefix(text, "#") {
+		text = strings.TrimPrefix(text, "#")
+	}
+	// Strip leading/trailing whitespace
+	text = strings.TrimSpace(text)
+	// Strip commas
+	text = strings.ReplaceAll(text, ",", "")
+	return text
+}
+
+// ParseResult holds the result of parsing an AGENT:NAV block.
+type ParseResult struct {
+	Block     NavBlock
+	Start     int // line index of opening delimiter (1-indexed); -1 if not found
+	End       int // line index of closing delimiter (1-indexed); -1 if not found
+	Found     bool
+	Corrupted bool
+}
+
 // ParseNavBlock extracts an AGENT:NAV block from file content.
-// Returns the block, its start line, end line (1-indexed), whether one was found,
-// and whether the block is corrupted (malformed entries).
+// Returns a ParseResult with the parsed block, its start/end line (1-indexed),
+// whether one was found, and whether the block is corrupted (malformed entries).
 // Skips nav blocks inside fenced code blocks.
-func ParseNavBlock(content string) (block NavBlock, startLine, endLine int, found bool, corrupted bool) {
+func ParseNavBlock(content string) ParseResult {
 	lines := strings.Split(content, "\n")
 	blockStart := -1
 	blockEnd := -1
@@ -75,11 +104,12 @@ func ParseNavBlock(content string) (block NavBlock, startLine, endLine int, foun
 	}
 
 	if blockStart < 0 || blockEnd < 0 {
-		return NavBlock{}, 0, 0, false, false
+		return ParseResult{Start: -1, End: -1}
 	}
 
 	// Parse lines inside the block
 	var parseCorrupted bool
+	var block NavBlock
 	block.Purpose, block.Nav, block.See, parseCorrupted = parseNavLines(lines[blockStart+1 : blockEnd])
 
 	// Validate N >= 1 for all nav entries; invalid N means corruption.
@@ -91,7 +121,13 @@ func ParseNavBlock(content string) (block NavBlock, startLine, endLine int, foun
 		}
 	}
 
-	return block, blockStart + 1, blockEnd + 1, true, parseCorrupted // 1-indexed
+	return ParseResult{
+		Block:     block,
+		Start:     blockStart + 1, // 1-indexed
+		End:       blockEnd + 1,   // 1-indexed
+		Found:     true,
+		Corrupted: parseCorrupted,
+	}
 }
 
 func parseNavLines(lines []string) (purpose string, nav []NavEntry, see []SeeEntry, corrupted bool) {

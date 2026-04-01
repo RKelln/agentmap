@@ -71,7 +71,7 @@ func Update(root string, cfg config.Config, dryRun, quiet bool) error {
 	}
 
 	// §12.4: one git diff call for the whole repo, not one per file.
-	repoChanges, err := gitutil.RepoChanges()
+	repoChanges, err := gitutil.RepoChanges(".")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "warning: git diff: %v; content-change detection disabled\n", err)
 	}
@@ -115,7 +115,8 @@ func File(path string, cfg config.Config, dryRun, quiet bool, changedLines ...[]
 	lines := strings.Split(string(content), "\n")
 	totalLines := len(lines)
 
-	oldBlock, _, _, hasBlock, corrupted := navblock.ParseNavBlock(string(content))
+	pr := navblock.ParseNavBlock(string(content))
+	oldBlock, hasBlock, corrupted := pr.Block, pr.Found, pr.Corrupted
 	if corrupted {
 		fmt.Fprintf(os.Stderr, "warning: %s: nav block is corrupted — run 'agentmap generate' to regenerate\n", path)
 		return noChanges, nil
@@ -183,17 +184,17 @@ func buildEntryReports(oldNav []navblock.NavEntry, sections []parser.Section, ch
 
 	oldByName := make(map[string]navblock.NavEntry)
 	for _, e := range oldNav {
-		key := stripHash(e.Name)
+		key := navblock.NormalizeHeading(e.Name)
 		oldByName[key] = e
 	}
 
 	used := make(map[int]bool)
 
 	for _, s := range sections {
-		key := strings.ReplaceAll(s.Text, ",", "")
+		key := navblock.NormalizeHeading(s.Text)
 		oldEntry, found := oldByName[key]
 		prefix := strings.Repeat("#", s.Depth)
-		name := prefix + strings.ReplaceAll(s.Text, ",", "")
+		name := prefix + navblock.NormalizeHeading(s.Text)
 
 		if !found {
 			reports = append(reports, ReportEntry{
@@ -241,7 +242,7 @@ func buildEntryReports(oldNav []navblock.NavEntry, sections []parser.Section, ch
 	}
 
 	for _, e := range oldNav {
-		key := stripHash(e.Name)
+		key := navblock.NormalizeHeading(e.Name)
 		if _, found := oldByName[key]; found && !used[oldByName[key].Start] {
 			reports = append(reports, ReportEntry{
 				Type: ReportDeleted,
@@ -256,14 +257,14 @@ func buildEntryReports(oldNav []navblock.NavEntry, sections []parser.Section, ch
 func buildUpdatedBlock(oldBlock navblock.NavBlock, sections []parser.Section, _ []ReportEntry) navblock.NavBlock {
 	oldByName := make(map[string]navblock.NavEntry)
 	for _, e := range oldBlock.Nav {
-		key := stripHash(e.Name)
+		key := navblock.NormalizeHeading(e.Name)
 		oldByName[key] = e
 	}
 
 	var newNav []navblock.NavEntry
 
 	for _, s := range sections {
-		key := strings.ReplaceAll(s.Text, ",", "")
+		key := navblock.NormalizeHeading(s.Text)
 		oldEntry, found := oldByName[key]
 
 		prefix := strings.Repeat("#", s.Depth)
@@ -272,14 +273,14 @@ func buildUpdatedBlock(oldBlock navblock.NavBlock, sections []parser.Section, _ 
 			newNav = append(newNav, navblock.NavEntry{
 				Start: s.Start,
 				N:     s.Len(),
-				Name:  prefix + strings.ReplaceAll(s.Text, ",", ""),
+				Name:  prefix + navblock.NormalizeHeading(s.Text),
 				About: oldEntry.About,
 			})
 		} else {
 			newNav = append(newNav, navblock.NavEntry{
 				Start: s.Start,
 				N:     s.Len(),
-				Name:  prefix + strings.ReplaceAll(s.Text, ",", ""),
+				Name:  prefix + navblock.NormalizeHeading(s.Text),
 				About: "",
 			})
 		}
@@ -304,14 +305,6 @@ func formatReport(path string, reports []ReportEntry) string {
 	}
 
 	return strings.TrimSpace(b.String())
-}
-
-func stripHash(name string) string {
-	name = strings.TrimSpace(name)
-	for strings.HasPrefix(name, "#") {
-		name = strings.TrimPrefix(name, "#")
-	}
-	return strings.TrimSpace(name)
 }
 
 const (
