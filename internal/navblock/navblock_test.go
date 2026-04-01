@@ -1,7 +1,11 @@
 package navblock
 
 import (
+	"bytes"
+	"io"
+	"os"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -161,5 +165,154 @@ func TestParseNavBlock_RoundTrip(t *testing.T) {
 	}
 	if !reflect.DeepEqual(parsed.See[0], original.See[0]) {
 		t.Errorf("see[0] = %+v, want %+v", parsed.See[0], original.See[0])
+	}
+}
+
+func TestNavBlockRoundTrip(t *testing.T) {
+	tests := []struct {
+		name  string
+		block NavBlock
+	}{
+		{
+			name: "full block with h1 h2 h3 and see",
+			block: NavBlock{
+				Purpose: "authentication module; handles token lifecycle",
+				Nav: []NavEntry{
+					{Start: 10, N: 41, Name: "#Authentication", About: "token lifecycle management"},
+					{Start: 12, N: 19, Name: "##Token Exchange", About: "OAuth2 code-for-token flow"},
+					{Start: 36, N: 15, Name: "###Token Validation", About: "JWT signature and expiry checks"},
+				},
+				See: []SeeEntry{
+					{Path: "src/config.py", Why: "default timeout values"},
+					{Path: "docs/oauth2.md", Why: "protocol specification"},
+				},
+			},
+		},
+		{
+			name: "purpose only",
+			block: NavBlock{
+				Purpose: "helper utilities",
+			},
+		},
+		{
+			name: "nav only no see",
+			block: NavBlock{
+				Purpose: "parser module",
+				Nav: []NavEntry{
+					{Start: 1, N: 100, Name: "#Parser", About: "markdown heading parser"},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			first := RenderNavBlock(tt.block)
+			parsed, _, _, found := ParseNavBlock(first)
+			if !found {
+				t.Fatal("expected nav block to be found after first render")
+			}
+			second := RenderNavBlock(parsed)
+			if first != second {
+				t.Errorf("round-trip render mismatch:\nfirst:\n%s\n\nsecond:\n%s", first, second)
+			}
+		})
+	}
+}
+
+func TestNavBlockRoundTrip_EmptyAbout(t *testing.T) {
+	block := NavBlock{
+		Purpose: "test empty about fields",
+		Nav: []NavEntry{
+			{Start: 1, N: 10, Name: "#Heading", About: ""},
+			{Start: 2, N: 5, Name: "##Sub", About: ""},
+			{Start: 3, N: 3, Name: "###Deep", About: ""},
+		},
+	}
+
+	first := RenderNavBlock(block)
+	parsed, _, _, found := ParseNavBlock(first)
+	if !found {
+		t.Fatal("expected nav block to be found")
+	}
+	second := RenderNavBlock(parsed)
+	if first != second {
+		t.Errorf("round-trip with empty about mismatch:\nfirst:\n%s\n\nsecond:\n%s", first, second)
+	}
+}
+
+func TestParseNavBlock_InvalidLineCount(t *testing.T) {
+	tests := []struct {
+		name    string
+		content string
+		wantN   []int
+	}{
+		{
+			name: "n is zero",
+			content: `<!-- AGENT:NAV
+purpose:test
+nav[1]{s,n,name,about}:
+1,0,#Heading,desc
+-->
+`,
+			wantN: []int{0},
+		},
+		{
+			name: "n is negative",
+			content: `<!-- AGENT:NAV
+purpose:test
+nav[1]{s,n,name,about}:
+1,-5,#Heading,desc
+-->
+`,
+			wantN: []int{0},
+		},
+		{
+			name: "mixed valid and invalid",
+			content: `<!-- AGENT:NAV
+purpose:test
+nav[3]{s,n,name,about}:
+1,10,#Valid,desc
+2,0,#Zero,desc
+3,-1,#Negative,desc
+-->
+`,
+			wantN: []int{10, 0, 0},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			old := os.Stderr
+			r, w, _ := os.Pipe()
+			os.Stderr = w
+
+			block, _, _, found := ParseNavBlock(tt.content)
+			if err := w.Close(); err != nil {
+				t.Fatalf("pipe close: %v", err)
+			}
+			os.Stderr = old
+
+			var buf bytes.Buffer
+			if _, err := io.Copy(&buf, r); err != nil {
+				t.Fatalf("pipe copy: %v", err)
+			}
+			stderr := buf.String()
+
+			if !found {
+				t.Fatal("expected nav block to be found")
+			}
+			if len(block.Nav) != len(tt.wantN) {
+				t.Fatalf("nav count = %d, want %d", len(block.Nav), len(tt.wantN))
+			}
+			for i, want := range tt.wantN {
+				if block.Nav[i].N != want {
+					t.Errorf("nav[%d].N = %d, want %d", i, block.Nav[i].N, want)
+				}
+			}
+			if !strings.Contains(stderr, "warning") {
+				t.Errorf("expected warning on stderr, got: %q", stderr)
+			}
+		})
 	}
 }
