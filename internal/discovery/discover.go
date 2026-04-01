@@ -110,7 +110,7 @@ func walkFiles(dir string) ([]string, error) {
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("discovery: walk: %w", err)
 	}
 	return files, nil
 }

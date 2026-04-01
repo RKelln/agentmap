@@ -246,3 +246,42 @@ More content.
 		t.Errorf("expected missing heading report, got: %s", report)
 	}
 }
+
+// TestCheckFile_CommaHeadingRoundtrip verifies that a nav block generated from a
+// heading containing a comma (e.g. "Setup, Configuration") passes check without
+// false "in nav but not in document" failures (C1 fix).
+func TestCheckFile_CommaHeadingRoundtrip(t *testing.T) {
+	tmpDir := t.TempDir()
+	// Simulate what generate writes: comma stripped from heading name in nav.
+	// The document heading still has the comma; check must normalise both sides.
+	// Lines: 1=nav-start, 2=purpose, 3=nav-header, 4=entry1, 5=entry2, 6=nav-end,
+	//        7=blank, 8=#Guide, 9=blank, 10=overview, 11=blank, 12=##Setup..., 13=blank, 14=config, 15=eof
+	content := `<!-- AGENT:NAV
+purpose:test comma roundtrip
+nav[2]{s,n,name,about}:
+8,8,#Guide,guide overview
+12,4,##Setup Configuration,setup and configuration steps
+-->
+
+# Guide
+
+Overview text here.
+
+## Setup, Configuration
+
+Configuration steps here.
+`
+	path := filepath.Join(tmpDir, "comma.md")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := config.Defaults()
+	failed, report, err := CheckFile(path, cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if failed {
+		t.Errorf("expected pass for comma heading roundtrip, got failure: %s", report)
+	}
+}

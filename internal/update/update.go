@@ -9,6 +9,7 @@ import (
 
 	"github.com/ryankelln/agentmap/internal/config"
 	"github.com/ryankelln/agentmap/internal/discovery"
+	"github.com/ryankelln/agentmap/internal/generate"
 	"github.com/ryankelln/agentmap/internal/gitutil"
 	"github.com/ryankelln/agentmap/internal/navblock"
 	"github.com/ryankelln/agentmap/internal/parser"
@@ -69,10 +70,20 @@ func Update(root string, cfg config.Config, dryRun, quiet bool) error {
 		return fmt.Errorf("update: discover files: %w", err)
 	}
 
+	// §12.4: one git diff call for the whole repo, not one per file.
+	repoChanges, err := gitutil.RepoChanges(".")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "warning: git diff: %v; content-change detection disabled\n", err)
+	}
+
 	var anyChanged bool
 	for _, f := range files {
 		fullPath := filepath.Join(root, f)
-		report, err := File(fullPath, cfg, dryRun, quiet)
+		var changedLines []gitutil.LineRange
+		if repoChanges != nil {
+			changedLines = repoChanges[f]
+		}
+		report, err := File(fullPath, cfg, dryRun, quiet, changedLines)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %s: %v\n", f, err)
 			continue
@@ -92,8 +103,10 @@ func Update(root string, cfg config.Config, dryRun, quiet bool) error {
 }
 
 // File processes a single markdown file and updates its nav block.
+// changedLines contains pre-computed git diff ranges for this file; if nil, falls back
+// to per-file git diff (for direct single-file calls from CLI).
 // Returns noChanges if the file has no nav block or no changes needed.
-func File(path string, cfg config.Config, dryRun, quiet bool) (string, error) {
+func File(path string, cfg config.Config, dryRun, quiet bool, changedLines ...[]gitutil.LineRange) (string, error) {
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return "", fmt.Errorf("update: read file: %w", err)
@@ -102,7 +115,12 @@ func File(path string, cfg config.Config, dryRun, quiet bool) (string, error) {
 	lines := strings.Split(string(content), "\n")
 	totalLines := len(lines)
 
-	oldBlock, _, _, hasBlock := navblock.ParseNavBlock(string(content))
+	pr := navblock.ParseNavBlock(string(content))
+	oldBlock, hasBlock, corrupted := pr.Block, pr.Found, pr.Corrupted
+	if corrupted {
+		fmt.Fprintf(os.Stderr, "warning: %s: nav block is corrupted — run 'agentmap generate' to regenerate\n", path)
+		return noChanges, nil
+	}
 	if !hasBlock {
 		return noChanges, nil
 	}
@@ -114,8 +132,14 @@ func File(path string, cfg config.Config, dryRun, quiet bool) (string, error) {
 		return noChanges, nil
 	}
 
-	changedLines := getChangedLines(path)
-	entryReports := buildEntryReports(oldBlock.Nav, sections, changedLines)
+	// Use pre-computed ranges if provided, otherwise fall back to per-file git diff.
+	var fileChanges []gitutil.LineRange
+	if len(changedLines) > 0 && changedLines[0] != nil {
+		fileChanges = changedLines[0]
+	} else if len(changedLines) == 0 {
+		fileChanges = getChangedLines(path)
+	}
+	entryReports := buildEntryReports(oldBlock.Nav, sections, fileChanges)
 
 	hasChanges := false
 	for _, er := range entryReports {
@@ -129,7 +153,7 @@ func File(path string, cfg config.Config, dryRun, quiet bool) (string, error) {
 		return noChanges, nil
 	}
 
-	block := buildUpdatedBlock(oldBlock, sections, entryReports)
+	block := buildUpdatedBlock(oldBlock, sections, entryReports, lines, cfg)
 	blockText := navblock.RenderNavBlock(block)
 
 	if dryRun {
@@ -160,21 +184,22 @@ func buildEntryReports(oldNav []navblock.NavEntry, sections []parser.Section, ch
 
 	oldByName := make(map[string]navblock.NavEntry)
 	for _, e := range oldNav {
-		key := stripHash(e.Name)
+		key := navblock.NormalizeHeading(e.Name)
 		oldByName[key] = e
 	}
 
 	used := make(map[int]bool)
 
 	for _, s := range sections {
-		key := s.Text
+		key := navblock.NormalizeHeading(s.Text)
 		oldEntry, found := oldByName[key]
 		prefix := strings.Repeat("#", s.Depth)
+		name := prefix + navblock.NormalizeHeading(s.Text)
 
 		if !found {
 			reports = append(reports, ReportEntry{
 				Type:     ReportNew,
-				Name:     prefix + s.Text,
+				Name:     name,
 				NewStart: s.Start,
 				NewEnd:   s.End,
 			})
@@ -206,7 +231,7 @@ func buildEntryReports(oldNav []navblock.NavEntry, sections []parser.Section, ch
 
 		reports = append(reports, ReportEntry{
 			Type:          reportType,
-			Name:          prefix + s.Text,
+			Name:          name,
 			OldStart:      oldEntry.Start,
 			OldEnd:        oldEntry.Start + oldEntry.N - 1,
 			NewStart:      s.Start,
@@ -217,7 +242,7 @@ func buildEntryReports(oldNav []navblock.NavEntry, sections []parser.Section, ch
 	}
 
 	for _, e := range oldNav {
-		key := stripHash(e.Name)
+		key := navblock.NormalizeHeading(e.Name)
 		if _, found := oldByName[key]; found && !used[oldByName[key].Start] {
 			reports = append(reports, ReportEntry{
 				Type: ReportDeleted,
@@ -229,41 +254,44 @@ func buildEntryReports(oldNav []navblock.NavEntry, sections []parser.Section, ch
 	return reports
 }
 
-func buildUpdatedBlock(oldBlock navblock.NavBlock, sections []parser.Section, _ []ReportEntry) navblock.NavBlock {
+func buildUpdatedBlock(oldBlock navblock.NavBlock, sections []parser.Section, _ []ReportEntry, lines []string, cfg config.Config) navblock.NavBlock {
 	oldByName := make(map[string]navblock.NavEntry)
 	for _, e := range oldBlock.Nav {
-		key := stripHash(e.Name)
+		key := navblock.NormalizeHeading(e.Name)
 		oldByName[key] = e
 	}
 
 	var newNav []navblock.NavEntry
 
 	for _, s := range sections {
-		key := s.Text
+		key := navblock.NormalizeHeading(s.Text)
 		oldEntry, found := oldByName[key]
 
 		prefix := strings.Repeat("#", s.Depth)
+		wc := navblock.SectionWordCount(lines, s.Start, s.Len())
 
 		if found {
 			newNav = append(newNav, navblock.NavEntry{
-				Start: s.Start,
-				N:     s.Len(),
-				Name:  prefix + s.Text,
-				About: oldEntry.About,
+				Start:     s.Start,
+				N:         s.Len(),
+				Name:      prefix + navblock.NormalizeHeading(s.Text),
+				About:     oldEntry.About,
+				WordCount: wc,
 			})
 		} else {
 			newNav = append(newNav, navblock.NavEntry{
-				Start: s.Start,
-				N:     s.Len(),
-				Name:  prefix + s.Text,
-				About: "",
+				Start:     s.Start,
+				N:         s.Len(),
+				Name:      prefix + navblock.NormalizeHeading(s.Text),
+				About:     "",
+				WordCount: wc,
 			})
 		}
 	}
 
 	return navblock.NavBlock{
 		Purpose: oldBlock.Purpose,
-		Nav:     newNav,
+		Nav:     generate.FilterNavEntries(newNav, cfg.MaxNavEntries, cfg.NavStubWords),
 		See:     oldBlock.See,
 	}
 }
@@ -280,14 +308,6 @@ func formatReport(path string, reports []ReportEntry) string {
 	}
 
 	return strings.TrimSpace(b.String())
-}
-
-func stripHash(name string) string {
-	name = strings.TrimSpace(name)
-	for strings.HasPrefix(name, "#") {
-		name = strings.TrimPrefix(name, "#")
-	}
-	return strings.TrimSpace(name)
 }
 
 const (

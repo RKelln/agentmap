@@ -17,10 +17,11 @@ type NavBlock struct {
 
 // NavEntry is a single line in the nav section.
 type NavEntry struct {
-	Start int    // start line (1-indexed, inclusive)
-	N     int    // line count (length of section)
-	Name  string // heading with # prefix (e.g. "##Section")
-	About string // short description; may be empty
+	Start     int    // start line (1-indexed, inclusive)
+	N         int    // line count (length of section)
+	Name      string // heading with # prefix (e.g. "##Section")
+	About     string // short description; may be empty
+	WordCount int    // words in section content (heading line excluded); not serialized
 }
 
 // SeeEntry is a single line in the see section.
@@ -29,10 +30,48 @@ type SeeEntry struct {
 	Why  string // reason to read it
 }
 
+// NormalizeHeading converts a raw heading name (with optional leading # characters
+// and commas) into a canonical lookup key: strips leading '#' chars, strips
+// leading/trailing whitespace, and removes all commas.
+//
+// Examples:
+//
+//	"##Setup, Configuration" → "Setup Configuration"
+//	"#Authentication"        → "Authentication"
+func NormalizeHeading(text string) string {
+	// Strip leading # characters
+	for strings.HasPrefix(text, "#") {
+		text = strings.TrimPrefix(text, "#")
+	}
+	// Strip leading/trailing whitespace
+	text = strings.TrimSpace(text)
+	// Strip commas
+	text = strings.ReplaceAll(text, ",", "")
+	return text
+}
+
+// CountWords returns the number of whitespace-separated tokens in s,
+// ignoring markdown heading prefixes (leading # chars) and blank lines.
+func CountWords(s string) int {
+	// Strip leading # characters from each line (heading prefix removal)
+	stripped := strings.TrimLeft(s, "#")
+	return len(strings.Fields(stripped))
+}
+
+// ParseResult holds the result of parsing an AGENT:NAV block.
+type ParseResult struct {
+	Block     NavBlock
+	Start     int // line index of opening delimiter (1-indexed); -1 if not found
+	End       int // line index of closing delimiter (1-indexed); -1 if not found
+	Found     bool
+	Corrupted bool
+}
+
 // ParseNavBlock extracts an AGENT:NAV block from file content.
-// Returns the block, its start line, end line (1-indexed), and whether one was found.
+// Returns a ParseResult with the parsed block, its start/end line (1-indexed),
+// whether one was found, and whether the block is corrupted (malformed entries).
 // Skips nav blocks inside fenced code blocks.
-func ParseNavBlock(content string) (block NavBlock, startLine, endLine int, found bool) {
+func ParseNavBlock(content string) ParseResult {
 	lines := strings.Split(content, "\n")
 	blockStart := -1
 	blockEnd := -1
@@ -74,24 +113,33 @@ func ParseNavBlock(content string) (block NavBlock, startLine, endLine int, foun
 	}
 
 	if blockStart < 0 || blockEnd < 0 {
-		return NavBlock{}, 0, 0, false
+		return ParseResult{Start: -1, End: -1}
 	}
 
 	// Parse lines inside the block
-	block.Purpose, block.Nav, block.See = parseNavLines(lines[blockStart+1 : blockEnd])
+	var parseCorrupted bool
+	var block NavBlock
+	block.Purpose, block.Nav, block.See, parseCorrupted = parseNavLines(lines[blockStart+1 : blockEnd])
 
-	// Validate N > 0 for all nav entries; warn and clamp to 0 if invalid
+	// Validate N >= 1 for all nav entries; invalid N means corruption.
 	for i := range block.Nav {
 		if block.Nav[i].N <= 0 {
-			fmt.Fprintf(os.Stderr, "warning: nav entry %q has invalid line count %d, treating as 0\n", block.Nav[i].Name, block.Nav[i].N)
+			fmt.Fprintf(os.Stderr, "warning: nav entry %q has invalid line count %d — treating as no block\n", block.Nav[i].Name, block.Nav[i].N)
 			block.Nav[i].N = 0
+			parseCorrupted = true
 		}
 	}
 
-	return block, blockStart + 1, blockEnd + 1, true // 1-indexed
+	return ParseResult{
+		Block:     block,
+		Start:     blockStart + 1, // 1-indexed
+		End:       blockEnd + 1,   // 1-indexed
+		Found:     true,
+		Corrupted: parseCorrupted,
+	}
 }
 
-func parseNavLines(lines []string) (purpose string, nav []NavEntry, see []SeeEntry) {
+func parseNavLines(lines []string) (purpose string, nav []NavEntry, see []SeeEntry, corrupted bool) {
 	parsingNav := false
 	parsingSee := false
 
@@ -122,7 +170,10 @@ func parseNavLines(lines []string) (purpose string, nav []NavEntry, see []SeeEnt
 		}
 
 		if parsingNav {
-			entry := parseNavEntry(line)
+			entry, entryCorrupted := parseNavEntry(line)
+			if entryCorrupted {
+				corrupted = true
+			}
 			nav = append(nav, entry)
 		}
 
@@ -132,13 +183,13 @@ func parseNavLines(lines []string) (purpose string, nav []NavEntry, see []SeeEnt
 		}
 	}
 
-	return purpose, nav, see
+	return purpose, nav, see, corrupted
 }
 
-func parseNavEntry(line string) NavEntry {
+func parseNavEntry(line string) (NavEntry, bool) {
 	parts := strings.SplitN(line, ",", 4)
 	if len(parts) < 3 {
-		return NavEntry{}
+		return NavEntry{}, true // corrupted: fewer than 3 fields
 	}
 
 	start, _ := strconv.Atoi(parts[0])
@@ -149,7 +200,7 @@ func parseNavEntry(line string) NavEntry {
 		about = parts[3]
 	}
 
-	return NavEntry{Start: start, N: n, Name: name, About: about}
+	return NavEntry{Start: start, N: n, Name: name, About: about}, false
 }
 
 func parseSeeEntry(line string) SeeEntry {
@@ -183,6 +234,26 @@ func RenderNavBlock(block NavBlock) string {
 
 	b.WriteString("-->")
 	return b.String()
+}
+
+// SectionWordCount returns the word count of a section's content lines,
+// excluding the heading line. lines is the full file as 0-indexed []string.
+// start is the 1-indexed section start line; n is the line count.
+func SectionWordCount(lines []string, start, n int) int {
+	// 0-indexed: heading is at lines[start-1], content starts at lines[start]
+	// content lines are lines[start : start+n-1] (skip heading, 0-indexed)
+	contentEnd := start + n - 1
+	if contentEnd > len(lines) {
+		contentEnd = len(lines)
+	}
+	if start >= contentEnd {
+		return 0
+	}
+	var words int
+	for _, line := range lines[start:contentEnd] {
+		words += CountWords(line)
+	}
+	return words
 }
 
 // RenderPurposeOnly produces a minimal nav block with only a purpose line.

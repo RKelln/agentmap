@@ -254,7 +254,8 @@ This is a real section after the code fence.
 	got := string(data)
 
 	// Parse the nav block to verify headings
-	block, _, _, found := navblock.ParseNavBlock(got)
+	parseResult := navblock.ParseNavBlock(got)
+	block, found := parseResult.Block, parseResult.Found
 	if !found {
 		t.Fatal("nav block not found")
 	}
@@ -324,7 +325,8 @@ Final section.
 	}
 	got := string(data)
 
-	block, _, _, found := navblock.ParseNavBlock(got)
+	parseResult := navblock.ParseNavBlock(got)
+	block, found := parseResult.Block, parseResult.Found
 	if !found {
 		t.Fatal("nav block not found")
 	}
@@ -446,7 +448,8 @@ func TestGenerate_LargeFile(t *testing.T) {
 	}
 	got := string(data)
 
-	block, _, _, found := navblock.ParseNavBlock(got)
+	parseResult := navblock.ParseNavBlock(got)
+	block, found := parseResult.Block, parseResult.Found
 	if !found {
 		t.Fatal("nav block not found")
 	}
@@ -519,7 +522,8 @@ Silent rotation and sliding-window expiry detection.
 	}
 	got := string(data)
 
-	block, _, _, found := navblock.ParseNavBlock(got)
+	parseResult := navblock.ParseNavBlock(got)
+	block, found := parseResult.Block, parseResult.Found
 	if !found {
 		t.Fatal("nav block not found")
 	}
@@ -587,7 +591,8 @@ Migration guide content.
 	}
 	got := string(data)
 
-	block, _, _, found := navblock.ParseNavBlock(got)
+	parseResult := navblock.ParseNavBlock(got)
+	block, found := parseResult.Block, parseResult.Found
 	if !found {
 		t.Fatal("nav block not found")
 	}
@@ -674,7 +679,8 @@ Brief other section.
 	}
 	got := string(data)
 
-	block, _, _, found := navblock.ParseNavBlock(got)
+	parseResult := navblock.ParseNavBlock(got)
+	block, found := parseResult.Block, parseResult.Found
 	if !found {
 		t.Fatal("nav block not found")
 	}
@@ -741,7 +747,8 @@ Detail B.
 	}
 	got := string(data)
 
-	block, _, _, found := navblock.ParseNavBlock(got)
+	parseResult := navblock.ParseNavBlock(got)
+	block, found := parseResult.Block, parseResult.Found
 	if !found {
 		t.Fatal("nav block not found")
 	}

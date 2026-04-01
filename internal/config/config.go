@@ -2,6 +2,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -14,6 +15,8 @@ type Config struct {
 	SubThreshold    int      `yaml:"sub_threshold"`
 	ExpandThreshold int      `yaml:"expand_threshold"`
 	MaxDepth        int      `yaml:"max_depth"`
+	MaxNavEntries   int      `yaml:"max_nav_entries"` // default 20
+	NavStubWords    int      `yaml:"nav_stub_words"`  // default 20
 	Exclude         []string `yaml:"exclude"`
 }
 
@@ -24,6 +27,8 @@ func Defaults() Config {
 		SubThreshold:    50,
 		ExpandThreshold: 150,
 		MaxDepth:        3,
+		MaxNavEntries:   20,
+		NavStubWords:    20,
 		Exclude:         []string{},
 	}
 }
@@ -36,12 +41,12 @@ func Load(path string) (Config, error) {
 		if os.IsNotExist(err) {
 			return Defaults(), nil
 		}
-		return Config{}, err
+		return Config{}, fmt.Errorf("config: read file: %w", err)
 	}
 
 	cfg := Defaults()
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return Config{}, err
+		return Config{}, fmt.Errorf("config: parse yaml: %w", err)
 	}
 
 	if cfg.Exclude == nil {
@@ -56,7 +61,7 @@ func Load(path string) (Config, error) {
 func FindConfig(startDir string) (string, error) {
 	dir, err := filepath.Abs(startDir)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("config: resolve path: %w", err)
 	}
 
 	for {

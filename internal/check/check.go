@@ -9,6 +9,7 @@ import (
 
 	"github.com/ryankelln/agentmap/internal/config"
 	"github.com/ryankelln/agentmap/internal/discovery"
+	"github.com/ryankelln/agentmap/internal/generate"
 	"github.com/ryankelln/agentmap/internal/navblock"
 	"github.com/ryankelln/agentmap/internal/parser"
 )
@@ -66,7 +67,12 @@ func CheckFile(path string, cfg config.Config) (bool, string, error) {
 	lines := strings.Split(string(content), "\n")
 	totalLines := len(lines)
 
-	oldBlock, _, _, hasBlock := navblock.ParseNavBlock(string(content))
+	pr := navblock.ParseNavBlock(string(content))
+	oldBlock, hasBlock, corrupted := pr.Block, pr.Found, pr.Corrupted
+	if corrupted {
+		fmt.Fprintf(os.Stderr, "warning: %s: nav block is corrupted — run 'agentmap generate' to regenerate\n", path)
+		return false, "", nil
+	}
 	if !hasBlock {
 		// No nav block to validate - that's valid
 		return false, "", nil
@@ -80,11 +86,38 @@ func CheckFile(path string, cfg config.Config) (bool, string, error) {
 	headings := parser.ParseHeadings(string(content), cfg.MaxDepth)
 	sections := parser.ComputeSections(headings, totalLines)
 
-	// Build queues of section indices by heading text so duplicates match in order.
-	sectionQueues := make(map[string][]int)
-	matched := make([]bool, len(sections))
+	// §W1: Apply the same large-file cap as generate: build lightweight NavEntry slice
+	// with WordCount, pass through FilterNavEntries for consistent filtering.
+	navEntries := make([]navblock.NavEntry, len(sections))
 	for i, s := range sections {
-		key := stripHash(s.Text)
+		prefix := strings.Repeat("#", s.Depth)
+		navEntries[i] = navblock.NavEntry{
+			Start:     s.Start,
+			N:         s.End - s.Start + 1,
+			Name:      prefix + navblock.NormalizeHeading(s.Text),
+			WordCount: navblock.SectionWordCount(lines, s.Start, s.End-s.Start+1),
+		}
+	}
+	filteredEntries := generate.FilterNavEntries(navEntries, cfg.MaxNavEntries, cfg.NavStubWords)
+
+	// Rebuild navSections from filtered entries (match by start line).
+	navSections := make([]parser.Section, 0, len(filteredEntries))
+	sectionByStart := make(map[int]parser.Section, len(sections))
+	for _, s := range sections {
+		sectionByStart[s.Start] = s
+	}
+	for _, e := range filteredEntries {
+		if s, ok := sectionByStart[e.Start]; ok {
+			navSections = append(navSections, s)
+		}
+	}
+
+	// Build queues of section indices by heading text so duplicates match in order.
+	// §C1: strip commas when building keys to match generate's comma-stripping behavior.
+	sectionQueues := make(map[string][]int)
+	matched := make([]bool, len(navSections))
+	for i, s := range navSections {
+		key := navblock.NormalizeHeading(s.Text)
 		sectionQueues[key] = append(sectionQueues[key], i)
 	}
 
@@ -92,7 +125,7 @@ func CheckFile(path string, cfg config.Config) (bool, string, error) {
 
 	// Check: headings in nav should exist in document with matching line numbers
 	for _, e := range oldBlock.Nav {
-		key := stripHash(e.Name)
+		key := navblock.NormalizeHeading(e.Name)
 		queue := sectionQueues[key]
 		if len(queue) == 0 {
 			failures = append(failures, fmt.Sprintf("  %s: in nav but not in document", e.Name))
@@ -102,7 +135,7 @@ func CheckFile(path string, cfg config.Config) (bool, string, error) {
 		idx := queue[0]
 		sectionQueues[key] = queue[1:]
 		matched[idx] = true
-		section := sections[idx]
+		section := navSections[idx]
 
 		prefix := strings.Repeat("#", section.Depth)
 		expectedName := prefix + section.Text
@@ -115,7 +148,7 @@ func CheckFile(path string, cfg config.Config) (bool, string, error) {
 	}
 
 	// Check: headings in document should exist in nav
-	for i, s := range sections {
+	for i, s := range navSections {
 		if matched[i] {
 			continue
 		}
@@ -130,12 +163,4 @@ func CheckFile(path string, cfg config.Config) (bool, string, error) {
 	}
 
 	return false, "", nil
-}
-
-func stripHash(name string) string {
-	name = strings.TrimSpace(name)
-	for strings.HasPrefix(name, "#") {
-		name = strings.TrimPrefix(name, "#")
-	}
-	return strings.TrimSpace(name)
 }

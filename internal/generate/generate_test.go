@@ -296,6 +296,455 @@ Content here.
 	}
 }
 
+func TestBuildNavEntries_LargeFileCap(t *testing.T) {
+	// §11.4: if more than 20 nav entries would be generated,
+	// filter to only h1 and h2 entries.
+	var sections []parser.Section
+	// Build 5 h1 + 5 h2 + 15 h3 = 25 total headings
+	line := 1
+	for i := 0; i < 5; i++ {
+		sections = append(sections, parser.Section{
+			Heading: parser.Heading{Line: line, Depth: 1, Text: fmt.Sprintf("Chapter %d", i+1)},
+			Start:   line,
+			End:     line + 4,
+		})
+		line++
+		sections = append(sections, parser.Section{
+			Heading: parser.Heading{Line: line, Depth: 2, Text: fmt.Sprintf("Section %d.1", i+1)},
+			Start:   line,
+			End:     line + 2,
+		})
+		line++
+		sections = append(sections, parser.Section{
+			Heading: parser.Heading{Line: line, Depth: 3, Text: fmt.Sprintf("Sub %d.1.1", i+1)},
+			Start:   line,
+			End:     line + 1,
+		})
+		line += 2
+		sections = append(sections, parser.Section{
+			Heading: parser.Heading{Line: line, Depth: 3, Text: fmt.Sprintf("Sub %d.1.2", i+1)},
+			Start:   line,
+			End:     line + 1,
+		})
+		line += 2
+		sections = append(sections, parser.Section{
+			Heading: parser.Heading{Line: line, Depth: 3, Text: fmt.Sprintf("Sub %d.1.3", i+1)},
+			Start:   line,
+			End:     line + 1,
+		})
+		line += 2
+	}
+
+	cfg := config.Defaults()
+	cfg.SubThreshold = 1
+	cfg.ExpandThreshold = 1
+
+	// Build dummy content (just newlines)
+	content := strings.Repeat("\n", line+1)
+
+	// §C3: buildNavEntries no longer caps internally; FilterNavEntries applies the cap.
+	got := FilterNavEntries(buildNavEntries(sections, content, cfg), 20, 3)
+
+	// With 25 headings (5 h1 + 5 h2 + 15 h3) > MaxNavEntries (20),
+	// should filter to h1 and h2 only = 10 entries
+	for _, e := range got {
+		depth := 0
+		for _, ch := range e.Name {
+			if ch == '#' {
+				depth++
+			} else {
+				break
+			}
+		}
+		if depth > 2 {
+			t.Errorf("entry %q: depth %d > 2 (should be filtered out when >20 entries)", e.Name, depth)
+		}
+	}
+
+	// Count h1+h2 in input
+	wantCount := 0
+	for _, s := range sections {
+		if s.Depth <= 2 {
+			wantCount++
+		}
+	}
+	if len(got) != wantCount {
+		t.Errorf("len(entries) = %d, want %d (h1+h2 only)", len(got), wantCount)
+	}
+}
+
+// TestFilterNavEntries_NoCapNeeded: 15 entries (mix of h1/h2/h3), all n≥3 → all returned
+func TestFilterNavEntries_NoCapNeeded(t *testing.T) {
+	entries := makeNavEntries([]entrySpec{
+		// 5 h1, 5 h2, 5 h3 — all with n=5
+		{depth: 1, n: 5},
+		{depth: 1, n: 5},
+		{depth: 1, n: 5},
+		{depth: 1, n: 5},
+		{depth: 1, n: 5},
+		{depth: 2, n: 5},
+		{depth: 2, n: 5},
+		{depth: 2, n: 5},
+		{depth: 2, n: 5},
+		{depth: 2, n: 5},
+		{depth: 3, n: 5},
+		{depth: 3, n: 5},
+		{depth: 3, n: 5},
+		{depth: 3, n: 5},
+		{depth: 3, n: 5},
+	})
+	got := FilterNavEntries(entries, 20, 3)
+	if len(got) != 15 {
+		t.Errorf("len(got) = %d, want 15 (no cap needed)", len(got))
+	}
+	// Verify document order preserved
+	for i := 1; i < len(got); i++ {
+		if got[i].Start <= got[i-1].Start {
+			t.Errorf("entries not in document order: got[%d].Start=%d <= got[%d].Start=%d",
+				i, got[i].Start, i-1, got[i-1].Start)
+		}
+	}
+}
+
+// TestFilterNavEntries_StubPassOnly: 22 entries (8 h1/h2 + 14 h3), 4 h3 are stubs (WordCount=1)
+// stub pass removes 4 stubs → 8+10=18 ≤ 20 → no budget pass needed, 18 returned
+func TestFilterNavEntries_StubPassOnly(t *testing.T) {
+	var specs []entrySpec
+	// 4 h1 + 4 h2
+	for i := 0; i < 4; i++ {
+		specs = append(specs, entrySpec{depth: 1, n: 10})
+	}
+	for i := 0; i < 4; i++ {
+		specs = append(specs, entrySpec{depth: 2, n: 10})
+	}
+	// 4 h3 stubs (wordCount=1 < stubWords=3)
+	for i := 0; i < 4; i++ {
+		specs = append(specs, entrySpec{depth: 3, n: 1, wordCount: 1})
+	}
+	// 10 h3 non-stubs (wordCount=25 ≥ stubWords=3)
+	for i := 0; i < 10; i++ {
+		specs = append(specs, entrySpec{depth: 3, n: 5, wordCount: 25})
+	}
+	entries := makeNavEntries(specs)
+	got := FilterNavEntries(entries, 20, 3)
+	if len(got) != 18 {
+		t.Errorf("len(got) = %d, want 18 (stub pass removes 4 stubs; 18 ≤ 20)", len(got))
+	}
+	// All returned h3 entries should have WordCount >= 3
+	for _, e := range got {
+		d := entryDepth(e)
+		if d > 2 && e.WordCount < 3 {
+			t.Errorf("stub entry %q (WordCount=%d) should have been removed", e.Name, e.WordCount)
+		}
+	}
+	// Verify document order
+	for i := 1; i < len(got); i++ {
+		if got[i].Start <= got[i-1].Start {
+			t.Errorf("entries not in document order at index %d", i)
+		}
+	}
+}
+
+// TestFilterNavEntries_BudgetPassOnly: 25 entries (8 h1/h2 + 17 h3), all WordCount≥stubWords
+// stub pass removes nothing; budget=12 → keep 12 longest h3, drop 5 shortest; 20 returned
+func TestFilterNavEntries_BudgetPassOnly(t *testing.T) {
+	var specs []entrySpec
+	// 4 h1 + 4 h2 (fixed, n=10)
+	for i := 0; i < 4; i++ {
+		specs = append(specs, entrySpec{depth: 1, n: 10})
+	}
+	for i := 0; i < 4; i++ {
+		specs = append(specs, entrySpec{depth: 2, n: 10})
+	}
+	// 17 h3: sizes 3..19 (unique, all ≥ 3, wordCount defaults to n*5 ≥ 15 ≥ stubWords=3)
+	for i := 0; i < 17; i++ {
+		specs = append(specs, entrySpec{depth: 3, n: 3 + i})
+	}
+	entries := makeNavEntries(specs)
+	got := FilterNavEntries(entries, 20, 3)
+	if len(got) != 20 {
+		t.Errorf("len(got) = %d, want 20", len(got))
+	}
+	// Shortest 5 h3 (n=3,4,5,6,7) should be gone (budget pass uses N for sorting)
+	for _, e := range got {
+		if entryDepth(e) == 3 && e.N < 8 {
+			t.Errorf("short h3 entry %q (n=%d) should have been removed by budget pass", e.Name, e.N)
+		}
+	}
+	// Verify document order
+	for i := 1; i < len(got); i++ {
+		if got[i].Start <= got[i-1].Start {
+			t.Errorf("entries not in document order at index %d", i)
+		}
+	}
+}
+
+// TestFilterNavEntries_BothPasses: 25 entries (8 h1/h2 + 17 h3), 3 h3 are stubs (WordCount=1)
+// stub pass drops 3 → 8+14=22 > 20; budget=12 → keep 12 longest of 14; 20 returned
+func TestFilterNavEntries_BothPasses(t *testing.T) {
+	var specs []entrySpec
+	// 4 h1 + 4 h2
+	for i := 0; i < 4; i++ {
+		specs = append(specs, entrySpec{depth: 1, n: 10})
+	}
+	for i := 0; i < 4; i++ {
+		specs = append(specs, entrySpec{depth: 2, n: 10})
+	}
+	// 3 h3 stubs (wordCount=1 < stubWords=3)
+	for i := 0; i < 3; i++ {
+		specs = append(specs, entrySpec{depth: 3, n: 2, wordCount: 1})
+	}
+	// 14 h3 non-stubs (n=5..18, wordCount defaults to n*5 ≥ 25 ≥ 3)
+	for i := 0; i < 14; i++ {
+		specs = append(specs, entrySpec{depth: 3, n: 5 + i})
+	}
+	entries := makeNavEntries(specs)
+	got := FilterNavEntries(entries, 20, 3)
+	if len(got) != 20 {
+		t.Errorf("len(got) = %d, want 20 (stub+budget passes)", len(got))
+	}
+	// No stubs (WordCount<3) should remain among h3s
+	for _, e := range got {
+		if entryDepth(e) > 2 && e.WordCount < 3 {
+			t.Errorf("stub h3 entry %q (WordCount=%d) should be removed", e.Name, e.WordCount)
+		}
+	}
+	// Verify document order
+	for i := 1; i < len(got); i++ {
+		if got[i].Start <= got[i-1].Start {
+			t.Errorf("entries not in document order at index %d", i)
+		}
+	}
+}
+
+// TestFilterNavEntries_H1H2Overrun: 25 entries all h1/h2, no candidates → accept overrun
+func TestFilterNavEntries_H1H2Overrun(t *testing.T) {
+	var specs []entrySpec
+	for i := 0; i < 13; i++ {
+		specs = append(specs, entrySpec{depth: 1, n: 10})
+	}
+	for i := 0; i < 12; i++ {
+		specs = append(specs, entrySpec{depth: 2, n: 10})
+	}
+	entries := makeNavEntries(specs)
+	got := FilterNavEntries(entries, 20, 3)
+	if len(got) != 25 {
+		t.Errorf("len(got) = %d, want 25 (h1/h2 overrun accepted)", len(got))
+	}
+}
+
+// TestFilterNavEntries_BudgetExhausted: 8 h1/h2 + 15 h3 stubs (all WordCount=1)
+// stub pass drops all 15 → 8 remain; 8 ≤ 20 → return 8
+func TestFilterNavEntries_BudgetExhausted(t *testing.T) {
+	var specs []entrySpec
+	for i := 0; i < 4; i++ {
+		specs = append(specs, entrySpec{depth: 1, n: 10})
+	}
+	for i := 0; i < 4; i++ {
+		specs = append(specs, entrySpec{depth: 2, n: 10})
+	}
+	for i := 0; i < 15; i++ {
+		specs = append(specs, entrySpec{depth: 3, n: 1, wordCount: 1})
+	}
+	entries := makeNavEntries(specs)
+	got := FilterNavEntries(entries, 20, 3)
+	if len(got) != 8 {
+		t.Errorf("len(got) = %d, want 8 (all stubs removed)", len(got))
+	}
+	for _, e := range got {
+		if entryDepth(e) > 2 {
+			t.Errorf("h3 entry %q should have been removed as stub", e.Name)
+		}
+	}
+}
+
+// entrySpec describes a nav entry for test helpers.
+type entrySpec struct {
+	depth     int
+	n         int
+	wordCount int // 0 means use a default based on n
+}
+
+// makeNavEntries creates a slice of NavEntry from specs, assigning sequential Start lines.
+func makeNavEntries(specs []entrySpec) []navblock.NavEntry {
+	entries := make([]navblock.NavEntry, len(specs))
+	start := 1
+	for i, s := range specs {
+		prefix := strings.Repeat("#", s.depth)
+		wc := s.wordCount
+		if wc == 0 {
+			// Default: give each line ~5 words, so substantive sections have WordCount > stubWords(3)
+			wc = s.n * 5
+		}
+		entries[i] = navblock.NavEntry{
+			Start:     start,
+			N:         s.n,
+			Name:      prefix + fmt.Sprintf("Section%d", i+1),
+			About:     "desc",
+			WordCount: wc,
+		}
+		start += s.n
+	}
+	return entries
+}
+
+// entryDepth returns the heading depth of a NavEntry by counting leading '#' chars.
+func entryDepth(e navblock.NavEntry) int {
+	d := 0
+	for _, ch := range e.Name {
+		if ch == '#' {
+			d++
+		} else {
+			break
+		}
+	}
+	return d
+}
+
+// TestFile_LargeFileCapLineNumbers verifies that when the large-file cap fires
+// (>20 entries), the kept h1/h2 entries have correct adjusted line numbers — i.e.
+// applyAdjustedLines runs on the full list BEFORE the cap, so the offset is applied.
+func TestFile_LargeFileCapLineNumbers(t *testing.T) {
+	dir := t.TempDir()
+
+	// Build a file that will produce >20 entries (h1 + many h2 + some h3).
+	// The h3 headings should cause the cap to fire and be filtered out.
+	// After generate, the h1/h2 entries should have s values > nav block size (offset applied).
+	var b strings.Builder
+	b.WriteString("# Overview\n\n")
+	b.WriteString(strings.Repeat("Intro line.\n", 5))
+	// Add 20 h2 sections (each with an h3) to force the cap (1 h1 + 20 h2 + 20 h3 = 41 entries)
+	for i := 1; i <= 20; i++ {
+		fmt.Fprintf(&b, "\n## Section %d\n\n", i)
+		b.WriteString(strings.Repeat("Section content.\n", 3))
+		fmt.Fprintf(&b, "\n### Sub %d\n\n", i)
+		b.WriteString("Subsection content.\n")
+	}
+
+	content := b.String()
+	path := filepath.Join(dir, "large-cap.md")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := config.Defaults()
+	cfg.MinLines = 10
+	// Set expand threshold low so h3s get included before the cap, testing the cap
+	cfg.SubThreshold = 1
+	cfg.ExpandThreshold = 1
+
+	_, err := File(path, cfg, false)
+	if err != nil {
+		t.Fatalf("File() error = %v", err)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := string(data)
+
+	// Verify no h3 entries were written (cap fired)
+	if strings.Contains(got, "###Sub") {
+		t.Error("h3 entries should be filtered by large-file cap")
+	}
+
+	// Parse the nav block and verify line numbers are sane
+	pr := navblock.ParseNavBlock(got)
+	block := pr.Block
+	navEndLine := pr.End
+	found := pr.Found
+	if !found {
+		t.Fatal("nav block not found after generate")
+	}
+
+	// Verify all entries have s values AFTER the nav block (offset was applied)
+	for _, entry := range block.Nav {
+		if entry.Start <= navEndLine {
+			t.Errorf("entry %q: s=%d should be after nav block end (line %d); offset not applied",
+				entry.Name, entry.Start, navEndLine)
+		}
+	}
+
+	// Verify entries have monotonically increasing s values
+	for i := 1; i < len(block.Nav); i++ {
+		if block.Nav[i].Start <= block.Nav[i-1].Start {
+			t.Errorf("entry[%d] %q: s=%d should be after entry[%d] %q s=%d",
+				i, block.Nav[i].Name, block.Nav[i].Start,
+				i-1, block.Nav[i-1].Name, block.Nav[i-1].Start)
+		}
+	}
+
+	// Verify each entry's s value actually points to a heading line in the file
+	fileLines := strings.Split(got, "\n")
+	for _, entry := range block.Nav {
+		if entry.Start < 1 || entry.Start > len(fileLines) {
+			t.Errorf("entry %q: s=%d out of range (file has %d lines)", entry.Name, entry.Start, len(fileLines))
+		}
+	}
+}
+
+func TestBuildNavEntries_EmptySection(t *testing.T) {
+	// §11.3: empty section (heading immediately followed by another heading) → n=1
+	// and is included in nav with empty about field.
+	content := `## First
+
+## Second
+
+Some content here.
+`
+	sections := []parser.Section{
+		{Heading: parser.Heading{Line: 1, Depth: 2, Text: "First"}, Start: 1, End: 1},
+		{Heading: parser.Heading{Line: 3, Depth: 2, Text: "Second"}, Start: 3, End: 6},
+	}
+	cfg := config.Defaults()
+
+	got := buildNavEntries(sections, content, cfg)
+
+	if len(got) != 2 {
+		t.Fatalf("len(entries) = %d, want 2", len(got))
+	}
+	// First entry: n=1, about empty
+	if got[0].N != 1 {
+		t.Errorf("empty section N = %d, want 1", got[0].N)
+	}
+	if got[0].Name != "##First" {
+		t.Errorf("Name = %q, want %q", got[0].Name, "##First")
+	}
+	// Empty section has no extractable content so about should be empty or minimal
+	// The key requirement: it IS included in nav (not skipped)
+}
+
+func TestBuildNavEntries_CommaStripping(t *testing.T) {
+	// §11.2: commas must be stripped from heading names (they break CSV parsing).
+	content := `# Setup, Configuration
+
+Some setup content.
+`
+	sections := []parser.Section{
+		{
+			Heading: parser.Heading{Line: 1, Depth: 2, Text: "Setup, Configuration"},
+			Start:   1,
+			End:     4,
+		},
+	}
+
+	cfg := config.Defaults()
+	got := buildNavEntries(sections, content, cfg)
+
+	if len(got) != 1 {
+		t.Fatalf("len(entries) = %d, want 1", len(got))
+	}
+	if strings.Contains(got[0].Name, ",") {
+		t.Errorf("entry Name = %q, must not contain a comma", got[0].Name)
+	}
+	want := "##Setup Configuration"
+	if got[0].Name != want {
+		t.Errorf("entry Name = %q, want %q", got[0].Name, want)
+	}
+}
+
 func TestBuildNavEntries(t *testing.T) {
 	content := `# Authentication
 
@@ -816,6 +1265,57 @@ a1 content
 				}
 			}
 		})
+	}
+}
+
+// TestFilterNavEntries_StubUsesWordCount verifies that the stub pass uses WordCount,
+// not N, to decide which h3 entries to drop.
+func TestFilterNavEntries_StubUsesWordCount(t *testing.T) {
+	// 4 h1/h2 fixed; 2 h3 with high N but low WordCount (stubs); 2 h3 with low N but high WordCount
+	entries := []navblock.NavEntry{
+		{Start: 1, N: 10, Name: "#Chapter", About: "", WordCount: 100},
+		{Start: 11, N: 10, Name: "##Section", About: "", WordCount: 80},
+		// h3 stubs: large N but few words
+		{Start: 21, N: 50, Name: "###StubA", About: "", WordCount: 5},
+		{Start: 71, N: 50, Name: "###StubB", About: "", WordCount: 3},
+		// h3 substantive: small N but many words (dense content)
+		{Start: 121, N: 3, Name: "###DenseA", About: "", WordCount: 30},
+		{Start: 124, N: 3, Name: "###DenseB", About: "", WordCount: 25},
+	}
+	// 6 entries total ≤ 20, but force stub pass via budget (set maxEntries to 4)
+	// With maxEntries=4: fixed=2, candidates=4, budget=2
+	// stub pass (stubWords=20): drops StubA(5) and StubB(3), keeps DenseA(30) and DenseB(25)
+	// After stub pass: 2 fixed + 2 dense = 4 ≤ 4
+	got := FilterNavEntries(entries, 4, 20)
+	if len(got) != 4 {
+		t.Fatalf("len(got) = %d, want 4", len(got))
+	}
+	for _, e := range got {
+		if e.Name == "###StubA" || e.Name == "###StubB" {
+			t.Errorf("stub entry %q (WordCount too low) should have been removed", e.Name)
+		}
+	}
+}
+
+// TestBuildNavEntries_WordCount verifies that buildNavEntries sets WordCount > 0
+// reflecting actual content words (not just line count).
+func TestBuildNavEntries_WordCount(t *testing.T) {
+	// A single-line paragraph with many words — WordCount should reflect words, not N-1.
+	content := "## Section\nThis is a long sentence with ten words total here.\n"
+	sections := []parser.Section{
+		{Heading: parser.Heading{Line: 1, Depth: 2, Text: "Section"}, Start: 1, End: 2},
+	}
+	cfg := config.Defaults()
+	got := buildNavEntries(sections, content, cfg)
+	if len(got) != 1 {
+		t.Fatalf("len(got) = %d, want 1", len(got))
+	}
+	if got[0].WordCount <= 0 {
+		t.Errorf("WordCount = %d, want > 0", got[0].WordCount)
+	}
+	// N-1 = 1 (one content line), but WordCount should be > 1 (multiple words)
+	if got[0].WordCount <= 1 {
+		t.Errorf("WordCount = %d, want > 1 (multi-word content line)", got[0].WordCount)
 	}
 }
 

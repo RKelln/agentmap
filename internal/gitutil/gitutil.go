@@ -35,6 +35,76 @@ func FileChanges(path string) ([]LineRange, error) {
 	return ranges, nil
 }
 
+// RepoChanges runs a single git diff HEAD -U0 in dir and returns a map of relative
+// file path → changed line ranges for all modified files in the repository.
+// Returns nil, nil if not in a git repo.
+func RepoChanges(dir string) (map[string][]LineRange, error) {
+	if !isGitRepo(dir) {
+		return nil, nil
+	}
+
+	cmd := exec.Command("git", "diff", "HEAD", "-U0")
+	cmd.Dir = dir
+	output, err := cmd.Output()
+	if err != nil {
+		// If HEAD doesn't exist yet (empty repo) or other issue, return empty map
+		if strings.Contains(string(output), "fatal: bad object") ||
+			strings.Contains(string(output), "fatal: ambiguous argument") {
+			return map[string][]LineRange{}, nil
+		}
+		return nil, fmt.Errorf("git diff: %w", err)
+	}
+
+	return parseRepoDiff(string(output)), nil
+}
+
+// parseRepoDiff parses the output of `git diff -U0 HEAD` into a map of
+// relative file path → line ranges.
+func parseRepoDiff(output string) map[string][]LineRange {
+	result := make(map[string][]LineRange)
+	currentFile := ""
+
+	for _, line := range strings.Split(output, "\n") {
+		// File header: +++ b/<path>
+		if strings.HasPrefix(line, "+++ b/") {
+			currentFile = strings.TrimPrefix(line, "+++ b/")
+			continue
+		}
+		// Skip dev/null (file deletions)
+		if strings.HasPrefix(line, "+++ ") {
+			currentFile = ""
+			continue
+		}
+
+		if currentFile == "" {
+			continue
+		}
+
+		// Hunk header: @@ -old +new,count @@
+		matches := hunkHeaderRE.FindStringSubmatch(line)
+		if len(matches) < 2 {
+			continue
+		}
+
+		start, _ := strconv.Atoi(matches[1])
+		var count int
+		if len(matches) >= 3 && matches[2] != "" {
+			count, _ = strconv.Atoi(matches[2])
+		} else {
+			count = 1
+		}
+
+		if count > 0 {
+			result[currentFile] = append(result[currentFile], LineRange{
+				Start: start,
+				End:   start + count - 1,
+			})
+		}
+	}
+
+	return result
+}
+
 func isGitRepo(dir string) bool {
 	cmd := exec.Command("git", "rev-parse", "--is-inside-work-tree")
 	cmd.Dir = dir
@@ -55,7 +125,7 @@ func getChangedRanges(path string) ([]LineRange, error) {
 			strings.Contains(string(output), "fatal: ambiguous argument") {
 			return nil, nil
 		}
-		return nil, err
+		return nil, fmt.Errorf("git diff: %w", err)
 	}
 
 	return parseDiffOutput(string(output)), nil
