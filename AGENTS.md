@@ -28,6 +28,17 @@ make install    # install to $GOPATH/bin
 make ci         # quality gate: test + lint + build (must pass before merge)
 ```
 
+## Debugging
+
+When nav output looks wrong, use `generate -D <file>` to see what the parser found:
+
+```bash
+agentmap generate -D docs/authentication.md
+```
+
+This prints every heading found, its line number, computed section range, and size.
+Compare against the file to spot missing/duplicate headings or incorrect boundaries.
+
 ## Project Structure
 
 ```
@@ -49,6 +60,7 @@ testdata/           -- sample markdown files for tests
 - **No LLM calls** in `update` or `check` commands -- ever.
 - **Target performance:** `update` and `check` under 100ms for 50 files.
 - **File I/O:** read each file once, write only if changed.
+- **Never alter test data files** -- always use `--output /tmp/` or `--dry-run` when testing on real files
 
 ## Key Design Constraints (from agentmap-design.md)
 
