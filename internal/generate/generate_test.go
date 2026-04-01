@@ -559,3 +559,261 @@ Content goes here.
 		t.Error("new nav block should be inserted at line 1")
 	}
 }
+
+func TestGetH3Children_ImmediateOnly(t *testing.T) {
+	tests := []struct {
+		name      string
+		sections  []parser.Section
+		parentIdx int
+		wantText  []string
+	}{
+		{
+			name: "h2 with immediate h3 children only",
+			sections: []parser.Section{
+				{Heading: parser.Heading{Line: 1, Depth: 1, Text: "Main"}, Start: 1, End: 100},
+				{Heading: parser.Heading{Line: 10, Depth: 2, Text: "Section A"}, Start: 10, End: 50},
+				{Heading: parser.Heading{Line: 15, Depth: 3, Text: "Subsection A1"}, Start: 15, End: 20},
+				{Heading: parser.Heading{Line: 25, Depth: 3, Text: "Subsection A2"}, Start: 25, End: 30},
+				{Heading: parser.Heading{Line: 60, Depth: 2, Text: "Section B"}, Start: 60, End: 100},
+			},
+			parentIdx: 1,
+			wantText:  []string{"Subsection A1", "Subsection A2"},
+		},
+		{
+			name: "h2 with grandchild h3s separated by another h2",
+			sections: []parser.Section{
+				{Heading: parser.Heading{Line: 1, Depth: 1, Text: "Main"}, Start: 1, End: 120},
+				{Heading: parser.Heading{Line: 10, Depth: 2, Text: "Section A"}, Start: 10, End: 60},
+				{Heading: parser.Heading{Line: 15, Depth: 3, Text: "Child A1"}, Start: 15, End: 20},
+				{Heading: parser.Heading{Line: 30, Depth: 2, Text: "Section B"}, Start: 30, End: 70},
+				{Heading: parser.Heading{Line: 35, Depth: 3, Text: "Child B1"}, Start: 35, End: 40},
+				{Heading: parser.Heading{Line: 50, Depth: 3, Text: "Child B2"}, Start: 50, End: 55},
+				{Heading: parser.Heading{Line: 80, Depth: 2, Text: "Section C"}, Start: 80, End: 120},
+			},
+			parentIdx: 1,
+			wantText:  []string{"Child A1"},
+		},
+		{
+			name: "h1 parent should not get h3s from later h2 sections",
+			sections: []parser.Section{
+				{Heading: parser.Heading{Line: 1, Depth: 1, Text: "Main"}, Start: 1, End: 100},
+				{Heading: parser.Heading{Line: 10, Depth: 2, Text: "Section A"}, Start: 10, End: 30},
+				{Heading: parser.Heading{Line: 15, Depth: 3, Text: "A1"}, Start: 15, End: 20},
+				{Heading: parser.Heading{Line: 40, Depth: 2, Text: "Section B"}, Start: 40, End: 100},
+				{Heading: parser.Heading{Line: 50, Depth: 3, Text: "B1"}, Start: 50, End: 60},
+				{Heading: parser.Heading{Line: 70, Depth: 3, Text: "B2"}, Start: 70, End: 80},
+			},
+			parentIdx: 0,
+			wantText:  nil,
+		},
+		{
+			name: "empty children case - no h3",
+			sections: []parser.Section{
+				{Heading: parser.Heading{Line: 1, Depth: 1, Text: "Main"}, Start: 1, End: 50},
+				{Heading: parser.Heading{Line: 10, Depth: 2, Text: "Section A"}, Start: 10, End: 30},
+				{Heading: parser.Heading{Line: 40, Depth: 2, Text: "Section B"}, Start: 40, End: 50},
+			},
+			parentIdx: 1,
+			wantText:  nil,
+		},
+		{
+			name: "multiple h2 siblings - each gets own h3s",
+			sections: []parser.Section{
+				{Heading: parser.Heading{Line: 1, Depth: 1, Text: "Main"}, Start: 1, End: 200},
+				{Heading: parser.Heading{Line: 10, Depth: 2, Text: "CLI Commands"}, Start: 10, End: 80},
+				{Heading: parser.Heading{Line: 15, Depth: 3, Text: "generate"}, Start: 15, End: 25},
+				{Heading: parser.Heading{Line: 30, Depth: 3, Text: "update"}, Start: 30, End: 40},
+				{Heading: parser.Heading{Line: 50, Depth: 2, Text: "Description Authoring"}, Start: 50, End: 120},
+				{Heading: parser.Heading{Line: 60, Depth: 3, Text: "Tier 1 Keywords"}, Start: 60, End: 70},
+				{Heading: parser.Heading{Line: 80, Depth: 3, Text: "LLM Generated"}, Start: 80, End: 90},
+				{Heading: parser.Heading{Line: 130, Depth: 2, Text: "Parser Spec"}, Start: 130, End: 200},
+				{Heading: parser.Heading{Line: 140, Depth: 3, Text: "Nav Block Parser"}, Start: 140, End: 160},
+				{Heading: parser.Heading{Line: 170, Depth: 3, Text: "Nav Block Writer"}, Start: 170, End: 190},
+			},
+			parentIdx: 1,
+			wantText:  []string{"generate", "update"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := getH3Children(tt.sections, tt.parentIdx)
+			if tt.wantText == nil {
+				if len(got) != 0 {
+					t.Errorf("getH3Children() = %v, want nil or empty", got)
+				}
+				return
+			}
+			if len(got) != len(tt.wantText) {
+				t.Errorf("len(getH3Children()) = %d, want %d. Got: %v, Want: %v",
+					len(got), len(tt.wantText), got, tt.wantText)
+				return
+			}
+			for i := range tt.wantText {
+				if got[i].Text != tt.wantText[i] {
+					t.Errorf("getH3Children()[%d].Text = %q, want %q", i, got[i].Text, tt.wantText[i])
+				}
+			}
+		})
+	}
+}
+
+func TestBuildNavEntries_HierarchyEdgeCases(t *testing.T) {
+	tests := []struct {
+		name           string
+		sections       []parser.Section
+		content        string
+		cfg            config.Config
+		wantEntryText  []string
+		wantEntryAbout []string
+	}{
+		{
+			name: "h2 with immediate h3 children only - Section 4 should not include Section 8 h3s",
+			sections: []parser.Section{
+				{Heading: parser.Heading{Line: 1, Depth: 1, Text: "Design Doc"}, Start: 1, End: 35},
+				{Heading: parser.Heading{Line: 3, Depth: 2, Text: "CLI Commands"}, Start: 3, End: 15},
+				{Heading: parser.Heading{Line: 5, Depth: 3, Text: "generate"}, Start: 5, End: 6},
+				{Heading: parser.Heading{Line: 8, Depth: 3, Text: "update"}, Start: 8, End: 9},
+				{Heading: parser.Heading{Line: 16, Depth: 2, Text: "Description Authoring"}, Start: 16, End: 22},
+				{Heading: parser.Heading{Line: 18, Depth: 3, Text: "Keywords"}, Start: 18, End: 19},
+				{Heading: parser.Heading{Line: 24, Depth: 2, Text: "Parser Spec"}, Start: 24, End: 35},
+				{Heading: parser.Heading{Line: 26, Depth: 3, Text: "Heading Parser"}, Start: 26, End: 27},
+			},
+			content: `# Design Doc
+
+intro
+
+## CLI Commands
+
+cli content
+more content
+more content
+more content
+
+### generate
+
+generate content
+
+### update
+
+update content
+
+## Description Authoring
+
+desc content
+more
+
+### Keywords
+
+keywords content
+
+## Parser Spec
+
+parser content
+more
+
+### Heading Parser
+
+heading parser content
+`,
+			cfg: config.Config{
+				SubThreshold:    5,
+				ExpandThreshold: 12,
+			},
+			// CLI Commands (lines 3-15, 13 lines >= expand threshold 12) gets h3 children expanded
+			// Description Authoring (lines 16-22, 7 lines >= sub threshold 5 but < expand) gets > hints
+			// Parser Spec (lines 24-35, 12 lines >= expand threshold 12) gets h3 children expanded
+			wantEntryText: []string{"#Design Doc", "##CLI Commands", "###generate", "###update", "##Description Authoring", "##Parser Spec", "###Heading Parser"},
+		},
+		{
+			name: "small h2 sections - should not expand h3 children, use > hints instead",
+			sections: []parser.Section{
+				{Heading: parser.Heading{Line: 1, Depth: 1, Text: "Main"}, Start: 1, End: 22},
+				{Heading: parser.Heading{Line: 3, Depth: 2, Text: "Section A"}, Start: 3, End: 15},
+				{Heading: parser.Heading{Line: 9, Depth: 3, Text: "A1"}, Start: 9, End: 10},
+				{Heading: parser.Heading{Line: 13, Depth: 3, Text: "A2"}, Start: 13, End: 14},
+				{Heading: parser.Heading{Line: 17, Depth: 2, Text: "Section B"}, Start: 17, End: 22},
+			},
+			content: `# Main
+
+content
+
+## Section A
+
+section a content
+more content
+more content
+more content
+more
+
+### A1
+
+a1 content
+
+### A2
+
+a2 content
+
+## Section B
+
+section b content
+`,
+			cfg: config.Config{
+				SubThreshold:    8,
+				ExpandThreshold: 20,
+			},
+			wantEntryText: []string{"#Main", "##Section A", "##Section B"},
+		},
+		{
+			name: "h2 below subThreshold - no h3 hints",
+			sections: []parser.Section{
+				{Heading: parser.Heading{Line: 1, Depth: 1, Text: "Main"}, Start: 1, End: 20},
+				{Heading: parser.Heading{Line: 3, Depth: 2, Text: "Section A"}, Start: 3, End: 12},
+				{Heading: parser.Heading{Line: 9, Depth: 3, Text: "A1"}, Start: 9, End: 10},
+			},
+			content: `# Main
+
+## Section A
+
+section a content
+more content
+more
+
+### A1
+
+a1 content
+`,
+			cfg: config.Config{
+				SubThreshold:    50,
+				ExpandThreshold: 100,
+			},
+			wantEntryText: []string{"#Main", "##Section A"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := buildNavEntries(tt.sections, tt.content, tt.cfg)
+			if len(got) != len(tt.wantEntryText) {
+				t.Errorf("len(buildNavEntries()) = %d, want %d", len(got), len(tt.wantEntryText))
+				for i, e := range got {
+					t.Logf("  got[%d]: %s (%d-%d) about=%q", i, e.Name, e.Start, e.End, e.About)
+				}
+				return
+			}
+			for i, want := range tt.wantEntryText {
+				if got[i].Name != want {
+					t.Errorf("entry[%d].Name = %q, want %q", i, got[i].Name, want)
+				}
+			}
+			// Check About field if provided
+			if len(tt.wantEntryAbout) > 0 {
+				for i, want := range tt.wantEntryAbout {
+					if got[i].About != want {
+						t.Errorf("entry[%d].About = %q, want %q", i, got[i].About, want)
+					}
+				}
+			}
+		})
+	}
+}
