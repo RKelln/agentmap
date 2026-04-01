@@ -184,7 +184,8 @@ func buildEntryReports(oldNav []navblock.NavEntry, sections []parser.Section, ch
 		used[oldEntry.Start] = true
 
 		reportType := ReportOK
-		if oldEntry.Start != s.Start || oldEntry.End != s.End {
+		oldEnd := oldEntry.Start + oldEntry.N - 1
+		if oldEntry.Start != s.Start || oldEnd != s.End {
 			reportType = ReportShifted
 		}
 
@@ -207,7 +208,7 @@ func buildEntryReports(oldNav []navblock.NavEntry, sections []parser.Section, ch
 			Type:          reportType,
 			Name:          prefix + s.Text,
 			OldStart:      oldEntry.Start,
-			OldEnd:        oldEntry.End,
+			OldEnd:        oldEntry.Start + oldEntry.N - 1,
 			NewStart:      s.Start,
 			NewEnd:        s.End,
 			ModifiedCount: modifiedCount,
@@ -246,14 +247,14 @@ func buildUpdatedBlock(oldBlock navblock.NavBlock, sections []parser.Section, _ 
 		if found {
 			newNav = append(newNav, navblock.NavEntry{
 				Start: s.Start,
-				End:   s.End,
+				N:     s.End - s.Start + 1,
 				Name:  prefix + s.Text,
 				About: oldEntry.About,
 			})
 		} else {
 			newNav = append(newNav, navblock.NavEntry{
 				Start: s.Start,
-				End:   s.End,
+				N:     s.End - s.Start + 1,
 				Name:  prefix + s.Text,
 				About: "",
 			})

@@ -122,7 +122,7 @@ func applyAdjustedLines(entries []navblock.NavEntry, adjusted []parser.Section) 
 	for i := range entries {
 		result[i] = navblock.NavEntry{
 			Start: adjusted[i].Start,
-			End:   adjusted[i].End,
+			N:     adjusted[i].End - adjusted[i].Start + 1,
 			Name:  entries[i].Name,
 			About: entries[i].About,
 		}
@@ -353,7 +353,7 @@ func buildNavEntries(sections []parser.Section, content string, cfg config.Confi
 				// Full expansion: add h3 children as separate entries
 				entries = append(entries, navblock.NavEntry{
 					Start: s.Start,
-					End:   s.End,
+					N:     s.End - s.Start + 1,
 					Name:  prefix + s.Text,
 					About: about,
 				})
@@ -363,7 +363,7 @@ func buildNavEntries(sections []parser.Section, content string, cfg config.Confi
 					childPrefix := strings.Repeat("#", child.Depth)
 					entries = append(entries, navblock.NavEntry{
 						Start: child.Start,
-						End:   child.End,
+						N:     child.End - child.Start + 1,
 						Name:  childPrefix + child.Text,
 						About: childAbout,
 					})
@@ -391,7 +391,7 @@ func buildNavEntries(sections []parser.Section, content string, cfg config.Confi
 
 		entries = append(entries, navblock.NavEntry{
 			Start: s.Start,
-			End:   s.End,
+			N:     s.End - s.Start + 1,
 			Name:  prefix + s.Text,
 			About: about,
 		})

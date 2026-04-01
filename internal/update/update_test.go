@@ -335,11 +335,11 @@ func TestFile_NoChanges(t *testing.T) {
 
 	oldContent := `<!-- AGENT:NAV
 purpose:docs
-nav[4]{s,e,name,about}:
-9,24,#Document,main doc
-13,16,##Section A,section A content
-17,20,##Section B,section B content
-21,24,##Section C,section C content
+nav[4]{s,n,name,about}:
+9,16,#Document,main doc
+13,4,##Section A,section A content
+17,4,##Section B,section B content
+21,4,##Section C,section C content
 -->
 # Document
 

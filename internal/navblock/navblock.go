@@ -17,7 +17,7 @@ type NavBlock struct {
 // NavEntry is a single line in the nav section.
 type NavEntry struct {
 	Start int    // start line (1-indexed, inclusive)
-	End   int    // end line (1-indexed, inclusive)
+	N     int    // line count (length of section)
 	Name  string // heading with # prefix (e.g. "##Section")
 	About string // short description; may be empty
 }
@@ -132,14 +132,14 @@ func parseNavEntry(line string) NavEntry {
 	}
 
 	start, _ := strconv.Atoi(parts[0])
-	end, _ := strconv.Atoi(parts[1])
+	n, _ := strconv.Atoi(parts[1])
 	name := parts[2]
 	about := ""
 	if len(parts) >= 4 {
 		about = parts[3]
 	}
 
-	return NavEntry{Start: start, End: end, Name: name, About: about}
+	return NavEntry{Start: start, N: n, Name: name, About: about}
 }
 
 func parseSeeEntry(line string) SeeEntry {
@@ -158,9 +158,9 @@ func RenderNavBlock(block NavBlock) string {
 	b.WriteString("purpose:" + block.Purpose + "\n")
 
 	if len(block.Nav) > 0 {
-		fmt.Fprintf(&b, "nav[%d]{s,e,name,about}:\n", len(block.Nav))
+		fmt.Fprintf(&b, "nav[%d]{s,n,name,about}:\n", len(block.Nav))
 		for _, e := range block.Nav {
-			fmt.Fprintf(&b, "%d,%d,%s,%s\n", e.Start, e.End, e.Name, e.About)
+			fmt.Fprintf(&b, "%d,%d,%s,%s\n", e.Start, e.N, e.Name, e.About)
 		}
 	}
 

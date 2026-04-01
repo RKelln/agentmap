@@ -246,7 +246,7 @@ Content.
 	block := navblock.NavBlock{
 		Purpose: "new purpose",
 		Nav: []navblock.NavEntry{
-			{Start: 5, End: 20, Name: "#Heading", About: "new desc"},
+			{Start: 5, N: 16, Name: "#Heading", About: "new desc"},
 		},
 	}
 
@@ -338,13 +338,13 @@ Silent rotation and expiry detection.
 
 	// Verify structure (about fields now contain keywords, not empty)
 	want := []navblock.NavEntry{
-		{Start: 1, End: 12, Name: "#Authentication"},
-		{Start: 5, End: 8, Name: "##Token Exchange"},
-		{Start: 10, End: 12, Name: "##Token Refresh"},
+		{Start: 1, N: 12, Name: "#Authentication"},
+		{Start: 5, N: 4, Name: "##Token Exchange"},
+		{Start: 10, N: 3, Name: "##Token Refresh"},
 	}
 
 	for i := range want {
-		if got[i].Start != want[i].Start || got[i].End != want[i].End || got[i].Name != want[i].Name {
+		if got[i].Start != want[i].Start || got[i].N != want[i].N || got[i].Name != want[i].Name {
 			t.Errorf("entry[%d] = %+v, want %+v", i, got[i], want[i])
 		}
 		// About should now contain keywords (not empty)
@@ -798,7 +798,7 @@ a1 content
 			if len(got) != len(tt.wantEntryText) {
 				t.Errorf("len(buildNavEntries()) = %d, want %d", len(got), len(tt.wantEntryText))
 				for i, e := range got {
-					t.Logf("  got[%d]: %s (%d-%d) about=%q", i, e.Name, e.Start, e.End, e.About)
+					t.Logf("  got[%d]: %s (%d-%d) about=%q", i, e.Name, e.Start, e.Start+e.N-1, e.About)
 				}
 				return
 			}

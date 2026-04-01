@@ -18,9 +18,9 @@ title: Test
 
 <!-- AGENT:NAV
 purpose:test file
-nav[2]{s,e,name,about}:
-12,19,#Test,test section
-16,19,##Subtest,sub section
+nav[2]{s,n,name,about}:
+12,8,#Test,test section
+16,4,##Subtest,sub section
 -->
 
 # Test
