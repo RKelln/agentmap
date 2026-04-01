@@ -30,16 +30,43 @@ type SeeEntry struct {
 
 // ParseNavBlock extracts an AGENT:NAV block from file content.
 // Returns the block, its start line, end line (1-indexed), and whether one was found.
+// Skips nav blocks inside fenced code blocks.
 func ParseNavBlock(content string) (block NavBlock, startLine, endLine int, found bool) {
 	lines := strings.Split(content, "\n")
 	blockStart := -1
 	blockEnd := -1
 
+	// Only search for nav block start in first 20 lines of the file
+	// (after frontmatter if present). Nav blocks inside code examples
+	// or in body content are ignored.
+	const maxNavBlockLine = 20
+
+	inFence := false
 	for i, line := range lines {
-		if strings.Contains(line, "<!-- AGENT:NAV") {
-			blockStart = i
+		trimmed := strings.TrimSpace(line)
+
+		// Track fenced code blocks (but still process nav block ends)
+		if strings.HasPrefix(trimmed, "```") || strings.HasPrefix(trimmed, "~~~") {
+			inFence = !inFence
+			continue
 		}
-		if blockStart >= 0 && strings.TrimSpace(line) == "-->" {
+		if inFence {
+			continue
+		}
+
+		// Only look for nav block START in first 20 lines
+		// But allow finding the END even if beyond line 20
+		if i <= maxNavBlockLine {
+			// Check for nav block start (skip single-line examples like `<!-- AGENT:NAV ... -->`)
+			if strings.Contains(line, "<!-- AGENT:NAV") && !strings.Contains(line, "-->") {
+				if blockStart < 0 {
+					blockStart = i
+				}
+			}
+		}
+
+		// Check for nav block end (can be beyond line 20)
+		if blockStart >= 0 && trimmed == "-->" {
 			blockEnd = i
 			break
 		}
