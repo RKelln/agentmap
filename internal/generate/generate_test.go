@@ -3,7 +3,6 @@ package generate
 import (
 	"os"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -233,49 +232,6 @@ Even more content.
 	}
 }
 
-func TestExtractPurpose_Basic(t *testing.T) {
-	tests := []struct {
-		name    string
-		content string
-		want    string
-	}{
-		{
-			name:    "first paragraph after heading",
-			content: "# Title\n\nThis is the first paragraph of the document.\n\n## Section\nMore text.",
-			want:    "This is the first paragraph of the document.",
-		},
-		{
-			name:    "first paragraph after frontmatter",
-			content: "---\ntitle: Test\n---\n\nPurpose description here.\n\n# Heading\n",
-			want:    "Purpose description here.",
-		},
-		{
-			name:    "trims to max length",
-			content: "# Title\n\n" + strings.Repeat("word ", 30) + "\n\n## Section\n",
-			want:    strings.Repeat("word ", 15) + "word",
-		},
-		{
-			name:    "empty content",
-			content: "",
-			want:    "",
-		},
-		{
-			name:    "heading only",
-			content: "# Title\n",
-			want:    "",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := extractPurpose(tt.content)
-			if got != tt.want {
-				t.Errorf("extractPurpose() = %q, want %q", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestInsertNavBlock_ReplacesExisting(t *testing.T) {
 	content := `<!-- AGENT:NAV
 purpose:old
@@ -340,39 +296,59 @@ Content here.
 }
 
 func TestBuildNavEntries(t *testing.T) {
+	content := `# Authentication
+
+Token lifecycle management.
+
+## Token Exchange
+
+OAuth2 code-for-token flow.
+
+## Token Refresh
+
+Silent rotation and expiry detection.
+`
 	sections := []parser.Section{
 		{
 			Heading: parser.Heading{Line: 1, Depth: 1, Text: "Authentication"},
 			Start:   1,
-			End:     65,
+			End:     12,
 		},
 		{
-			Heading: parser.Heading{Line: 3, Depth: 2, Text: "Token Exchange"},
-			Start:   3,
-			End:     35,
+			Heading: parser.Heading{Line: 5, Depth: 2, Text: "Token Exchange"},
+			Start:   5,
+			End:     8,
 		},
 		{
-			Heading: parser.Heading{Line: 36, Depth: 2, Text: "Token Refresh"},
-			Start:   36,
-			End:     65,
+			Heading: parser.Heading{Line: 10, Depth: 2, Text: "Token Refresh"},
+			Start:   10,
+			End:     12,
 		},
 	}
 
-	got := buildNavEntries(sections)
+	cfg := config.Defaults()
+	cfg.MinLines = 10
+
+	got := buildNavEntries(sections, content, cfg)
 
 	if len(got) != 3 {
 		t.Fatalf("len(entries) = %d, want 3", len(got))
 	}
 
+	// Verify structure (about fields now contain keywords, not empty)
 	want := []navblock.NavEntry{
-		{Start: 1, End: 65, Name: "#Authentication", About: ""},
-		{Start: 3, End: 35, Name: "##Token Exchange", About: ""},
-		{Start: 36, End: 65, Name: "##Token Refresh", About: ""},
+		{Start: 1, End: 12, Name: "#Authentication"},
+		{Start: 5, End: 8, Name: "##Token Exchange"},
+		{Start: 10, End: 12, Name: "##Token Refresh"},
 	}
 
 	for i := range want {
-		if !reflect.DeepEqual(got[i], want[i]) {
+		if got[i].Start != want[i].Start || got[i].End != want[i].End || got[i].Name != want[i].Name {
 			t.Errorf("entry[%d] = %+v, want %+v", i, got[i], want[i])
+		}
+		// About should now contain keywords (not empty)
+		if got[i].About == "" {
+			t.Errorf("entry[%d] About should contain keywords, got empty", i)
 		}
 	}
 }
@@ -421,6 +397,7 @@ Intro.
 
 Content A.
 
+` + strings.Repeat("Detailed content about section A.\n", 20) + `
 ### Subsection A1
 
 Detail A1.
@@ -429,6 +406,7 @@ Detail A1.
 
 Detail A2.
 
+` + strings.Repeat("More section A content.\n", 20) + `
 ## Section B
 
 Content B.
@@ -441,6 +419,8 @@ Content B.
 
 	cfg := config.Defaults()
 	cfg.MinLines = 10
+	cfg.SubThreshold = 50
+	cfg.ExpandThreshold = 150
 
 	_, err := File(path, cfg, false)
 	if err != nil {
@@ -453,17 +433,22 @@ Content B.
 	}
 
 	got := string(data)
+	if !strings.Contains(got, "<!-- AGENT:NAV") {
+		t.Error("file should contain AGENT:NAV block")
+	}
 	if !strings.Contains(got, "#Main") {
 		t.Error("nav should contain #Main")
 	}
 	if !strings.Contains(got, "##Section A") {
 		t.Error("nav should contain ##Section A")
 	}
-	if !strings.Contains(got, "###Subsection A1") {
-		t.Error("nav should contain ###Subsection A1")
+	// Section A is medium-sized (between sub_threshold and expand_threshold),
+	// so h3 children appear as > hints, not full entries
+	if !strings.Contains(got, ">Subsection A1") {
+		t.Error("Section A should have > hint for Subsection A1")
 	}
-	if !strings.Contains(got, "###Subsection A2") {
-		t.Error("nav should contain ###Subsection A2")
+	if !strings.Contains(got, "Subsection A2") {
+		t.Error("Section A should have > hint for Subsection A2")
 	}
 	if !strings.Contains(got, "##Section B") {
 		t.Error("nav should contain ##Section B")

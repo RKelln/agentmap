@@ -1,3 +1,7 @@
+<!-- AGENT:NAV
+purpose:circuit;open;policy;retry;service;attempts;backoff;breaker
+-->
+
 # Error Policy
 
 Retry and circuit-breaker rules for all service-to-service calls.

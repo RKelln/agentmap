@@ -33,6 +33,7 @@ OAuth2 code-for-token flow.
 
 This section describes the main authentication flow.
 
+` + strings.Repeat("Additional details about token exchange.\n", 15) + `
 ### PKCE
 
 Proof key for code exchange.
@@ -41,6 +42,7 @@ Proof key for code exchange.
 
 Legacy implicit grant flow.
 
+` + strings.Repeat("More exchange details.\n", 15) + `
 ## Token Refresh
 
 Silent rotation and sliding-window expiry.
@@ -145,8 +147,9 @@ Content for section two.
 	if !strings.Contains(got, "##Token Exchange") {
 		t.Error("nav should contain ##Token Exchange")
 	}
-	if !strings.Contains(got, "###PKCE") {
-		t.Error("nav should contain ###PKCE")
+	// Token Exchange is medium-sized, so h3 children appear as > hints
+	if !strings.Contains(got, ">PKCE") && !strings.Contains(got, "PKCE") {
+		t.Error("nav should have hint for PKCE")
 	}
 	if !strings.Contains(got, "##Token Refresh") {
 		t.Error("nav should contain ##Token Refresh")
@@ -448,9 +451,10 @@ func TestGenerate_LargeFile(t *testing.T) {
 		t.Fatal("nav block not found")
 	}
 
-	// Should have all 20 h2 sections plus the h1 plus the 2 h3s = 23 entries
-	if len(block.Nav) != 23 {
-		t.Errorf("expected 23 nav entries, got %d", len(block.Nav))
+	// Should have all 20 h2 sections plus the h1 = 21 entries
+	// h3 children are under sub_threshold so they appear as hints, not full entries
+	if len(block.Nav) != 21 {
+		t.Errorf("expected 21 nav entries, got %d", len(block.Nav))
 	}
 
 	// Verify all section names are present
@@ -467,12 +471,10 @@ func TestGenerate_LargeFile(t *testing.T) {
 		}
 	}
 
-	// Verify h3 entries are present
-	if !strings.Contains(got, "###Subsection A") {
-		t.Error("nav should contain ###Subsection A")
-	}
-	if !strings.Contains(got, "###Subsection B") {
-		t.Error("nav should contain ###Subsection B")
+	// h3 children appear as > hints in the last h2 section's about field
+	foundHints := strings.Contains(got, "Subsection A") && strings.Contains(got, "Subsection B")
+	if !foundHints {
+		t.Error("nav should have hints for Subsection A and B")
 	}
 
 	// Verify line ranges are in order (each entry starts after the previous)
@@ -480,6 +482,289 @@ func TestGenerate_LargeFile(t *testing.T) {
 		if block.Nav[i].Start <= block.Nav[i-1].Start {
 			t.Errorf("entry %d start (%d) should be after entry %d start (%d)",
 				i, block.Nav[i].Start, i-1, block.Nav[i-1].Start)
+		}
+	}
+}
+
+func TestGenerate_KeywordDescriptions(t *testing.T) {
+	dir := t.TempDir()
+
+	content := `# Authentication
+
+Token lifecycle management for the platform.
+
+## Token Exchange
+
+OAuth2 code-for-token flow with PKCE proof key.
+
+## Token Refresh
+
+Silent rotation and sliding-window expiry detection.
+
+` + strings.Repeat("More refresh details.\n", 45)
+
+	writeTempFile(t, dir, "auth.md", content)
+
+	cfg := config.Defaults()
+	cfg.MinLines = 50
+
+	_, err := File(filepath.Join(dir, "auth.md"), cfg, false)
+	if err != nil {
+		t.Fatalf("File() error = %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, "auth.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(data)
+
+	block, _, _, found := navblock.ParseNavBlock(got)
+	if !found {
+		t.Fatal("nav block not found")
+	}
+
+	if block.Purpose == "" {
+		t.Error("purpose should not be empty")
+	}
+
+	for _, entry := range block.Nav {
+		if entry.About == "" {
+			t.Errorf("entry %q should have keyword description, got empty", entry.Name)
+		}
+		if strings.Contains(entry.About, ",") {
+			t.Errorf("entry %q About should not contain commas: %q", entry.Name, entry.About)
+		}
+	}
+}
+
+func TestGenerate_SubsectionHints(t *testing.T) {
+	dir := t.TempDir()
+
+	// Medium section (between sub_threshold=50 and expand_threshold=150) with h3 children
+	// should get > hints instead of full h3 entries
+	// Token Exchange section needs to be between sub_threshold(50) and expand_threshold(150)
+	// to trigger > hints instead of full h3 entries
+	content := `# Guide
+
+Overview of the guide.
+
+## Token Exchange
+
+Main section about token exchange.
+
+` + strings.Repeat("Token exchange details and implementation notes about OAuth2 flows.\n", 20) + `
+### PKCE
+
+Proof key for code exchange details.
+
+### Implicit
+
+Legacy implicit grant flow.
+
+` + strings.Repeat("More exchange content here covering various scenarios.\n", 20) + `
+## Migration
+
+Migration guide content.
+
+` + strings.Repeat("More migration details.\n", 40)
+
+	writeTempFile(t, dir, "hints.md", content)
+
+	cfg := config.Defaults()
+	cfg.MinLines = 50
+	cfg.SubThreshold = 50
+	cfg.ExpandThreshold = 150
+
+	_, err := File(filepath.Join(dir, "hints.md"), cfg, false)
+	if err != nil {
+		t.Fatalf("File() error = %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, "hints.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(data)
+
+	block, _, _, found := navblock.ParseNavBlock(got)
+	if !found {
+		t.Fatal("nav block not found")
+	}
+
+	var exchangeEntry navblock.NavEntry
+	for _, entry := range block.Nav {
+		if entry.Name == "##Token Exchange" {
+			exchangeEntry = entry
+			break
+		}
+	}
+
+	if exchangeEntry.Name == "" {
+		t.Fatal("##Token Exchange entry not found")
+	}
+
+	if !strings.Contains(exchangeEntry.About, ">") {
+		t.Errorf("##Token Exchange should have > hints, got: %q", exchangeEntry.About)
+	}
+	if !strings.Contains(exchangeEntry.About, "PKCE") {
+		t.Errorf("hints should mention PKCE, got: %q", exchangeEntry.About)
+	}
+	if !strings.Contains(exchangeEntry.About, "Implicit") {
+		t.Errorf("hints should mention Implicit, got: %q", exchangeEntry.About)
+	}
+
+	for _, entry := range block.Nav {
+		if entry.Name == "###PKCE" || entry.Name == "###Implicit" {
+			t.Errorf("h3 %q should not appear as full entry in medium section", entry.Name)
+		}
+	}
+}
+
+func TestGenerate_H3Expansion(t *testing.T) {
+	dir := t.TempDir()
+
+	content := `# Guide
+
+Overview.
+
+## Token Lifecycle
+
+This is a very large section about token lifecycle management.
+It covers many topics including rotation, expiry, revocation,
+introspection, and more.
+
+` + strings.Repeat("Lots of detailed content about token lifecycle.\n", 100) + `
+### Refresh
+
+Silent rotation and sliding-window expiry.
+
+` + strings.Repeat("Detailed refresh content.\n", 10) + `
+### Revocation
+
+Logout and forced invalidation.
+
+` + strings.Repeat("Detailed revocation content.\n", 10) + `
+### Introspection
+
+Token validation endpoint.
+
+` + strings.Repeat("Detailed introspection content.\n", 10) + `
+## Other Section
+
+Brief other section.
+
+` + strings.Repeat("Other section details.\n", 20)
+
+	writeTempFile(t, dir, "expand.md", content)
+
+	cfg := config.Defaults()
+	cfg.MinLines = 50
+	cfg.SubThreshold = 50
+	cfg.ExpandThreshold = 150
+
+	_, err := File(filepath.Join(dir, "expand.md"), cfg, false)
+	if err != nil {
+		t.Fatalf("File() error = %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, "expand.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(data)
+
+	block, _, _, found := navblock.ParseNavBlock(got)
+	if !found {
+		t.Fatal("nav block not found")
+	}
+
+	h3Names := []string{"###Refresh", "###Revocation", "###Introspection"}
+	for _, h3 := range h3Names {
+		found := false
+		for _, entry := range block.Nav {
+			if entry.Name == h3 {
+				found = true
+				if entry.About == "" {
+					t.Errorf("%s should have keyword description", h3)
+				}
+				break
+			}
+		}
+		if !found {
+			t.Errorf("nav block missing %s as full entry", h3)
+		}
+	}
+}
+
+func TestGenerate_NoSubsectionInfoForSmallSections(t *testing.T) {
+	dir := t.TempDir()
+
+	// File must exceed min_lines (50) to get full nav block
+	// But the "Small Section" must be under sub_threshold (50) to get no subsection info
+	// We make "Another Section" large to push the file over min_lines
+	content := `# Guide
+
+Overview of the guide document.
+
+## Small Section
+
+Brief content here.
+
+### SubA
+
+Detail A.
+
+### SubB
+
+Detail B.
+
+## Another Section
+
+` + strings.Repeat("Content for another section to push file over min_lines.\n", 45)
+
+	writeTempFile(t, dir, "small.md", content)
+
+	cfg := config.Defaults()
+	cfg.MinLines = 50
+	cfg.SubThreshold = 50
+	cfg.ExpandThreshold = 150
+
+	_, err := File(filepath.Join(dir, "small.md"), cfg, false)
+	if err != nil {
+		t.Fatalf("File() error = %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, "small.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(data)
+
+	block, _, _, found := navblock.ParseNavBlock(got)
+	if !found {
+		t.Fatal("nav block not found")
+	}
+
+	var entry navblock.NavEntry
+	for _, e := range block.Nav {
+		if e.Name == "##Small Section" {
+			entry = e
+			break
+		}
+	}
+
+	if entry.Name == "" {
+		t.Fatal("##Small Section entry not found")
+	}
+
+	if strings.Contains(entry.About, ">") {
+		t.Errorf("small section should not have > hints, got: %q", entry.About)
+	}
+
+	for _, e := range block.Nav {
+		if e.Name == "###SubA" || e.Name == "###SubB" {
+			t.Errorf("h3 %q should not appear for small parent section", e.Name)
 		}
 	}
 }

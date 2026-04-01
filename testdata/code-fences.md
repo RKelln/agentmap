@@ -1,3 +1,7 @@
+<!-- AGENT:NAV
+purpose:heading;code;content;real;another;blocks;fence;file
+-->
+
 # Code Fence Test
 
 This file has headings inside code blocks that should not be parsed.

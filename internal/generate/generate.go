@@ -9,12 +9,12 @@ import (
 
 	"github.com/ryankelln/agentmap/internal/config"
 	"github.com/ryankelln/agentmap/internal/discovery"
+	"github.com/ryankelln/agentmap/internal/keywords"
 	"github.com/ryankelln/agentmap/internal/navblock"
 	"github.com/ryankelln/agentmap/internal/parser"
 )
 
 const (
-	maxPurposeLen    = 80
 	frontmatterDelim = "---"
 	navBlockEnd      = "-->"
 )
@@ -45,7 +45,8 @@ func Generate(root string, cfg config.Config, dryRun bool) error {
 }
 
 // File processes a single markdown file and writes a nav block.
-func File(path string, cfg config.Config, dryRun bool) (string, error) {
+// If outputPath is non-empty, the result is written there instead of modifying the source.
+func File(path string, cfg config.Config, dryRun bool, outputPath ...string) (string, error) {
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return "", fmt.Errorf("generate: read file: %w", err)
@@ -68,19 +69,22 @@ func File(path string, cfg config.Config, dryRun bool) (string, error) {
 	var report string
 
 	if totalLines < cfg.MinLines || len(headings) == 0 {
-		purpose := extractPurpose(string(content))
+		purpose := keywords.ExtractPurpose(string(content))
 		blockText = navblock.RenderPurposeOnly(purpose)
 		report = fmt.Sprintf("Skipped: %s (purpose-only)", path)
 	} else {
-		purpose := extractPurpose(string(content))
+		purpose := keywords.ExtractPurpose(string(content))
+		// Build nav entries with keyword descriptions from original content
+		originalEntries := buildNavEntries(sections, string(content), cfg)
 		// Compute line offset: new block will shift headings down
-		placeholder := navblock.NavBlock{Purpose: purpose, Nav: buildNavEntries(sections)}
+		placeholder := navblock.NavBlock{Purpose: purpose, Nav: originalEntries}
 		placeholderText := navblock.RenderNavBlock(placeholder)
 		newBlockLines := len(strings.Split(placeholderText, "\n"))
 		offset := newBlockLines - oldBlockLines
 
 		adjusted := adjustSections(sections, offset)
-		entries := buildNavEntries(adjusted)
+		// Apply adjusted line numbers to entries (preserve keyword descriptions)
+		entries := applyAdjustedLines(originalEntries, adjusted)
 		block := navblock.NavBlock{
 			Purpose: purpose,
 			Nav:     entries,
@@ -94,11 +98,36 @@ func File(path string, cfg config.Config, dryRun bool) (string, error) {
 	}
 
 	newContent := insertNavBlock(string(content), blockText)
-	if err := os.WriteFile(path, []byte(newContent), 0o644); err != nil {
+
+	// Write to output path if specified, otherwise modify source in place
+	dest := path
+	if len(outputPath) > 0 && outputPath[0] != "" {
+		dest = outputPath[0]
+	}
+
+	if err := os.WriteFile(dest, []byte(newContent), 0o644); err != nil {
 		return "", fmt.Errorf("generate: write file: %w", err)
 	}
 
 	return report, nil
+}
+
+// applyAdjustedLines copies Start/End line numbers from adjusted sections to entries.
+// Preserves the About field (keyword descriptions) from the original entries.
+func applyAdjustedLines(entries []navblock.NavEntry, adjusted []parser.Section) []navblock.NavEntry {
+	if len(entries) != len(adjusted) {
+		return entries
+	}
+	result := make([]navblock.NavEntry, len(entries))
+	for i := range entries {
+		result[i] = navblock.NavEntry{
+			Start: adjusted[i].Start,
+			End:   adjusted[i].End,
+			Name:  entries[i].Name,
+			About: entries[i].About,
+		}
+	}
+	return result
 }
 
 // adjustSections shifts all Start/End line numbers by the given offset.
@@ -130,70 +159,6 @@ func findNavBlock(lines []string) (start, end int) {
 		}
 	}
 	return -1, -1
-}
-
-// extractPurpose extracts the first non-heading, non-frontmatter paragraph as purpose.
-func extractPurpose(content string) string {
-	lines := strings.Split(content, "\n")
-
-	inFrontmatter := false
-	inNavBlock := false
-
-	for i, line := range lines {
-		trimmed := strings.TrimSpace(line)
-
-		// Handle YAML frontmatter
-		if i == 0 && trimmed == frontmatterDelim {
-			inFrontmatter = true
-			continue
-		}
-		if inFrontmatter {
-			if trimmed == frontmatterDelim {
-				inFrontmatter = false
-			}
-			continue
-		}
-
-		// Track existing nav block
-		if strings.Contains(trimmed, "<!-- AGENT:NAV") {
-			inNavBlock = true
-			continue
-		}
-		if inNavBlock {
-			if trimmed == navBlockEnd {
-				inNavBlock = false
-			}
-			continue
-		}
-
-		// Skip empty lines before first content
-		if trimmed == "" {
-			continue
-		}
-
-		// Skip heading lines
-		if len(trimmed) > 0 && trimmed[0] == '#' {
-			continue
-		}
-
-		// Skip HTML comment lines
-		if strings.HasPrefix(trimmed, "<!--") {
-			continue
-		}
-
-		// This is the first content paragraph
-		purpose := strings.ReplaceAll(trimmed, ",", ";")
-		if len(purpose) > maxPurposeLen {
-			// Trim to maxPurposeLen, cutting at word boundary
-			purpose = purpose[:maxPurposeLen]
-			if idx := strings.LastIndex(purpose, " "); idx > 0 {
-				purpose = purpose[:idx]
-			}
-		}
-		return purpose
-	}
-
-	return ""
 }
 
 // insertNavBlock inserts or replaces a nav block in file content.
@@ -299,17 +264,111 @@ func cleanBlankLines(content string) string {
 	return content
 }
 
-// buildNavEntries converts parser sections to nav entries.
-func buildNavEntries(sections []parser.Section) []navblock.NavEntry {
-	entries := make([]navblock.NavEntry, len(sections))
+// buildNavEntries converts parser sections to nav entries with keyword descriptions.
+// Applies three-tier subsection logic:
+//   - Under subThreshold: no subsection info (h3 children skipped)
+//   - Between subThreshold and expandThreshold: > hints for h3 children (h3 skipped)
+//   - Over expandThreshold: full h3 entries as separate nav entries
+func buildNavEntries(sections []parser.Section, content string, cfg config.Config) []navblock.NavEntry {
+	lines := strings.Split(content, "\n")
+	var entries []navblock.NavEntry
+	skipUntil := 0 // track sections to skip (h3 children of parents not expanding)
+
 	for i, s := range sections {
+		if s.Start < skipUntil {
+			continue
+		}
+
+		sectionContent := getSectionContent(lines, s.Start, s.End)
+		sectionSize := s.End - s.Start + 1
+
 		prefix := strings.Repeat("#", s.Depth)
-		entries[i] = navblock.NavEntry{
+		about := keywords.ExtractKeywords(sectionContent, 5)
+
+		// Apply subsection logic for h2 entries (depth 2) with h3 children
+		if s.Depth == 2 {
+			h3Children := getH3Children(sections, i)
+
+			if sectionSize >= cfg.ExpandThreshold {
+				// Full expansion: add h3 children as separate entries
+				entries = append(entries, navblock.NavEntry{
+					Start: s.Start,
+					End:   s.End,
+					Name:  prefix + s.Text,
+					About: about,
+				})
+				for _, child := range h3Children {
+					childContent := getSectionContent(lines, child.Start, child.End)
+					childAbout := keywords.ExtractKeywords(childContent, 5)
+					childPrefix := strings.Repeat("#", child.Depth)
+					entries = append(entries, navblock.NavEntry{
+						Start: child.Start,
+						End:   child.End,
+						Name:  childPrefix + child.Text,
+						About: childAbout,
+					})
+				}
+				continue
+			} else if len(h3Children) > 0 {
+				// Small or medium section: skip h3 children
+				skipUntil = h3Children[len(h3Children)-1].Start + 1
+				// Only add > hints for medium sections (>= sub_threshold)
+				if sectionSize >= cfg.SubThreshold {
+					hints := make([]string, len(h3Children))
+					for j, child := range h3Children {
+						hints[j] = strings.ReplaceAll(child.Text, ",", ";")
+					}
+					if about != "" {
+						about += ">" + strings.Join(hints, ";")
+					} else {
+						about = ">" + strings.Join(hints, ";")
+					}
+				}
+			}
+		}
+
+		entries = append(entries, navblock.NavEntry{
 			Start: s.Start,
 			End:   s.End,
 			Name:  prefix + s.Text,
-			About: "",
+			About: about,
+		})
+	}
+
+	return entries
+}
+
+// getSectionContent extracts the text content between start and end line numbers (1-indexed).
+func getSectionContent(lines []string, start, end int) string {
+	if start < 1 || end < start {
+		return ""
+	}
+	if end > len(lines) {
+		end = len(lines)
+	}
+	return strings.Join(lines[start-1:end], "\n")
+}
+
+// getH3Children returns h3 sections that are immediate children of the section at index i.
+func getH3Children(sections []parser.Section, parentIdx int) []parser.Section {
+	if parentIdx+1 >= len(sections) {
+		return nil
+	}
+
+	parent := sections[parentIdx]
+	if parent.Depth != 2 {
+		return nil
+	}
+
+	var children []parser.Section
+	for j := parentIdx + 1; j < len(sections); j++ {
+		s := sections[j]
+		if s.Depth == 3 && s.Start <= parent.End {
+			children = append(children, s)
+		} else if s.Depth <= 2 {
+			break
 		}
 	}
-	return entries
+
+	return children
 }
