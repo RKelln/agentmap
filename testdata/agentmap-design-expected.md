@@ -1,6 +1,6 @@
 <!-- AGENT:NAV
 purpose:nav;line;block;file;lines;entries;markdown;threshold
-nav[27]{s,e,name,about}:
+nav[27]{s,n,name,about}:
 32,338,#agentmap: Navigation Maps for AI Agents,nav;line;block;file;lines
 35,40,##Design Document v0.1,design;complete;document;implementation;ready
 37,40,##1. Problem,file;line;tokens;files;markdown
@@ -59,7 +59,7 @@ Code files have LSPs, treesitter, go-to-definition, and symbol search. Markdown 
 2. A section index with line ranges (which section do I need, and exactly which lines?)
 3. Cross-references to related files (is the answer actually somewhere else?)
 
-Agents are instructed (via AGENTS.md) to read the first ~20 lines of any markdown file before reading the rest. This gives them the nav block, which collapses multi-step navigation into a single precise `Read(offset=s, limit=e-s)` call.
+Agents are instructed (via AGENTS.md) to read the first ~20 lines of any markdown file before reading the rest. This gives them the nav block, which collapses multi-step navigation into a single precise `Read(offset=s, limit=n)` call.
 
 ## 3. Format Specification
 
@@ -77,13 +77,13 @@ Agents are instructed (via AGENTS.md) to read the first ~20 lines of any markdow
 The `#` count in the `name` field mirrors the heading depth in the source markdown:
 
 ```markdown
-nav[6]{s,e,name,about}:
-5,45,#Authentication,token lifecycle management
-8,20,##Token Exchange,OAuth2 code-for-token flow
-10,14,###PKCE,proof key for code exchange
-15,20,###Implicit,legacy implicit grant flow
-21,35,##Token Refresh,silent rotation and expiry
-36,45,##Token Revocation,logout and forced invalidation
+nav[6]{s,n,name,about}:
+5,41,#Authentication,token lifecycle management
+8,13,##Token Exchange,OAuth2 code-for-token flow
+10,5,###PKCE,proof key for code exchange
+15,6,###Implicit,legacy implicit grant flow
+21,15,##Token Refresh,silent rotation and expiry detection
+36,10,##Token Revocation,logout and forced invalidation
 ```
 
 This provides **absolute depth** — an agent landing on any entry knows its exact position in the hierarchy without scanning upward. It directly mirrors the markdown heading syntax agents have seen extensively in training data.

@@ -27,7 +27,7 @@ Code files have LSPs, treesitter, go-to-definition, and symbol search. Markdown 
 2. A section index with line ranges (which section do I need, and exactly which lines?)
 3. Cross-references to related files (is the answer actually somewhere else?)
 
-Agents are instructed (via AGENTS.md) to read the first ~20 lines of any markdown file before reading the rest. This gives them the nav block, which collapses multi-step navigation into a single precise `Read(offset=s, limit=e-s)` call.
+Agents are instructed (via AGENTS.md) to read the first ~20 lines of any markdown file before reading the rest. This gives them the nav block, which collapses multi-step navigation into a single precise `Read(offset=s, limit=n)` call.
 
 ## 3. Format Specification
 
@@ -36,9 +36,9 @@ Agents are instructed (via AGENTS.md) to read the first ~20 lines of any markdow
 ```markdown
 <!-- AGENT:NAV
 purpose:one-line file description
-nav[N]{s,e,name,about}:
-s,e,#Heading,description
-s,e,##Subheading,description
+nav[N]{s,n,name,about}:
+s,n,#Heading,description
+s,n,##Subheading,description
 see[N]{path,why}:
 relative/path.md,reason to read it
 -->
@@ -55,7 +55,7 @@ relative/path.md,reason to read it
 - Single line. Describes what the file is and when an agent should read further.
 - Written by `generate` (via keyword extraction or LLM). Preserved by `update`.
 
-**nav:** `nav[N]{s,e,name,about}:`
+**nav:** `nav[N]{s,n,name,about}:`
 - `N` = total number of entries (including subheadings).
 - `s` = start line number (1-indexed, inclusive).
 - `e` = end line number (1-indexed, inclusive). The last line of content before the next heading or EOF.
@@ -77,13 +77,13 @@ relative/path.md,reason to read it
 The `#` count in the `name` field mirrors the heading depth in the source markdown:
 
 ```markdown
-nav[6]{s,e,name,about}:
-5,45,#Authentication,token lifecycle management
-8,20,##Token Exchange,OAuth2 code-for-token flow
-10,14,###PKCE,proof key for code exchange
-15,20,###Implicit,legacy implicit grant flow
-21,35,##Token Refresh,silent rotation and expiry
-36,45,##Token Revocation,logout and forced invalidation
+nav[6]{s,n,name,about}:
+5,41,#Authentication,token lifecycle management
+8,13,##Token Exchange,OAuth2 code-for-token flow
+10,5,###PKCE,proof key for code exchange
+15,6,###Implicit,legacy implicit grant flow
+21,15,##Token Refresh,silent rotation and expiry detection
+36,10,##Token Revocation,logout and forced invalidation
 ```
 
 This provides **absolute depth** — an agent landing on any entry knows its exact position in the hierarchy without scanning upward. It directly mirrors the markdown heading syntax agents have seen extensively in training data.
@@ -104,15 +104,15 @@ title: Authentication
 
 <!-- AGENT:NAV
 purpose:token lifecycle; OAuth2 exchange; refresh and revocation policies
-nav[8]{s,e,name,about}:
-12,350,#Authentication,token lifecycle management
-14,50,##Overview,protocol selection; supported grant types
-51,130,##Token Exchange,OAuth2 code-for-token flow>PKCE;implicit;device-code
-131,330,##Token Lifecycle,rotation; expiry; revocation
-135,200,###Refresh,silent rotation and sliding-window expiry
-201,280,###Revocation,logout; forced invalidation; webhook notify
-281,330,###Introspection,token validation endpoint; caching policy
-331,350,##Migration Guide,upgrading from v1 tokens
+nav[8]{s,n,name,about}:
+12,339,#Authentication,token lifecycle management
+14,37,##Overview,protocol selection; supported grant types
+51,80,##Token Exchange,OAuth2 code-for-token flow>PKCE;implicit;device-code
+131,200,##Token Lifecycle,rotation; expiry; revocation
+135,66,###Refresh,silent rotation and sliding-window expiry
+201,80,###Revocation,logout; forced invalidation; webhook notify
+281,50,###Introspection,token validation endpoint; caching policy
+331,20,##Migration Guide,upgrading from v1 tokens
 see[2]{path,why}:
 src/config.py,default timeout and token TTL values
 docs/error-policy.md,error handling for auth failures
@@ -424,7 +424,7 @@ Every markdown file over 50 lines has an AGENT:NAV block in the first
 20 lines. Read it before reading the rest of the file.
 
 - If purpose doesn't match your task; stop reading.
-- Use s,e line ranges: Read(offset=s, limit=e-s) for the section you need.
+- Use s,n line ranges: Read(offset=s, limit=n) for the section you need.
 - If a description has `>` hints (e.g. `topic>sub1;sub2;sub3`); scan the hints to find the right subsection before reading the whole parent section.
 - Check see before searching; the file you need may be listed.
 - If line numbers seem off; grep for the heading as fallback.
@@ -445,11 +445,11 @@ Every markdown file over 50 lines has an AGENT:NAV block in the first
 2. Agent reads first 20 lines of docs/authentication.md.
 3. Sees nav block:
    purpose:token lifecycle; OAuth2 exchange; refresh and revocation
-   nav[6]{s,e,name,about}:
-   12,65,#Authentication,token lifecycle management
-   14,35,##Token Exchange,OAuth2 code-for-token flow
+   nav[6]{s,n,name,about}:
+   12,54,#Authentication,token lifecycle management
+   14,22,##Token Exchange,OAuth2 code-for-token flow
    ...
-   36,50,##Token Refresh,silent rotation and expiry detection
+   36,15,##Token Refresh,silent rotation and expiry detection
 4. Agent needs token refresh info.
 5. Agent calls Read(offset=36, limit=14).
 6. Done. Read 14 lines instead of 200+.
@@ -762,12 +762,11 @@ A typical nav block for a file with 6 sections and 2 see entries:
 ```
 <!-- AGENT:NAV
 purpose:token lifecycle; OAuth2 exchange; refresh and revocation
-nav[6]{s,e,name,about}:
-12,65,#Authentication,token lifecycle management
-14,35,##Token Exchange,OAuth2 code-for-token flow
-17,25,###PKCE,proof key for code exchange
-26,35,###Implicit,legacy implicit grant; deprecated
-36,50,##Token Refresh,silent rotation and expiry detection
+   nav[6]{s,n,name,about}:
+   12,54,#Authentication,token lifecycle management
+   14,22,##Token Exchange,OAuth2 code-for-token flow
+   ...
+   36,15,##Token Refresh,silent rotation and expiry detection
 51,65,##Token Revocation,logout and forced invalidation
 see[2]{path,why}:
 src/config.py,default timeout and token TTL values

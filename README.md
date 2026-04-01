@@ -9,10 +9,10 @@ Navigation maps for AI agents.
 ```markdown
 <!-- AGENT:NAV
 purpose:token lifecycle; OAuth2 exchange; refresh and revocation
-nav[6]{s,e,name,about}:
-12,65,#Authentication,token lifecycle management
-14,35,##Token Exchange,OAuth2 code-for-token flow
-36,50,##Token Refresh,silent rotation and expiry detection
+nav[6]{s,n,name,about}:
+12,54,#Authentication,token lifecycle management
+14,22,##Token Exchange,OAuth2 code-for-token flow
+36,15,##Token Refresh,silent rotation and expiry detection
 see[2]{path,why}:
 src/config.py,default timeout and token TTL values
 docs/error-policy.md,error handling for auth failures
@@ -28,7 +28,7 @@ This gives AI coding agents:
 
 Code files have LSPs, treesitter, go-to-definition, and symbol search. Markdown has none of these. When an agent needs information from a 500-line markdown file, it typically reads the entire file (~2000 tokens) even if it only needs a 20-line section (~80 tokens).
 
-`agentmap` closes that gap with a compact nav block that collapses multi-step navigation into a single precise `Read(offset=s, limit=e-s)` call.
+`agentmap` closes that gap with a compact nav block that collapses multi-step navigation into a single precise `Read(offset=s, limit=n)` call.
 
 ## Commands
 

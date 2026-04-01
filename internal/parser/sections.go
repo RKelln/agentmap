@@ -7,6 +7,11 @@ type Section struct {
 	End   int // 1-indexed end line (inclusive)
 }
 
+// Len returns the number of lines in this section (inclusive).
+func (s Section) Len() int {
+	return s.End - s.Start + 1
+}
+
 // ComputeSections computes start/end line ranges for each heading.
 // A section ends at the line before the next heading at the same or higher level,
 // or at totalLines if no such heading exists.
