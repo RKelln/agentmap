@@ -21,7 +21,7 @@ var rootCmd = &cobra.Command{
 var generateCmd = &cobra.Command{
 	Use:   "generate [path]",
 	Short: "Generate nav blocks for markdown files",
-	Long:  "Parse markdown headings, generate descriptions, write full nav blocks.",
+	Long:  "Parse markdown headings, generate descriptions, write full nav blocks.\nPath can be a directory (recursive) or a single .md file.",
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		root := "."
@@ -55,6 +55,17 @@ var generateCmd = &cobra.Command{
 		}
 
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
+
+		// If path is a single file, process it directly
+		info, err := os.Stat(root)
+		if err == nil && !info.IsDir() {
+			report, err := generate.File(root, cfg, dryRun)
+			if err != nil {
+				return err
+			}
+			fmt.Println(report)
+			return nil
+		}
 
 		return generate.Generate(root, cfg, dryRun)
 	},

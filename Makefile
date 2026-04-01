@@ -1,4 +1,4 @@
-.PHONY: build test lint fmt install clean
+.PHONY: build test lint fmt install clean check-sample
 
 BINARY := agentmap
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
@@ -22,6 +22,24 @@ install:
 
 clean:
 	rm -f $(BINARY)
+
+# Run agentmap generate on a copy of the design doc (with fake nav block stripped)
+# and diff the result against the expected output. Sanity check, not a true test.
+SAMPLE := testdata/agentmap-design-sample.md
+EXPECTED := testdata/agentmap-design-expected.md
+
+check-sample: build
+	@# Strip the existing fake nav block from the design doc copy
+	@sed '/<!-- AGENT:NAV/,/-->/d' agentmap-design.md > $(SAMPLE)
+	@# Generate nav blocks for all files in testdata
+	@./$(BINARY) generate testdata
+	@# Diff the sample against expected output
+	@diff -u $(EXPECTED) $(SAMPLE) || { \
+		echo "Sample output changed. Review the diff above."; \
+		echo "If changes are expected, run: cp $(SAMPLE) $(EXPECTED)"; \
+		exit 1; \
+	}
+	@rm -f $(SAMPLE)
 
 # CI gate: all three must pass before merge
 ci: test lint build

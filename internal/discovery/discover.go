@@ -71,9 +71,9 @@ func isGitRepo(dir string) bool {
 	}
 }
 
-// gitLsFiles runs git ls-files in dir and returns the list of tracked files.
+// gitLsFiles runs git ls-files in dir and returns the list of tracked and untracked files.
 func gitLsFiles(dir string) ([]string, error) {
-	cmd := exec.Command("git", "ls-files")
+	cmd := exec.Command("git", "ls-files", "--cached", "--others", "--exclude-standard")
 	cmd.Dir = dir
 	output, err := cmd.Output()
 	if err != nil {
