@@ -368,6 +368,8 @@ func buildNavEntries(sections []parser.Section, content string, cfg config.Confi
 						About: childAbout,
 					})
 				}
+				// Skip past h3 children so they're not processed again as standalone entries
+				skipUntil = h3Children[len(h3Children)-1].Start + 1
 				continue
 			} else if len(h3Children) > 0 {
 				// Small or medium section: skip h3 children
@@ -423,10 +425,13 @@ func getH3Children(sections []parser.Section, parentIdx int) []parser.Section {
 	var children []parser.Section
 	for j := parentIdx + 1; j < len(sections); j++ {
 		s := sections[j]
+		// Stop at any heading at same or higher level (h1 or h2)
+		if s.Depth <= parent.Depth {
+			break
+		}
+		// Only include h3 that starts within parent's span
 		if s.Depth == 3 && s.Start <= parent.End {
 			children = append(children, s)
-		} else if s.Depth <= 2 {
-			break
 		}
 	}
 
