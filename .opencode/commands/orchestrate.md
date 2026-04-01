@@ -128,14 +128,14 @@ bd update <id> --status in_progress
 
 ## Phase 4: IMPLEMENT (TDD)
 
-**Goal:** Write tests first, then implement. Delegate each step to `@general`.
+**Goal:** Red/Green TDD - tests first, then implement. Delegate each step to `@general`.
 
-Tell each subagent: the step to implement, that this is Go TDD (failing tests first,
-table-driven, edge cases), the Reference File paths from Phase 1, and files to modify.
+Tell each subagent: the step to implement, that this is Go TDD (failing tests FIRST, then minimal implementation to pass, table-driven, edge cases), the Reference File paths from Phase 1, and files to modify.
 
 **Implement subagent prompts must include:**
 > **Do NOT commit or push any changes. The orchestrator owns all git commits.
-> Write the code, run the tests, fix failures -- then stop and reflect.
+> Write tests FIRST (they should fail initially), then implement just enough to make them pass.
+> Run tests, fix failures -- then stop and reflect.
 >
 > (Reflect on what you would have done differently: awkward abstractions,
 > package boundaries, tech debt, performance concerns, test coverage gaps,
