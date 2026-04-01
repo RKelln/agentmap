@@ -23,6 +23,9 @@ install:
 clean:
 	rm -f $(BINARY)
 
+agent-clean:
+	scripts/agent-cleanup.sh
+
 # Run agentmap generate on a copy of the design doc (with fake nav block stripped)
 # and diff the result against the expected output. Sanity check, not a true test.
 SAMPLE := /tmp/agentmap-design-sample.md

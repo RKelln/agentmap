@@ -21,12 +21,24 @@ Before planning or writing code, read:
 
 ```bash
 make build      # build binary to ./agentmap
-make test       # run all tests
-make lint       # run golangci-lint
-make fmt        # format with gofumpt
-make install    # install to $GOPATH/bin
-make ci         # quality gate: test + lint + build (must pass before merge)
+
+# CI before pushing (required)
+scripts/agent-run.sh make ci
+
+# Targeted tests
+scripts/agent-run.sh make test
+
+# Lint
+scripts/agent-run.sh make lint
+
+# Format
+make fmt
+
+# Rebuild after code changes
+make build
 ```
+
+**Always wrap build/test/lint/long output commands with `scripts/agent-run.sh`** — captures verbose output to `.agent-output/`, shows only summary.
 
 ## Debugging
 
