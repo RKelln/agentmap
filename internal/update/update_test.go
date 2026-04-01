@@ -24,10 +24,10 @@ func TestFile_Shifted(t *testing.T) {
 
 	oldContent := `<!-- AGENT:NAV
 purpose:authentication documentation
-nav[3]{s,e,name,about}:
-12,50,#Authentication,token lifecycle management
-14,30,##Token Exchange,OAuth2 code-for-token flow
-32,50,##Token Refresh,silent rotation and expiry
+nav[3]{s,n,name,about}:
+12,39,#Authentication,token lifecycle management
+14,17,##Token Exchange,OAuth2 code-for-token flow
+32,19,##Token Refresh,silent rotation and expiry
 -->
 # Authentication
 
@@ -88,9 +88,9 @@ func TestFile_NewHeading(t *testing.T) {
 
 	oldContent := `<!-- AGENT:NAV
 purpose:authentication documentation
-nav[2]{s,e,name,about}:
-12,25,#Authentication,token lifecycle management
-14,20,##Token Exchange,OAuth2 code-for-token flow
+nav[2]{s,n,name,about}:
+12,14,#Authentication,token lifecycle management
+14,7,##Token Exchange,OAuth2 code-for-token flow
 -->
 # Authentication
 
@@ -153,10 +153,10 @@ func TestFile_DeletedHeading(t *testing.T) {
 
 	oldContent := `<!-- AGENT:NAV
 purpose:authentication documentation
-nav[3]{s,e,name,about}:
-12,50,#Authentication,token lifecycle management
-14,30,##Token Exchange,OAuth2 code-for-token flow
-32,50,##Token Refresh,silent rotation and expiry
+nav[3]{s,n,name,about}:
+12,39,#Authentication,token lifecycle management
+14,17,##Token Exchange,OAuth2 code-for-token flow
+32,19,##Token Refresh,silent rotation and expiry
 -->
 # Authentication
 
@@ -255,8 +255,8 @@ func TestFile_DryRun(t *testing.T) {
 
 	oldContent := `<!-- AGENT:NAV
 purpose:old purpose
-nav[1]{s,e,name,about}:
-12,25,#Old Section,old description
+nav[1]{s,n,name,about}:
+12,14,#Old Section,old description
 -->
 # Old Section
 
@@ -284,9 +284,9 @@ func TestFile_UpdatePreservesDescriptions(t *testing.T) {
 
 	oldContent := `<!-- AGENT:NAV
 purpose:authentication docs
-nav[2]{s,e,name,about}:
-12,40,#Auth,token lifecycle
-14,25,##Exchange,OAuth2 code flow
+nav[2]{s,n,name,about}:
+12,29,#Auth,token lifecycle
+14,12,##Exchange,OAuth2 code flow
 -->
 # Auth
 
@@ -335,11 +335,11 @@ func TestFile_NoChanges(t *testing.T) {
 
 	oldContent := `<!-- AGENT:NAV
 purpose:docs
-nav[4]{s,e,name,about}:
-9,24,#Document,main doc
-13,16,##Section A,section A content
-17,20,##Section B,section B content
-21,24,##Section C,section C content
+nav[4]{s,n,name,about}:
+9,16,#Document,main doc
+13,4,##Section A,section A content
+17,4,##Section B,section B content
+21,4,##Section C,section C content
 -->
 # Document
 
@@ -378,9 +378,9 @@ func TestFile_DuplicateHeadings(t *testing.T) {
 
 	oldContent := `<!-- AGENT:NAV
 purpose:guide
-nav[2]{s,e,name,about}:
-12,30,#Guide,guide doc
-14,15,##Examples,first examples
+nav[2]{s,n,name,about}:
+12,19,#Guide,guide doc
+14,2,##Examples,first examples
 -->
 # Guide
 
@@ -432,8 +432,8 @@ func TestFile_QuietMode(t *testing.T) {
 
 	oldContent := `<!-- AGENT:NAV
 purpose:old
-nav[1]{s,e,name,about}:
-12,20,#Section,old desc
+nav[1]{s,n,name,about}:
+12,9,#Section,old desc
 -->
 # Section
 
@@ -470,9 +470,9 @@ func TestFile_EmptyNavEntries(t *testing.T) {
 
 	oldContent := `<!-- AGENT:NAV
 purpose:docs
-nav[2]{s,e,name,about}:
-12,25,#Doc,description
-14,25,##Section,
+nav[2]{s,n,name,about}:
+12,14,#Doc,description
+14,12,##Section,
 -->
 # Doc
 
@@ -515,9 +515,9 @@ func TestFile_RenameHeading(t *testing.T) {
 
 	oldContent := `<!-- AGENT:NAV
 purpose:docs
-nav[2]{s,e,name,about}:
-7,14,#Doc,description
-11,14,##OldName,old description
+nav[2]{s,n,name,about}:
+7,8,#Doc,description
+11,4,##OldName,old description
 -->
 # Doc
 
@@ -577,8 +577,8 @@ func TestFile_PreservesSeeBlock(t *testing.T) {
 
 	oldContent := `<!-- AGENT:NAV
 purpose:docs
-nav[1]{s,e,name,about}:
-12,17,#Doc,description
+nav[1]{s,n,name,about}:
+12,6,#Doc,description
 see[2]{path,why}:
 other.md,related file
 config.md,configuration
@@ -629,8 +629,8 @@ func TestFile_PreservesPurpose(t *testing.T) {
 
 	oldContent := `<!-- AGENT:NAV
 purpose:important docs
-nav[1]{s,e,name,about}:
-12,30,#Doc,description
+nav[1]{s,n,name,about}:
+12,19,#Doc,description
 -->
 # Doc
 
@@ -663,9 +663,9 @@ func TestFile_ShiftedWithDescription(t *testing.T) {
 
 	oldContent := `<!-- AGENT:NAV
 purpose:docs
-nav[2]{s,e,name,about}:
-12,20,#Doc,description
-14,20,##Section,section content
+nav[2]{s,n,name,about}:
+12,9,#Doc,description
+14,7,##Section,section content
 -->
 # Doc
 

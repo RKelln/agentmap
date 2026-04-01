@@ -18,9 +18,9 @@ title: Test
 
 <!-- AGENT:NAV
 purpose:test file
-nav[2]{s,e,name,about}:
-12,19,#Test,test section
-16,19,##Subtest,sub section
+nav[2]{s,n,name,about}:
+12,8,#Test,test section
+16,4,##Subtest,sub section
 -->
 
 # Test
@@ -54,8 +54,8 @@ title: Test
 
 <!-- AGENT:NAV
 purpose:test file
-nav[1]{s,e,name,about}:
-7,20,#Test,test section
+nav[1]{s,n,name,about}:
+7,14,#Test,test section
 -->
 
 # Test
@@ -88,8 +88,8 @@ title: Test
 
 <!-- AGENT:NAV
 purpose:test file
-nav[1]{s,e,name,about}:
-11,16,#Test,test section
+nav[1]{s,n,name,about}:
+11,6,#Test,test section
 -->
 
 # Test
@@ -124,9 +124,9 @@ title: Test
 
 <!-- AGENT:NAV
 purpose:test file
-nav[2]{s,e,name,about}:
-12,15,#Test,test section
-16,18,##Extra,extra section
+nav[2]{s,n,name,about}:
+12,4,#Test,test section
+16,3,##Extra,extra section
 -->
 
 # Test
@@ -209,10 +209,10 @@ title: Test
 
 <!-- AGENT:NAV
 purpose:test file
-nav[3]{s,e,name,about}:
-7,25,#Test,test section
-9,15,##OldOne,old section
-20,25,##Missing,missing section
+nav[3]{s,n,name,about}:
+7,3,#Test,test section
+9,7,##OldOne,old section
+20,6,##Missing,missing section
 -->
 
 # Test

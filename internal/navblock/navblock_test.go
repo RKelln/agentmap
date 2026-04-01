@@ -8,10 +8,10 @@ import (
 func TestParseNavBlock_Full(t *testing.T) {
 	content := `<!-- AGENT:NAV
 purpose:token lifecycle; OAuth2 exchange
-nav[3]{s,e,name,about}:
-12,65,#Authentication,token lifecycle management
-14,35,##Token Exchange,OAuth2 code-for-token flow
-36,50,##Token Refresh,silent rotation and expiry
+nav[3]{s,n,name,about}:
+12,54,#Authentication,token lifecycle management
+14,22,##Token Exchange,OAuth2 code-for-token flow
+36,15,##Token Refresh,silent rotation and expiry
 see[1]{path,why}:
 src/config.py,default timeout and token TTL values
 -->
@@ -34,7 +34,7 @@ src/config.py,default timeout and token TTL values
 	if len(block.Nav) != 3 {
 		t.Fatalf("len(Nav) = %d, want 3", len(block.Nav))
 	}
-	want := NavEntry{Start: 12, End: 65, Name: "#Authentication", About: "token lifecycle management"}
+	want := NavEntry{Start: 12, N: 54, Name: "#Authentication", About: "token lifecycle management"}
 	if !reflect.DeepEqual(block.Nav[0], want) {
 		t.Errorf("nav[0] = %+v, want %+v", block.Nav[0], want)
 	}
@@ -79,7 +79,7 @@ func TestParseNavBlock_NotFound(t *testing.T) {
 func TestParseNavBlock_EmptyAbout(t *testing.T) {
 	content := `<!-- AGENT:NAV
 purpose:test
-nav[1]{s,e,name,about}:
+nav[1]{s,n,name,about}:
 1,10,#Heading,
 -->
 `
@@ -97,8 +97,8 @@ func TestRenderNavBlock(t *testing.T) {
 	block := NavBlock{
 		Purpose: "test purpose",
 		Nav: []NavEntry{
-			{Start: 5, End: 45, Name: "#Authentication", About: "token lifecycle"},
-			{Start: 8, End: 20, Name: "##Token Exchange", About: "OAuth2 flow"},
+			{Start: 5, N: 41, Name: "#Authentication", About: "token lifecycle"},
+			{Start: 8, N: 13, Name: "##Token Exchange", About: "OAuth2 flow"},
 		},
 		See: []SeeEntry{
 			{Path: "src/config.py", Why: "default timeout values"},
@@ -108,9 +108,9 @@ func TestRenderNavBlock(t *testing.T) {
 	got := RenderNavBlock(block)
 	want := `<!-- AGENT:NAV
 purpose:test purpose
-nav[2]{s,e,name,about}:
-5,45,#Authentication,token lifecycle
-8,20,##Token Exchange,OAuth2 flow
+nav[2]{s,n,name,about}:
+5,41,#Authentication,token lifecycle
+8,13,##Token Exchange,OAuth2 flow
 see[1]{path,why}:
 src/config.py,default timeout values
 -->`
@@ -132,8 +132,8 @@ func TestParseNavBlock_RoundTrip(t *testing.T) {
 	original := NavBlock{
 		Purpose: "round trip test",
 		Nav: []NavEntry{
-			{Start: 10, End: 50, Name: "#Section", About: "content description"},
-			{Start: 12, End: 30, Name: "##Subsection", About: ""},
+			{Start: 10, N: 41, Name: "#Section", About: "content description"},
+			{Start: 12, N: 19, Name: "##Subsection", About: ""},
 		},
 		See: []SeeEntry{
 			{Path: "other.md", Why: "related info"},

@@ -1,0 +1,20 @@
+goos: linux
+goarch: amd64
+pkg: github.com/ryankelln/agentmap/internal/generate
+cpu: 12th Gen Intel(R) Core(TM) i5-1240P
+BenchmarkFileDryRun/small-16         	   58392	     18771 ns/op	   13617 B/op	     185 allocs/op
+BenchmarkFileDryRun/medium-16        	   19624	     59843 ns/op	   51662 B/op	     636 allocs/op
+BenchmarkFileDryRun/large-16         	    8654	    148100 ns/op	  113413 B/op	    1683 allocs/op
+BenchmarkFileDryRun/design-clean-16  	     326	   3534316 ns/op	 2292707 B/op	   23235 allocs/op
+PASS
+ok  	github.com/ryankelln/agentmap/internal/generate	5.932s
+goos: linux
+goarch: amd64
+pkg: github.com/ryankelln/agentmap/internal/keywords
+cpu: 12th Gen Intel(R) Core(TM) i5-1240P
+BenchmarkExtractKeywords/small-16         	  370142	      2813 ns/op	    1552 B/op	      36 allocs/op
+BenchmarkExtractKeywords/medium-16        	   67608	     16727 ns/op	   11216 B/op	     207 allocs/op
+BenchmarkExtractKeywords/large-16         	   19957	     62817 ns/op	   41680 B/op	     785 allocs/op
+BenchmarkExtractPurpose-16                	   30601	     37170 ns/op	   23280 B/op	     464 allocs/op
+PASS
+ok  	github.com/ryankelln/agentmap/internal/keywords	5.794s

@@ -12,10 +12,9 @@ Go 1.25+. Cobra CLI. Single binary; no runtime dependencies.
 
 ## Documentation First
 
-Before planning or writing code, read:
+When you need to reference the design:
 
 - `agentmap-design.md` -- full specification; nav block format; CLI commands; parser rules; keyword extraction; config
-- `@.opencode/commands/orchestrate.md` -- read before starting any feature/bugfix/refactor work
 
 ## Fast Path
 
@@ -39,6 +38,12 @@ make build
 ```
 
 **Always wrap build/test/lint/long output commands with `scripts/agent-run.sh`** — captures verbose output to `.agent-output/`, shows only summary.
+
+## Benchmarks
+
+- Run `make bench` for a concise throughput summary.
+- Run `make bench-update` to refresh `benchmarks.md` with the current baseline and raw data.
+- Use `benchmarks.md` as the comparison point for future regressions.
 
 ## Debugging
 
@@ -86,16 +91,16 @@ testdata/           -- sample markdown files for tests
 
 ## Reading Markdown Files
 
-Every markdown file over 50 lines has an AGENT:NAV block in the first
-20 lines. Read it before reading the rest of the file.
+Read the AGENT:NAV block at the top after any other the frontmatter. 
+Read the first 40 lines of a file before reading the rest of the file.
 
 - If purpose doesn't match your task; stop reading.
-- Use s,e line ranges: Read(offset=s, limit=e-s) for the section you need.
+- Use s,n line ranges: Read(offset=s, limit=n) for the section you need.
 - Check see before searching; the file you need may be listed.
 
 ## Before Committing Markdown Changes
 
-1. Run: `agentmap update <changed files>` (once the tool is built)
+1. Run: `agentmap update <changed markdown files>` (once the tool is built)
 2. Review output for sections marked content-changed or new.
 3. Read flagged sections and update their descriptions in the nav block.
 4. Commit.

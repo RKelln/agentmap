@@ -27,7 +27,7 @@ Code files have LSPs, treesitter, go-to-definition, and symbol search. Markdown 
 2. A section index with line ranges (which section do I need, and exactly which lines?)
 3. Cross-references to related files (is the answer actually somewhere else?)
 
-Agents are instructed (via AGENTS.md) to read the first ~20 lines of any markdown file before reading the rest. This gives them the nav block, which collapses multi-step navigation into a single precise `Read(offset=s, limit=e-s)` call.
+Agents are instructed (via AGENTS.md) to read the first ~20 lines of any markdown file before reading the rest. This gives them the nav block, which collapses multi-step navigation into a single precise `Read(offset=s, limit=n)` call.
 
 ## 3. Format Specification
 
@@ -36,9 +36,9 @@ Agents are instructed (via AGENTS.md) to read the first ~20 lines of any markdow
 ```markdown
 <!-- AGENT:NAV
 purpose:one-line file description
-nav[N]{s,e,name,about}:
-s,e,#Heading,description
-s,e,##Subheading,description
+nav[N]{s,n,name,about}:
+s,n,#Heading,description
+s,n,##Subheading,description
 see[N]{path,why}:
 relative/path.md,reason to read it
 -->
@@ -55,7 +55,7 @@ relative/path.md,reason to read it
 - Single line. Describes what the file is and when an agent should read further.
 - Written by `generate` (via keyword extraction or LLM). Preserved by `update`.
 
-**nav:** `nav[N]{s,e,name,about}:`
+**nav:** `nav[N]{s,n,name,about}:`
 - `N` = total number of entries (including subheadings).
 - `s` = start line number (1-indexed, inclusive).
 - `e` = end line number (1-indexed, inclusive). The last line of content before the next heading or EOF.
@@ -77,13 +77,13 @@ relative/path.md,reason to read it
 The `#` count in the `name` field mirrors the heading depth in the source markdown:
 
 ```markdown
-nav[6]{s,e,name,about}:
-5,45,#Authentication,token lifecycle management
-8,20,##Token Exchange,OAuth2 code-for-token flow
-10,14,###PKCE,proof key for code exchange
-15,20,###Implicit,legacy implicit grant flow
-21,35,##Token Refresh,silent rotation and expiry
-36,45,##Token Revocation,logout and forced invalidation
+nav[6]{s,n,name,about}:
+5,41,#Authentication,token lifecycle management
+8,13,##Token Exchange,OAuth2 code-for-token flow
+10,5,###PKCE,proof key for code exchange
+15,6,###Implicit,legacy implicit grant flow
+21,15,##Token Refresh,silent rotation and expiry detection
+36,10,##Token Revocation,logout and forced invalidation
 ```
 
 This provides **absolute depth** — an agent landing on any entry knows its exact position in the hierarchy without scanning upward. It directly mirrors the markdown heading syntax agents have seen extensively in training data.
@@ -104,15 +104,15 @@ title: Authentication
 
 <!-- AGENT:NAV
 purpose:token lifecycle; OAuth2 exchange; refresh and revocation policies
-nav[8]{s,e,name,about}:
-12,350,#Authentication,token lifecycle management
-14,50,##Overview,protocol selection; supported grant types
-51,130,##Token Exchange,OAuth2 code-for-token flow>PKCE;implicit;device-code
-131,330,##Token Lifecycle,rotation; expiry; revocation
-135,200,###Refresh,silent rotation and sliding-window expiry
-201,280,###Revocation,logout; forced invalidation; webhook notify
-281,330,###Introspection,token validation endpoint; caching policy
-331,350,##Migration Guide,upgrading from v1 tokens
+nav[8]{s,n,name,about}:
+12,339,#Authentication,token lifecycle management
+14,37,##Overview,protocol selection; supported grant types
+51,80,##Token Exchange,OAuth2 code-for-token flow>PKCE;implicit;device-code
+131,200,##Token Lifecycle,rotation; expiry; revocation
+135,66,###Refresh,silent rotation and sliding-window expiry
+201,80,###Revocation,logout; forced invalidation; webhook notify
+281,50,###Introspection,token validation endpoint; caching policy
+331,20,##Migration Guide,upgrading from v1 tokens
 see[2]{path,why}:
 src/config.py,default timeout and token TTL values
 docs/error-policy.md,error handling for auth failures
@@ -126,7 +126,7 @@ Token lifecycle management for the platform...
 This example shows all three tiers from section 3.8:
 - `##Overview` (36 lines) and `##Migration Guide` (19 lines) — under `sub_threshold`; no subsection info even if they had h3 children.
 - `##Token Exchange` (79 lines) — between `sub_threshold` and `expand_threshold`; `>` hints list its three h3 children without giving them their own entries.
-- `##Token Lifecycle` (199 lines) — over `expand_threshold`; its h3 children (`###Refresh`, `###Revocation`, `###Introspection`) appear as full nav entries with their own `s,e` ranges.
+- `##Token Lifecycle` (199 lines) — over `expand_threshold`; its h3 children (`###Refresh`, `###Revocation`, `###Introspection`) appear as full nav entries with their own `s,n` ranges.
 
 ### 3.5 Placement Rules
 
@@ -175,7 +175,7 @@ The generator uses a three-tier threshold based on parent section line count:
 |---|---|---|
 | Under `sub_threshold` (default 50 lines) | No subsection info | Section is cheap to read in full |
 | `sub_threshold` to `expand_threshold` (default 150 lines) | `>` hints only | Agent reads parent section; hints help scan |
-| Over `expand_threshold` | Full h3 entries with own `s,e` ranges | Section too large to scan; agent needs precise offsets |
+| Over `expand_threshold` | Full h3 entries with own `s,n` ranges | Section too large to scan; agent needs precise offsets |
 
 This keeps the nav block compact for most files. A file with ten 40-line sections produces 10 nav entries with no hints. A file with three 80-line sections produces 3 entries with `>` hints. A file with one 200-line section produces 1 parent entry plus its h3 children as full entries.
 
@@ -209,7 +209,7 @@ This keeps the nav block compact for most files. A file with ten 40-line section
 - `--llm` — Use an LLM to generate descriptions instead of keyword extraction. Requires LLM configuration (see section 7).
 - `--min-lines N` — Override minimum file size threshold (default: 50).
 - `--sub-threshold N` — Override subheading inclusion threshold (default: 50 lines). Sections under this size get no subsection info.
-- `--expand-threshold N` — Override full-expansion threshold (default: 150 lines). Sections over this size get full h3 entries with own `s,e` ranges. Sections between `sub-threshold` and `expand-threshold` get `>` hints instead (see section 3.8).
+- `--expand-threshold N` — Override full-expansion threshold (default: 150 lines). Sections over this size get full h3 entries with own `s,n` ranges. Sections between `sub-threshold` and `expand-threshold` get `>` hints instead (see section 3.8).
 - `--dry-run` — Print what would be generated without writing files.
 
 **Output:**
@@ -230,7 +230,7 @@ Skipped: README.md (under 50 lines; purpose-only)
    a. Parse the existing nav block (extract entries with their `name` and `about` fields).
    b. Reparse the markdown to get current headings and line numbers.
    c. Match existing nav entries to current headings by heading text (`name` field, ignoring `#` prefixes).
-   d. **Matched headings:** Update `s,e` values. Preserve `about` description unchanged.
+   d. **Matched headings:** Update `s,n` values. Preserve `about` description unchanged.
    e. **New headings** (in document but not in nav): Add entry with empty `about`.
    f. **Deleted headings** (in nav but not in document): Remove entry.
    g. **Renamed headings:** Appear as a deletion + a new entry. This is correct — a renamed section likely needs a new description.
@@ -361,7 +361,7 @@ This requires LLM configuration (API key, model selection). It's optional and ne
 ### 5.5 Description Preservation Rules
 
 - `generate` writes descriptions (overwrites existing).
-- `update` never writes descriptions. Never. It only modifies `s,e` values and `[N]` counts.
+- `update` never writes descriptions. Never. It only modifies `s,n` values and `[N]` counts.
 - `check` never writes anything.
 - Descriptions are anchored to heading text. If a heading is renamed, the old description is lost and the new heading gets an empty description.
 
@@ -372,7 +372,7 @@ This requires LLM configuration (API key, model selection). It's optional and ne
 `agentmap update` uses git to determine which sections have modified content:
 
 1. Run `git diff HEAD -- <file>` to get changed line ranges.
-2. Map each changed line range to the section(s) it falls within (using the newly computed `s,e` values).
+2. Map each changed line range to the section(s) it falls within (using the newly computed `s,n` values).
 3. Mark those sections as `content-changed` in the report.
 
 If the file is untracked (new file), all sections are marked as `new`.
@@ -424,7 +424,7 @@ Every markdown file over 50 lines has an AGENT:NAV block in the first
 20 lines. Read it before reading the rest of the file.
 
 - If purpose doesn't match your task; stop reading.
-- Use s,e line ranges: Read(offset=s, limit=e-s) for the section you need.
+- Use s,n line ranges: Read(offset=s, limit=n) for the section you need.
 - If a description has `>` hints (e.g. `topic>sub1;sub2;sub3`); scan the hints to find the right subsection before reading the whole parent section.
 - Check see before searching; the file you need may be listed.
 - If line numbers seem off; grep for the heading as fallback.
@@ -445,11 +445,11 @@ Every markdown file over 50 lines has an AGENT:NAV block in the first
 2. Agent reads first 20 lines of docs/authentication.md.
 3. Sees nav block:
    purpose:token lifecycle; OAuth2 exchange; refresh and revocation
-   nav[6]{s,e,name,about}:
-   12,65,#Authentication,token lifecycle management
-   14,35,##Token Exchange,OAuth2 code-for-token flow
+   nav[6]{s,n,name,about}:
+   12,54,#Authentication,token lifecycle management
+   14,22,##Token Exchange,OAuth2 code-for-token flow
    ...
-   36,50,##Token Refresh,silent rotation and expiry detection
+   36,15,##Token Refresh,silent rotation and expiry detection
 4. Agent needs token refresh info.
 5. Agent calls Read(offset=36, limit=14).
 6. Done. Read 14 lines instead of 200+.
@@ -637,7 +637,7 @@ All configuration is optional. Sensible defaults:
 
 ### 11.1 Duplicate Headings
 
-If a document has multiple headings with the same text (e.g., two `## Examples` sections), match by order of appearance. The nav block lists them in document order, and the `s,e` line ranges disambiguate.
+If a document has multiple headings with the same text (e.g., two `## Examples` sections), match by order of appearance. The nav block lists them in document order, and the `s,n` line ranges disambiguate.
 
 ### 11.2 Headings with Special Characters
 
@@ -762,12 +762,11 @@ A typical nav block for a file with 6 sections and 2 see entries:
 ```
 <!-- AGENT:NAV
 purpose:token lifecycle; OAuth2 exchange; refresh and revocation
-nav[6]{s,e,name,about}:
-12,65,#Authentication,token lifecycle management
-14,35,##Token Exchange,OAuth2 code-for-token flow
-17,25,###PKCE,proof key for code exchange
-26,35,###Implicit,legacy implicit grant; deprecated
-36,50,##Token Refresh,silent rotation and expiry detection
+   nav[6]{s,n,name,about}:
+   12,54,#Authentication,token lifecycle management
+   14,22,##Token Exchange,OAuth2 code-for-token flow
+   ...
+   36,15,##Token Refresh,silent rotation and expiry detection
 51,65,##Token Revocation,logout and forced invalidation
 see[2]{path,why}:
 src/config.py,default timeout and token TTL values

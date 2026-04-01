@@ -108,9 +108,9 @@ func CheckFile(path string, cfg config.Config) (bool, string, error) {
 		expectedName := prefix + section.Text
 
 		// Check line number mismatch
-		if e.Start != section.Start || e.End != section.End {
+		if e.Start != section.Start || e.N != section.End-section.Start+1 {
 			failures = append(failures, fmt.Sprintf("  %s: nav says %d-%d, actual %d-%d",
-				expectedName, e.Start, e.End, section.Start, section.End))
+				expectedName, e.Start, e.Start+e.N-1, section.Start, section.End))
 		}
 	}
 
