@@ -232,49 +232,6 @@ Even more content.
 	}
 }
 
-func TestExtractPurpose_Basic(t *testing.T) {
-	tests := []struct {
-		name    string
-		content string
-		want    string
-	}{
-		{
-			name:    "first paragraph after heading",
-			content: "# Title\n\nThis is the first paragraph of the document.\n\n## Section\nMore text.",
-			want:    "This is the first paragraph of the document.",
-		},
-		{
-			name:    "first paragraph after frontmatter",
-			content: "---\ntitle: Test\n---\n\nPurpose description here.\n\n# Heading\n",
-			want:    "Purpose description here.",
-		},
-		{
-			name:    "trims to max length",
-			content: "# Title\n\n" + strings.Repeat("word ", 30) + "\n\n## Section\n",
-			want:    strings.Repeat("word ", 15) + "word",
-		},
-		{
-			name:    "empty content",
-			content: "",
-			want:    "",
-		},
-		{
-			name:    "heading only",
-			content: "# Title\n",
-			want:    "",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := extractPurpose(tt.content)
-			if got != tt.want {
-				t.Errorf("extractPurpose() = %q, want %q", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestInsertNavBlock_ReplacesExisting(t *testing.T) {
 	content := `<!-- AGENT:NAV
 purpose:old

@@ -15,7 +15,6 @@ import (
 )
 
 const (
-	maxPurposeLen    = 80
 	frontmatterDelim = "---"
 	navBlockEnd      = "-->"
 )
@@ -46,7 +45,8 @@ func Generate(root string, cfg config.Config, dryRun bool) error {
 }
 
 // File processes a single markdown file and writes a nav block.
-func File(path string, cfg config.Config, dryRun bool) (string, error) {
+// If outputPath is non-empty, the result is written there instead of modifying the source.
+func File(path string, cfg config.Config, dryRun bool, outputPath ...string) (string, error) {
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return "", fmt.Errorf("generate: read file: %w", err)
@@ -98,7 +98,14 @@ func File(path string, cfg config.Config, dryRun bool) (string, error) {
 	}
 
 	newContent := insertNavBlock(string(content), blockText)
-	if err := os.WriteFile(path, []byte(newContent), 0o644); err != nil {
+
+	// Write to output path if specified, otherwise modify source in place
+	dest := path
+	if len(outputPath) > 0 && outputPath[0] != "" {
+		dest = outputPath[0]
+	}
+
+	if err := os.WriteFile(dest, []byte(newContent), 0o644); err != nil {
 		return "", fmt.Errorf("generate: write file: %w", err)
 	}
 
@@ -152,70 +159,6 @@ func findNavBlock(lines []string) (start, end int) {
 		}
 	}
 	return -1, -1
-}
-
-// extractPurpose extracts the first non-heading, non-frontmatter paragraph as purpose.
-func extractPurpose(content string) string {
-	lines := strings.Split(content, "\n")
-
-	inFrontmatter := false
-	inNavBlock := false
-
-	for i, line := range lines {
-		trimmed := strings.TrimSpace(line)
-
-		// Handle YAML frontmatter
-		if i == 0 && trimmed == frontmatterDelim {
-			inFrontmatter = true
-			continue
-		}
-		if inFrontmatter {
-			if trimmed == frontmatterDelim {
-				inFrontmatter = false
-			}
-			continue
-		}
-
-		// Track existing nav block
-		if strings.Contains(trimmed, "<!-- AGENT:NAV") {
-			inNavBlock = true
-			continue
-		}
-		if inNavBlock {
-			if trimmed == navBlockEnd {
-				inNavBlock = false
-			}
-			continue
-		}
-
-		// Skip empty lines before first content
-		if trimmed == "" {
-			continue
-		}
-
-		// Skip heading lines
-		if len(trimmed) > 0 && trimmed[0] == '#' {
-			continue
-		}
-
-		// Skip HTML comment lines
-		if strings.HasPrefix(trimmed, "<!--") {
-			continue
-		}
-
-		// This is the first content paragraph
-		purpose := strings.ReplaceAll(trimmed, ",", ";")
-		if len(purpose) > maxPurposeLen {
-			// Trim to maxPurposeLen, cutting at word boundary
-			purpose = purpose[:maxPurposeLen]
-			if idx := strings.LastIndex(purpose, " "); idx > 0 {
-				purpose = purpose[:idx]
-			}
-		}
-		return purpose
-	}
-
-	return ""
 }
 
 // insertNavBlock inserts or replaces a nav block in file content.
@@ -368,14 +311,12 @@ func buildNavEntries(sections []parser.Section, content string, cfg config.Confi
 				continue
 			} else if len(h3Children) > 0 {
 				// Small or medium section: skip h3 children
-				if len(h3Children) > 0 {
-					skipUntil = h3Children[len(h3Children)-1].Start + 1
-				}
+				skipUntil = h3Children[len(h3Children)-1].Start + 1
 				// Only add > hints for medium sections (>= sub_threshold)
 				if sectionSize >= cfg.SubThreshold {
 					hints := make([]string, len(h3Children))
 					for j, child := range h3Children {
-						hints[j] = child.Text
+						hints[j] = strings.ReplaceAll(child.Text, ",", ";")
 					}
 					if about != "" {
 						about += ">" + strings.Join(hints, ";")

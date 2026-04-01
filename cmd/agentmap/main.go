@@ -55,11 +55,12 @@ var generateCmd = &cobra.Command{
 		}
 
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		output, _ := cmd.Flags().GetString("output")
 
 		// If path is a single file, process it directly
 		info, err := os.Stat(root)
 		if err == nil && !info.IsDir() {
-			report, err := generate.File(root, cfg, dryRun)
+			report, err := generate.File(root, cfg, dryRun, output)
 			if err != nil {
 				return err
 			}
@@ -107,6 +108,7 @@ func init() {
 	generateCmd.Flags().Int("sub-threshold", 50, "Minimum section size for subsection info")
 	generateCmd.Flags().Int("expand-threshold", 150, "Section size for full h3 entries")
 	generateCmd.Flags().Bool("dry-run", false, "Print without writing files")
+	generateCmd.Flags().StringP("output", "o", "", "Write output to file instead of modifying source")
 
 	// update flags
 	updateCmd.Flags().Bool("quiet", false, "Suppress report output")
