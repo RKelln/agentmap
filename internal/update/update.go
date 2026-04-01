@@ -79,7 +79,9 @@ func Update(root string, cfg config.Config, dryRun, quiet bool) error {
 		}
 		if report != noChanges {
 			anyChanged = true
-			fmt.Println(report)
+			if !quiet {
+				fmt.Println(report)
+			}
 		}
 	}
 
