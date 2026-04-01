@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -95,13 +97,22 @@ func TestUpdateCommand_FlagParsing(t *testing.T) {
 	}
 }
 
-func TestCheckCommand_NotYetImplemented(t *testing.T) {
-	output, err := executeCommand("check", ".")
+func TestCheckCommand_ValidFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	content := `# Test
+
+Some content.
+`
+	if err := os.WriteFile(filepath.Join(tmpDir, "test.md"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	output, err := executeCommand("check", tmpDir)
 	if err != nil {
 		t.Fatalf("ExecuteC() error = %v", err)
 	}
 
-	if !strings.Contains(output, "not yet implemented") {
-		t.Errorf("check output = %q, want 'not yet implemented'", output)
+	if strings.TrimSpace(output) != "" {
+		t.Errorf("check output = %q, want empty output", output)
 	}
 }

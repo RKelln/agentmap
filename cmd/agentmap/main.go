@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/ryankelln/agentmap/internal/check"
 	"github.com/ryankelln/agentmap/internal/config"
 	"github.com/ryankelln/agentmap/internal/generate"
 	"github.com/ryankelln/agentmap/internal/navblock"
@@ -151,13 +152,47 @@ var updateCmd = &cobra.Command{
 }
 
 var checkCmd = &cobra.Command{
-	Use:   "check [path]",
-	Short: "Validate nav blocks are in sync with headings",
-	Long:  "Verify nav blocks match current headings and line numbers. Never modifies files.",
-	Args:  cobra.MaximumNArgs(1),
-	RunE: func(cmd *cobra.Command, _ []string) error {
-		cmd.Println("check: not yet implemented")
-		return nil
+	Use:           "check [path]",
+	Short:         "Validate nav blocks are in sync with headings",
+	Long:          "Verify nav blocks match current headings and line numbers. Never modifies files.",
+	Args:          cobra.MaximumNArgs(1),
+	SilenceErrors: true,
+	SilenceUsage:  true,
+	RunE: func(_ *cobra.Command, args []string) error {
+		root := "."
+		if len(args) > 0 {
+			root = args[0]
+		}
+
+		cfgPath, err := config.FindConfig(root)
+		if err != nil {
+			return fmt.Errorf("find config: %w", err)
+		}
+
+		cfg := config.Defaults()
+		if cfgPath != "" {
+			loaded, err := config.Load(cfgPath)
+			if err != nil {
+				return fmt.Errorf("load config: %w", err)
+			}
+			cfg = loaded
+		}
+
+		info, err := os.Stat(root)
+		if err == nil && !info.IsDir() {
+			failed, report, err := check.CheckFile(root, cfg)
+			if err != nil {
+				return err
+			}
+			if failed {
+				fmt.Println(report)
+				fmt.Println("1 file failed validation.")
+				return fmt.Errorf("validation failed")
+			}
+			return nil
+		}
+
+		return check.Check(root, cfg)
 	},
 }
 
