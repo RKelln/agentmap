@@ -3,6 +3,7 @@ package navblock
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 )
@@ -78,6 +79,15 @@ func ParseNavBlock(content string) (block NavBlock, startLine, endLine int, foun
 
 	// Parse lines inside the block
 	block.Purpose, block.Nav, block.See = parseNavLines(lines[blockStart+1 : blockEnd])
+
+	// Validate N > 0 for all nav entries; warn and clamp to 0 if invalid
+	for i := range block.Nav {
+		if block.Nav[i].N <= 0 {
+			fmt.Fprintf(os.Stderr, "warning: nav entry %q has invalid line count %d, treating as 0\n", block.Nav[i].Name, block.Nav[i].N)
+			block.Nav[i].N = 0
+		}
+	}
+
 	return block, blockStart + 1, blockEnd + 1, true // 1-indexed
 }
 
