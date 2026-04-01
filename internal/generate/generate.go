@@ -147,32 +147,92 @@ func adjustSections(sections []parser.Section, offset int) []parser.Section {
 }
 
 // findNavBlock returns the 0-indexed start and end lines of an existing nav block.
+// Skips nav blocks inside fenced code blocks. Only searches after frontmatter.
+// Returns -1,-1 if any non-whitespace, non-nav-block content appears before nav block.
 func findNavBlock(lines []string) (start, end int) {
-	for i, line := range lines {
-		if strings.HasPrefix(strings.TrimSpace(line), "<!-- AGENT:NAV") {
-			start = i
-			for j := i; j < len(lines); j++ {
-				if strings.TrimSpace(lines[j]) == navBlockEnd {
-					return start, j
-				}
+	// Find frontmatter end first
+	fmEnd := -1
+	if len(lines) > 0 && strings.TrimSpace(lines[0]) == frontmatterDelim {
+		for i := 1; i < len(lines); i++ {
+			if strings.TrimSpace(lines[i]) == frontmatterDelim {
+				fmEnd = i
+				break
 			}
 		}
 	}
+
+	searchStart := 0
+	if fmEnd >= 0 {
+		searchStart = fmEnd + 1
+	}
+
+	inFence := false
+	searchEnd := searchStart + 20
+	if searchEnd > len(lines) {
+		searchEnd = len(lines)
+	}
+	for i := searchStart; i < searchEnd; i++ {
+		trimmed := strings.TrimSpace(lines[i])
+
+		// Track fenced code blocks
+		if strings.HasPrefix(trimmed, "```") || strings.HasPrefix(trimmed, "~~~") {
+			inFence = !inFence
+			continue
+		}
+		if inFence {
+			continue
+		}
+
+		// Empty line - skip (nav block can have leading blank lines)
+		if trimmed == "" {
+			continue
+		}
+
+		// Found nav block start
+		if strings.HasPrefix(trimmed, "<!-- AGENT:NAV") {
+			start = i
+			for j := i + 1; j < len(lines); j++ {
+				if strings.TrimSpace(lines[j]) == "-->" {
+					return start, j
+				}
+			}
+			return -1, -1 // incomplete block
+		}
+
+		// Any other non-empty content - continue searching but no longer in valid zone
+		// Move searchEnd to current position - can't find valid nav block after this
+		searchEnd = i
+	}
+
 	return -1, -1
 }
 
 // insertNavBlock inserts or replaces a nav block in file content.
+// Skips nav blocks inside fenced code blocks.
 func insertNavBlock(content string, blockText string) string {
 	lines := strings.Split(content, "\n")
 
-	// Check for existing nav block
+	// Check for existing nav block (only in first 20 lines after frontmatter)
+	const maxExistingBlockLine = 20
 	blockStart := -1
 	blockEnd := -1
+	inFence := false
 	for i, line := range lines {
+		if i > maxExistingBlockLine {
+			break
+		}
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "```") || strings.HasPrefix(trimmed, "~~~") {
+			inFence = !inFence
+			continue
+		}
+		if inFence {
+			continue
+		}
 		if strings.Contains(line, "<!-- AGENT:NAV") {
 			blockStart = i
 		}
-		if blockStart >= 0 && strings.TrimSpace(line) == navBlockEnd {
+		if blockStart >= 0 && trimmed == navBlockEnd {
 			blockEnd = i
 			break
 		}

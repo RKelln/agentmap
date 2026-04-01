@@ -454,3 +454,108 @@ Content B.
 		t.Error("nav should contain ##Section B")
 	}
 }
+
+func TestFindNavBlock_IgnoresCodeFences(t *testing.T) {
+	content := `# Title
+
+Some content here.
+
+` + "```markdown" + `
+<!-- AGENT:NAV
+purpose:this is inside a code fence
+nav[1]{s,e,name,about}:
+1,10,#Fake,fake entry
+-->
+` + "```" + `
+
+More content.
+`
+	lines := strings.Split(content, "\n")
+	start, end := findNavBlock(lines)
+	if start != -1 || end != -1 {
+		t.Errorf("findNavBlock() = %d, %d, want -1, -1 (nav block inside code fence should be ignored)", start, end)
+	}
+}
+
+func TestFindNavBlock_FindsRealBlock(t *testing.T) {
+	// Valid nav block comes before any heading
+	content := `<!-- AGENT:NAV
+purpose:real nav block
+nav[1]{s,e,name,about}:
+1,10,#Real,real entry
+-->
+
+# Title
+
+Content.
+`
+	lines := strings.Split(content, "\n")
+	start, end := findNavBlock(lines)
+	if start == -1 {
+		t.Fatal("findNavBlock() did not find real nav block")
+	}
+	if !strings.Contains(lines[start], "<!-- AGENT:NAV") {
+		t.Errorf("findNavBlock() start line = %q, want AGENT:NAV", lines[start])
+	}
+	if strings.TrimSpace(lines[end]) != "-->" {
+		t.Errorf("findNavBlock() end line = %q, want -->", lines[end])
+	}
+}
+
+func TestFindNavBlock_CodeFenceThenRealBlock(t *testing.T) {
+	// Nav block at start, code fence example later in file (should find nav block)
+	content := `<!-- AGENT:NAV
+purpose:real
+nav[1]{s,e,name,about}:
+10,20,#Real,real
+-->
+
+` + "```" + `
+<!-- AGENT:NAV
+purpose:fake
+-->
+` + "```" + `
+
+# Title
+
+Content.
+`
+	lines := strings.Split(content, "\n")
+	start, end := findNavBlock(lines)
+	if start == -1 {
+		t.Fatal("findNavBlock() did not find real nav block")
+	}
+	if strings.TrimSpace(lines[start]) != "<!-- AGENT:NAV" {
+		t.Errorf("findNavBlock() start line = %q, want <!-- AGENT:NAV", lines[start])
+	}
+	_ = end
+}
+
+func TestInsertNavBlock_SkipsCodeFenceNavBlocks(t *testing.T) {
+	content := `# Title
+
+` + "```markdown" + `
+<!-- AGENT:NAV
+purpose:fake
+nav[1]{s,e,name,about}:
+1,5,#Fake,fake
+-->
+` + "```" + `
+
+Content goes here.
+`
+	result := insertNavBlock(content, "<!-- AGENT:NAV\npurpose:test\n-->")
+
+	// Should NOT replace the fake block inside the code fence
+	// Should insert at line 1 (no existing real block found)
+	if !strings.Contains(result, "```markdown") {
+		t.Error("result should still contain the code fence")
+	}
+	if !strings.Contains(result, "purpose:fake") {
+		t.Error("result should preserve the fake block inside code fence")
+	}
+	// New nav block should be at the very start (line 1)
+	if !strings.HasPrefix(result, "<!-- AGENT:NAV\npurpose:test\n-->") {
+		t.Error("new nav block should be inserted at line 1")
+	}
+}
