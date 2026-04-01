@@ -105,14 +105,3 @@ func TestCheckCommand_NotYetImplemented(t *testing.T) {
 		t.Errorf("check output = %q, want 'not yet implemented'", output)
 	}
 }
-
-func TestUpdateCommand_NotYetImplemented(t *testing.T) {
-	output, err := executeCommand("update", ".")
-	if err != nil {
-		t.Fatalf("ExecuteC() error = %v", err)
-	}
-
-	if !strings.Contains(output, "not yet implemented") {
-		t.Errorf("update output = %q, want 'not yet implemented'", output)
-	}
-}

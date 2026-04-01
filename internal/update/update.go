@@ -1,0 +1,391 @@
+// Package update implements the agentmap update command.
+package update
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/ryankelln/agentmap/internal/config"
+	"github.com/ryankelln/agentmap/internal/discovery"
+	"github.com/ryankelln/agentmap/internal/gitutil"
+	"github.com/ryankelln/agentmap/internal/navblock"
+	"github.com/ryankelln/agentmap/internal/parser"
+)
+
+// ReportType indicates the type of update report entry.
+type ReportType int
+
+const (
+	// ReportOK means heading matched and line numbers unchanged.
+	ReportOK ReportType = iota
+	// ReportShifted means heading matched but line numbers changed.
+	ReportShifted
+	// ReportContentChanged means section has content changes from git diff.
+	ReportContentChanged
+	// ReportNew means new heading with no description.
+	ReportNew
+	// ReportDeleted means heading removed from document.
+	ReportDeleted
+)
+
+// noChanges is returned when a file has no nav block or no changes needed.
+const noChanges = "no-changes"
+
+// ReportEntry represents a single entry in the update report.
+type ReportEntry struct {
+	Type          ReportType
+	Name          string
+	OldStart      int
+	OldEnd        int
+	NewStart      int
+	NewEnd        int
+	ModifiedCount int
+	CurrentAbout  string
+}
+
+func (r ReportEntry) String() string {
+	switch r.Type {
+	case ReportOK:
+		return fmt.Sprintf("  OK: %s (%d-%d)", r.Name, r.NewStart, r.NewEnd)
+	case ReportShifted:
+		return fmt.Sprintf("  shifted: %s (%d-%d -> %d-%d)", r.Name, r.OldStart, r.OldEnd, r.NewStart, r.NewEnd)
+	case ReportContentChanged:
+		return fmt.Sprintf("  content-changed: %s (lines %d-%d; %d lines modified)\n    current description: %q", r.Name, r.NewStart, r.NewEnd, r.ModifiedCount, r.CurrentAbout)
+	case ReportNew:
+		return fmt.Sprintf("  new: %s (%d-%d; no description)", r.Name, r.NewStart, r.NewEnd)
+	case ReportDeleted:
+		return fmt.Sprintf("  deleted: %s (removed from document)", r.Name)
+	default:
+		return ""
+	}
+}
+
+// Update discovers markdown files with nav blocks under root and updates line numbers.
+func Update(root string, cfg config.Config, dryRun, quiet bool) error {
+	files, err := discovery.DiscoverFiles(root, cfg.Exclude)
+	if err != nil {
+		return fmt.Errorf("update: discover files: %w", err)
+	}
+
+	var anyChanged bool
+	for _, f := range files {
+		fullPath := filepath.Join(root, f)
+		report, err := File(fullPath, cfg, dryRun, quiet)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %s: %v\n", f, err)
+			continue
+		}
+		if report != noChanges {
+			anyChanged = true
+			if !quiet {
+				fmt.Println(report)
+			}
+		}
+	}
+
+	if len(files) > 0 && !anyChanged {
+		fmt.Println("No changes")
+	}
+	return nil
+}
+
+// File processes a single markdown file and updates its nav block.
+// Returns noChanges if the file has no nav block or no changes needed.
+func File(path string, cfg config.Config, dryRun, quiet bool) (string, error) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("update: read file: %w", err)
+	}
+
+	lines := strings.Split(string(content), "\n")
+	totalLines := len(lines)
+
+	oldBlock, _, _, hasBlock := navblock.ParseNavBlock(string(content))
+	if !hasBlock {
+		return noChanges, nil
+	}
+
+	headings := parser.ParseHeadings(string(content), cfg.MaxDepth)
+	sections := parser.ComputeSections(headings, totalLines)
+
+	if len(headings) == 0 {
+		return noChanges, nil
+	}
+
+	changedLines := getChangedLines(path)
+	entryReports := buildEntryReports(oldBlock.Nav, sections, changedLines)
+
+	hasChanges := false
+	for _, er := range entryReports {
+		if er.Type != ReportOK {
+			hasChanges = true
+			break
+		}
+	}
+
+	if !hasChanges {
+		return noChanges, nil
+	}
+
+	block := buildUpdatedBlock(oldBlock, sections, entryReports)
+	blockText := navblock.RenderNavBlock(block)
+
+	if dryRun {
+		return formatReport(path, entryReports), nil
+	}
+
+	newContent := insertNavBlock(string(content), blockText)
+	if err := os.WriteFile(path, []byte(newContent), 0o644); err != nil {
+		return "", fmt.Errorf("update: write file: %w", err)
+	}
+
+	if quiet {
+		return noChanges, nil
+	}
+	return formatReport(path, entryReports), nil
+}
+
+func getChangedLines(path string) []gitutil.LineRange {
+	ranges, err := gitutil.FileChanges(path)
+	if err != nil || ranges == nil {
+		return nil
+	}
+	return ranges
+}
+
+func buildEntryReports(oldNav []navblock.NavEntry, sections []parser.Section, changedLines []gitutil.LineRange) []ReportEntry {
+	var reports []ReportEntry
+
+	oldByName := make(map[string]navblock.NavEntry)
+	for _, e := range oldNav {
+		key := stripHash(e.Name)
+		oldByName[key] = e
+	}
+
+	used := make(map[int]bool)
+
+	for _, s := range sections {
+		key := s.Text
+		oldEntry, found := oldByName[key]
+		prefix := strings.Repeat("#", s.Depth)
+
+		if !found {
+			reports = append(reports, ReportEntry{
+				Type:     ReportNew,
+				Name:     prefix + s.Text,
+				NewStart: s.Start,
+				NewEnd:   s.End,
+			})
+			continue
+		}
+
+		used[oldEntry.Start] = true
+
+		reportType := ReportOK
+		if oldEntry.Start != s.Start || oldEntry.End != s.End {
+			reportType = ReportShifted
+		}
+
+		modifiedCount := 0
+		if len(changedLines) > 0 {
+			for _, cl := range changedLines {
+				if s.Start <= cl.End && s.End >= cl.Start {
+					clLen := cl.End - cl.Start + 1
+					if clLen > modifiedCount {
+						modifiedCount = clLen
+					}
+				}
+			}
+			if modifiedCount > 0 {
+				reportType = ReportContentChanged
+			}
+		}
+
+		reports = append(reports, ReportEntry{
+			Type:          reportType,
+			Name:          prefix + s.Text,
+			OldStart:      oldEntry.Start,
+			OldEnd:        oldEntry.End,
+			NewStart:      s.Start,
+			NewEnd:        s.End,
+			ModifiedCount: modifiedCount,
+			CurrentAbout:  oldEntry.About,
+		})
+	}
+
+	for _, e := range oldNav {
+		key := stripHash(e.Name)
+		if _, found := oldByName[key]; found && !used[oldByName[key].Start] {
+			reports = append(reports, ReportEntry{
+				Type: ReportDeleted,
+				Name: e.Name,
+			})
+		}
+	}
+
+	return reports
+}
+
+func buildUpdatedBlock(oldBlock navblock.NavBlock, sections []parser.Section, _ []ReportEntry) navblock.NavBlock {
+	oldByName := make(map[string]navblock.NavEntry)
+	for _, e := range oldBlock.Nav {
+		key := stripHash(e.Name)
+		oldByName[key] = e
+	}
+
+	var newNav []navblock.NavEntry
+
+	for _, s := range sections {
+		key := s.Text
+		oldEntry, found := oldByName[key]
+
+		prefix := strings.Repeat("#", s.Depth)
+
+		if found {
+			newNav = append(newNav, navblock.NavEntry{
+				Start: s.Start,
+				End:   s.End,
+				Name:  prefix + s.Text,
+				About: oldEntry.About,
+			})
+		} else {
+			newNav = append(newNav, navblock.NavEntry{
+				Start: s.Start,
+				End:   s.End,
+				Name:  prefix + s.Text,
+				About: "",
+			})
+		}
+	}
+
+	return navblock.NavBlock{
+		Purpose: oldBlock.Purpose,
+		Nav:     newNav,
+		See:     oldBlock.See,
+	}
+}
+
+func formatReport(path string, reports []ReportEntry) string {
+	var b strings.Builder
+	b.WriteString("Updated: ")
+	b.WriteString(path)
+	b.WriteString("\n")
+
+	for _, r := range reports {
+		b.WriteString(r.String())
+		b.WriteString("\n")
+	}
+
+	return strings.TrimSpace(b.String())
+}
+
+func stripHash(name string) string {
+	name = strings.TrimSpace(name)
+	for strings.HasPrefix(name, "#") {
+		name = strings.TrimPrefix(name, "#")
+	}
+	return strings.TrimSpace(name)
+}
+
+const (
+	frontmatterDelim = "---"
+	navBlockEnd      = "-->"
+)
+
+func insertNavBlock(content string, blockText string) string {
+	lines := strings.Split(content, "\n")
+
+	blockStart := -1
+	blockEnd := -1
+	inFence := false
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "```") || strings.HasPrefix(trimmed, "~~~") {
+			inFence = !inFence
+			continue
+		}
+		if inFence {
+			continue
+		}
+		if strings.Contains(line, "<!-- AGENT:NAV") {
+			blockStart = i
+		}
+		if blockStart >= 0 && trimmed == navBlockEnd {
+			blockEnd = i
+			break
+		}
+	}
+
+	if blockStart >= 0 && blockEnd >= 0 {
+		before := strings.Join(lines[:blockStart], "\n")
+		after := ""
+		if blockEnd+1 < len(lines) {
+			after = strings.Join(lines[blockEnd+1:], "\n")
+		}
+		result := before + blockText + "\n" + after
+		return cleanBlankLines(result)
+	}
+
+	fmEnd := -1
+	if len(lines) > 0 && strings.TrimSpace(lines[0]) == frontmatterDelim {
+		for i := 1; i < len(lines); i++ {
+			if strings.TrimSpace(lines[i]) == frontmatterDelim {
+				fmEnd = i
+				break
+			}
+		}
+	}
+
+	if fmEnd >= 0 {
+		before := strings.Join(lines[:fmEnd+1], "\n")
+		after := strings.Join(lines[fmEnd+1:], "\n")
+		result := before + "\n" + blockText + "\n" + after
+		return cleanBlankLines(result)
+	}
+
+	result := blockText + "\n" + content
+	return cleanBlankLines(result)
+}
+
+func cleanBlankLines(content string) string {
+	lines := strings.Split(content, "\n")
+
+	navEnd := -1
+	for i, line := range lines {
+		if strings.TrimSpace(line) == navBlockEnd {
+			navEnd = i
+			break
+		}
+	}
+
+	if navEnd < 0 {
+		return content
+	}
+
+	blankCount := 0
+	for i := navEnd + 1; i < len(lines); i++ {
+		if strings.TrimSpace(lines[i]) == "" {
+			blankCount++
+		} else {
+			break
+		}
+	}
+
+	if blankCount == 0 {
+		newLines := make([]string, 0, len(lines)+1)
+		newLines = append(newLines, lines[:navEnd+1]...)
+		newLines = append(newLines, "")
+		newLines = append(newLines, lines[navEnd+1:]...)
+		return strings.Join(newLines, "\n")
+	} else if blankCount > 1 {
+		newLines := make([]string, 0, len(lines)-blankCount+1)
+		newLines = append(newLines, lines[:navEnd+1]...)
+		newLines = append(newLines, "")
+		newLines = append(newLines, lines[navEnd+1+blankCount:]...)
+		return strings.Join(newLines, "\n")
+	}
+
+	return content
+}
