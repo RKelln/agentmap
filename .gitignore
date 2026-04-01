@@ -33,3 +33,6 @@ Thumbs.db
 .dolt/
 *.db
 .beads-credential-key
+
+# project
+.agent-output/
