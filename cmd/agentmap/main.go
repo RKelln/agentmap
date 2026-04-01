@@ -10,6 +10,7 @@ import (
 	"github.com/ryankelln/agentmap/internal/generate"
 	"github.com/ryankelln/agentmap/internal/navblock"
 	"github.com/ryankelln/agentmap/internal/parser"
+	"github.com/ryankelln/agentmap/internal/update"
 	"github.com/spf13/cobra"
 )
 
@@ -109,9 +110,43 @@ var updateCmd = &cobra.Command{
 	Short: "Refresh line numbers in existing nav blocks",
 	Long:  "Fast line-number refresh. Preserves all descriptions.",
 	Args:  cobra.MaximumNArgs(1),
-	RunE: func(cmd *cobra.Command, _ []string) error {
-		cmd.Println("update: not yet implemented")
-		return nil
+	RunE: func(cmd *cobra.Command, args []string) error {
+		root := "."
+		if len(args) > 0 {
+			root = args[0]
+		}
+
+		cfgPath, err := config.FindConfig(root)
+		if err != nil {
+			return fmt.Errorf("find config: %w", err)
+		}
+
+		cfg := config.Defaults()
+		if cfgPath != "" {
+			loaded, err := config.Load(cfgPath)
+			if err != nil {
+				return fmt.Errorf("load config: %w", err)
+			}
+			cfg = loaded
+		}
+
+		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		quiet, _ := cmd.Flags().GetBool("quiet")
+
+		// If path is a single file, process it directly
+		info, err := os.Stat(root)
+		if err == nil && !info.IsDir() {
+			report, err := update.File(root, cfg, dryRun, quiet)
+			if err != nil {
+				return err
+			}
+			if !quiet && report != "" {
+				fmt.Println(report)
+			}
+			return nil
+		}
+
+		return update.Update(root, cfg, dryRun, quiet)
 	},
 }
 
