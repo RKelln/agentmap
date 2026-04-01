@@ -508,6 +508,75 @@ func TestNavEntry_WordCountNotSerialized(t *testing.T) {
 	}
 }
 
+func TestSectionWordCount(t *testing.T) {
+	tests := []struct {
+		name  string
+		lines []string
+		start int // 1-indexed
+		n     int // line count
+		want  int
+	}{
+		{
+			name:  "zero lines (n=0)",
+			lines: []string{"# Heading", "some content"},
+			start: 1,
+			n:     0,
+			want:  0,
+		},
+		{
+			name:  "heading only (n=1)",
+			lines: []string{"# Heading", "next line"},
+			start: 1,
+			n:     1,
+			want:  0,
+		},
+		{
+			name:  "single content line",
+			lines: []string{"# Heading", "hello world"},
+			start: 1,
+			n:     2,
+			want:  2,
+		},
+		{
+			name:  "multi-line section",
+			lines: []string{"# Heading", "one two", "three four five", "six"},
+			start: 1,
+			n:     4,
+			want:  6,
+		},
+		{
+			name:  "start beyond slice (out-of-bounds safety)",
+			lines: []string{"# Heading"},
+			start: 5,
+			n:     3,
+			want:  0,
+		},
+		{
+			name:  "n exceeds available lines (clamps to end)",
+			lines: []string{"# Heading", "word1 word2"},
+			start: 1,
+			n:     100,
+			want:  2,
+		},
+		{
+			name:  "empty lines slice",
+			lines: []string{},
+			start: 1,
+			n:     5,
+			want:  0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := SectionWordCount(tt.lines, tt.start, tt.n)
+			if got != tt.want {
+				t.Errorf("SectionWordCount(lines, %d, %d) = %d, want %d", tt.start, tt.n, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestParseNavBlock_InvalidLineCount(t *testing.T) {
 	tests := []struct {
 		name    string

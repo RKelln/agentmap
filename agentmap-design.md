@@ -678,7 +678,12 @@ A heading immediately followed by another heading (no content between them) prod
 
 ### 11.4 Very Large Files
 
-Files with 50+ headings would produce a nav block that itself costs significant tokens. Consider a cap: if more than ~20 nav entries would be generated, only include h1 and h2, regardless of the subheading threshold.
+Files with many headings would produce a nav block that itself costs significant tokens. A soft cap (`max_nav_entries`, default 20) limits nav entries using a two-pass algorithm:
+
+1. **Stub pass** — drop h3+ sections with fewer than `nav_stub_words` words of content (default 20). Trivially empty sections (just a heading) are removed first.
+2. **Budget pass** — if still over the cap, keep the longest h3+ entries that fit the remaining budget (`max_nav_entries - h1h2_count`), dropping the shortest. Word count (`NavEntry.WordCount`) drives both passes.
+
+h1/h2 entries are always kept. If h1/h2 alone exceeds the cap, the overrun is accepted — h2 sections are structural and dropping them would lose more than it saves.
 
 ### 11.5 Files Without Headings
 

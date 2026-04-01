@@ -334,25 +334,6 @@ func cleanBlankLines(content string) string {
 	return content
 }
 
-// sectionWordCount counts words in the content lines of a section (heading line excluded).
-// start is 1-indexed, n is the line count. lines is 0-indexed.
-func sectionWordCount(lines []string, start, n int) int {
-	// 0-indexed: heading is at lines[start-1], content starts at lines[start]
-	// content lines are lines[start : start+n-1] (skip heading, 0-indexed)
-	contentEnd := start + n - 1
-	if contentEnd > len(lines) {
-		contentEnd = len(lines)
-	}
-	if start >= contentEnd {
-		return 0
-	}
-	var words int
-	for _, line := range lines[start:contentEnd] {
-		words += navblock.CountWords(line)
-	}
-	return words
-}
-
 // buildNavEntries converts parser sections to nav entries with keyword descriptions.
 // Applies three-tier subsection logic:
 //   - Under subThreshold: no subsection info (h3 children skipped)
@@ -385,7 +366,7 @@ func buildNavEntries(sections []parser.Section, content string, cfg config.Confi
 					N:         s.Len(),
 					Name:      prefix + navblock.NormalizeHeading(s.Text),
 					About:     about,
-					WordCount: sectionWordCount(lines, s.Start, s.Len()),
+					WordCount: navblock.SectionWordCount(lines, s.Start, s.Len()),
 				})
 				for _, child := range h3Children {
 					childContent := getSectionContent(lines, child.Start, child.End)
@@ -396,7 +377,7 @@ func buildNavEntries(sections []parser.Section, content string, cfg config.Confi
 						N:         child.Len(),
 						Name:      childPrefix + navblock.NormalizeHeading(child.Text),
 						About:     childAbout,
-						WordCount: sectionWordCount(lines, child.Start, child.Len()),
+						WordCount: navblock.SectionWordCount(lines, child.Start, child.Len()),
 					})
 				}
 				// Skip past h3 children so they're not processed again as standalone entries
@@ -425,7 +406,7 @@ func buildNavEntries(sections []parser.Section, content string, cfg config.Confi
 			N:         s.Len(),
 			Name:      prefix + navblock.NormalizeHeading(s.Text),
 			About:     about,
-			WordCount: sectionWordCount(lines, s.Start, s.Len()),
+			WordCount: navblock.SectionWordCount(lines, s.Start, s.Len()),
 		})
 	}
 

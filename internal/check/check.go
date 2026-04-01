@@ -95,7 +95,7 @@ func CheckFile(path string, cfg config.Config) (bool, string, error) {
 			Start:     s.Start,
 			N:         s.End - s.Start + 1,
 			Name:      prefix + navblock.NormalizeHeading(s.Text),
-			WordCount: sectionWordCount(lines, s.Start, s.End-s.Start+1),
+			WordCount: navblock.SectionWordCount(lines, s.Start, s.End-s.Start+1),
 		}
 	}
 	filteredEntries := generate.FilterNavEntries(navEntries, cfg.MaxNavEntries, cfg.NavStubWords)
@@ -163,23 +163,4 @@ func CheckFile(path string, cfg config.Config) (bool, string, error) {
 	}
 
 	return false, "", nil
-}
-
-// sectionWordCount counts words in the content lines of a section (heading line excluded).
-// start is 1-indexed, n is the line count. lines is 0-indexed.
-func sectionWordCount(lines []string, start, n int) int {
-	// 0-indexed: heading is at lines[start-1], content starts at lines[start]
-	// content lines are lines[start : start+n-1] (skip heading, 0-indexed)
-	contentEnd := start + n - 1
-	if contentEnd > len(lines) {
-		contentEnd = len(lines)
-	}
-	if start >= contentEnd {
-		return 0
-	}
-	var words int
-	for _, line := range lines[start:contentEnd] {
-		words += navblock.CountWords(line)
-	}
-	return words
 }

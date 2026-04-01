@@ -236,6 +236,26 @@ func RenderNavBlock(block NavBlock) string {
 	return b.String()
 }
 
+// SectionWordCount returns the word count of a section's content lines,
+// excluding the heading line. lines is the full file as 0-indexed []string.
+// start is the 1-indexed section start line; n is the line count.
+func SectionWordCount(lines []string, start, n int) int {
+	// 0-indexed: heading is at lines[start-1], content starts at lines[start]
+	// content lines are lines[start : start+n-1] (skip heading, 0-indexed)
+	contentEnd := start + n - 1
+	if contentEnd > len(lines) {
+		contentEnd = len(lines)
+	}
+	if start >= contentEnd {
+		return 0
+	}
+	var words int
+	for _, line := range lines[start:contentEnd] {
+		words += CountWords(line)
+	}
+	return words
+}
+
 // RenderPurposeOnly produces a minimal nav block with only a purpose line.
 func RenderPurposeOnly(purpose string) string {
 	return "<!-- AGENT:NAV\npurpose:" + purpose + "\n-->"
