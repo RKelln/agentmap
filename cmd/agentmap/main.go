@@ -92,7 +92,6 @@ var versionCmd = &cobra.Command{
 
 func init() {
 	// generate flags
-	generateCmd.Flags().Bool("llm", false, "Use LLM for description generation")
 	generateCmd.Flags().Int("min-lines", 50, "Minimum file size for full nav block")
 	generateCmd.Flags().Int("sub-threshold", 50, "Minimum section size for subsection info")
 	generateCmd.Flags().Int("expand-threshold", 150, "Section size for full h3 entries")

@@ -26,6 +26,7 @@ func Generate(root string, cfg config.Config, dryRun bool) error {
 		return fmt.Errorf("generate: discover files: %w", err)
 	}
 
+	var anySuccess bool
 	for _, f := range files {
 		fullPath := filepath.Join(root, f)
 		report, err := File(fullPath, cfg, dryRun)
@@ -33,9 +34,13 @@ func Generate(root string, cfg config.Config, dryRun bool) error {
 			fmt.Fprintf(os.Stderr, "Error: %s: %v\n", f, err)
 			continue
 		}
+		anySuccess = true
 		fmt.Println(report)
 	}
 
+	if len(files) > 0 && !anySuccess {
+		return fmt.Errorf("generate: no files processed successfully")
+	}
 	return nil
 }
 
@@ -49,6 +54,13 @@ func File(path string, cfg config.Config, dryRun bool) (string, error) {
 	lines := strings.Split(string(content), "\n")
 	totalLines := len(lines)
 
+	// Check for existing nav block to compute line offset
+	blockStart, blockEnd := findNavBlock(lines)
+	oldBlockLines := 0
+	if blockStart >= 0 {
+		oldBlockLines = blockEnd - blockStart + 1
+	}
+
 	headings := parser.ParseHeadings(string(content), cfg.MaxDepth)
 	sections := parser.ComputeSections(headings, totalLines)
 
@@ -61,12 +73,18 @@ func File(path string, cfg config.Config, dryRun bool) (string, error) {
 		report = fmt.Sprintf("Skipped: %s (purpose-only)", path)
 	} else {
 		purpose := extractPurpose(string(content))
-		entries := buildNavEntries(sections)
+		// Compute line offset: new block will shift headings down
+		placeholder := navblock.NavBlock{Purpose: purpose, Nav: buildNavEntries(sections)}
+		placeholderText := navblock.RenderNavBlock(placeholder)
+		newBlockLines := len(strings.Split(placeholderText, "\n"))
+		offset := newBlockLines - oldBlockLines
+
+		adjusted := adjustSections(sections, offset)
+		entries := buildNavEntries(adjusted)
 		block := navblock.NavBlock{
 			Purpose: purpose,
 			Nav:     entries,
 		}
-		_ = block // used for future keyword extraction
 		blockText = navblock.RenderNavBlock(block)
 		report = fmt.Sprintf("Generated: %s (%d sections)", path, len(entries))
 	}
@@ -81,6 +99,37 @@ func File(path string, cfg config.Config, dryRun bool) (string, error) {
 	}
 
 	return report, nil
+}
+
+// adjustSections shifts all Start/End line numbers by the given offset.
+func adjustSections(sections []parser.Section, offset int) []parser.Section {
+	if offset == 0 {
+		return sections
+	}
+	adjusted := make([]parser.Section, len(sections))
+	for i, s := range sections {
+		adjusted[i] = parser.Section{
+			Heading: s.Heading,
+			Start:   s.Start + offset,
+			End:     s.End + offset,
+		}
+	}
+	return adjusted
+}
+
+// findNavBlock returns the 0-indexed start and end lines of an existing nav block.
+func findNavBlock(lines []string) (start, end int) {
+	for i, line := range lines {
+		if strings.HasPrefix(strings.TrimSpace(line), "<!-- AGENT:NAV") {
+			start = i
+			for j := i; j < len(lines); j++ {
+				if strings.TrimSpace(lines[j]) == navBlockEnd {
+					return start, j
+				}
+			}
+		}
+	}
+	return -1, -1
 }
 
 // extractPurpose extracts the first non-heading, non-frontmatter paragraph as purpose.
@@ -133,7 +182,7 @@ func extractPurpose(content string) string {
 		}
 
 		// This is the first content paragraph
-		purpose := trimmed
+		purpose := strings.ReplaceAll(trimmed, ",", ";")
 		if len(purpose) > maxPurposeLen {
 			// Trim to maxPurposeLen, cutting at word boundary
 			purpose = purpose[:maxPurposeLen]
