@@ -2,6 +2,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -36,12 +37,12 @@ func Load(path string) (Config, error) {
 		if os.IsNotExist(err) {
 			return Defaults(), nil
 		}
-		return Config{}, err
+		return Config{}, fmt.Errorf("config: read file: %w", err)
 	}
 
 	cfg := Defaults()
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return Config{}, err
+		return Config{}, fmt.Errorf("config: parse yaml: %w", err)
 	}
 
 	if cfg.Exclude == nil {
@@ -56,7 +57,7 @@ func Load(path string) (Config, error) {
 func FindConfig(startDir string) (string, error) {
 	dir, err := filepath.Abs(startDir)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("config: resolve path: %w", err)
 	}
 
 	for {

@@ -69,10 +69,17 @@ func Update(root string, cfg config.Config, dryRun, quiet bool) error {
 		return fmt.Errorf("update: discover files: %w", err)
 	}
 
+	// §12.4: one git diff call for the whole repo, not one per file.
+	repoChanges, _ := gitutil.RepoChanges()
+
 	var anyChanged bool
 	for _, f := range files {
 		fullPath := filepath.Join(root, f)
-		report, err := File(fullPath, cfg, dryRun, quiet)
+		var changedLines []gitutil.LineRange
+		if repoChanges != nil {
+			changedLines = repoChanges[f]
+		}
+		report, err := File(fullPath, cfg, dryRun, quiet, changedLines)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %s: %v\n", f, err)
 			continue
@@ -92,8 +99,10 @@ func Update(root string, cfg config.Config, dryRun, quiet bool) error {
 }
 
 // File processes a single markdown file and updates its nav block.
+// changedLines contains pre-computed git diff ranges for this file; if nil, falls back
+// to per-file git diff (for direct single-file calls from CLI).
 // Returns noChanges if the file has no nav block or no changes needed.
-func File(path string, cfg config.Config, dryRun, quiet bool) (string, error) {
+func File(path string, cfg config.Config, dryRun, quiet bool, changedLines ...[]gitutil.LineRange) (string, error) {
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return "", fmt.Errorf("update: read file: %w", err)
@@ -102,7 +111,11 @@ func File(path string, cfg config.Config, dryRun, quiet bool) (string, error) {
 	lines := strings.Split(string(content), "\n")
 	totalLines := len(lines)
 
-	oldBlock, _, _, hasBlock := navblock.ParseNavBlock(string(content))
+	oldBlock, _, _, hasBlock, corrupted := navblock.ParseNavBlock(string(content))
+	if corrupted {
+		fmt.Fprintf(os.Stderr, "warning: %s: nav block is corrupted — run 'agentmap generate' to regenerate\n", path)
+		return noChanges, nil
+	}
 	if !hasBlock {
 		return noChanges, nil
 	}
@@ -114,8 +127,14 @@ func File(path string, cfg config.Config, dryRun, quiet bool) (string, error) {
 		return noChanges, nil
 	}
 
-	changedLines := getChangedLines(path)
-	entryReports := buildEntryReports(oldBlock.Nav, sections, changedLines)
+	// Use pre-computed ranges if provided, otherwise fall back to per-file git diff.
+	var fileChanges []gitutil.LineRange
+	if len(changedLines) > 0 && changedLines[0] != nil {
+		fileChanges = changedLines[0]
+	} else if len(changedLines) == 0 {
+		fileChanges = getChangedLines(path)
+	}
+	entryReports := buildEntryReports(oldBlock.Nav, sections, fileChanges)
 
 	hasChanges := false
 	for _, er := range entryReports {
@@ -167,14 +186,15 @@ func buildEntryReports(oldNav []navblock.NavEntry, sections []parser.Section, ch
 	used := make(map[int]bool)
 
 	for _, s := range sections {
-		key := s.Text
+		key := strings.ReplaceAll(s.Text, ",", "")
 		oldEntry, found := oldByName[key]
 		prefix := strings.Repeat("#", s.Depth)
+		name := prefix + strings.ReplaceAll(s.Text, ",", "")
 
 		if !found {
 			reports = append(reports, ReportEntry{
 				Type:     ReportNew,
-				Name:     prefix + s.Text,
+				Name:     name,
 				NewStart: s.Start,
 				NewEnd:   s.End,
 			})
@@ -206,7 +226,7 @@ func buildEntryReports(oldNav []navblock.NavEntry, sections []parser.Section, ch
 
 		reports = append(reports, ReportEntry{
 			Type:          reportType,
-			Name:          prefix + s.Text,
+			Name:          name,
 			OldStart:      oldEntry.Start,
 			OldEnd:        oldEntry.Start + oldEntry.N - 1,
 			NewStart:      s.Start,
@@ -239,7 +259,7 @@ func buildUpdatedBlock(oldBlock navblock.NavBlock, sections []parser.Section, _ 
 	var newNav []navblock.NavEntry
 
 	for _, s := range sections {
-		key := s.Text
+		key := strings.ReplaceAll(s.Text, ",", "")
 		oldEntry, found := oldByName[key]
 
 		prefix := strings.Repeat("#", s.Depth)
@@ -248,14 +268,14 @@ func buildUpdatedBlock(oldBlock navblock.NavBlock, sections []parser.Section, _ 
 			newNav = append(newNav, navblock.NavEntry{
 				Start: s.Start,
 				N:     s.Len(),
-				Name:  prefix + s.Text,
+				Name:  prefix + strings.ReplaceAll(s.Text, ",", ""),
 				About: oldEntry.About,
 			})
 		} else {
 			newNav = append(newNav, navblock.NavEntry{
 				Start: s.Start,
 				N:     s.Len(),
-				Name:  prefix + s.Text,
+				Name:  prefix + strings.ReplaceAll(s.Text, ",", ""),
 				About: "",
 			})
 		}

@@ -6,6 +6,50 @@ import (
 	"testing"
 )
 
+func TestComputeSections_EmptySection(t *testing.T) {
+	// §11.3: heading immediately followed by another heading → n=1 (heading line only).
+	// Minimum valid n is 1 (the heading itself).
+	headings := []Heading{
+		{Line: 1, Depth: 1, Text: "Title"},
+		{Line: 2, Depth: 2, Text: "Empty Section"},
+		{Line: 3, Depth: 2, Text: "Non-Empty Section"},
+	}
+
+	sections := ComputeSections(headings, 6)
+
+	if len(sections) != 3 {
+		t.Fatalf("len(sections) = %d, want 3", len(sections))
+	}
+
+	// "Empty Section" at line 2, followed immediately by another heading at line 3 → End = 2, Len = 1
+	emptySection := sections[1]
+	if emptySection.Text != "Empty Section" {
+		t.Fatalf("sections[1].Text = %q, want %q", emptySection.Text, "Empty Section")
+	}
+	if emptySection.Len() != 1 {
+		t.Errorf("empty section Len() = %d, want 1 (heading line only)", emptySection.Len())
+	}
+	if emptySection.Start != 2 || emptySection.End != 2 {
+		t.Errorf("empty section Start=%d End=%d, want Start=2 End=2", emptySection.Start, emptySection.End)
+	}
+}
+
+func TestBuildNavEntries_EmptySection(t *testing.T) {
+	// §11.3: empty section gets included in nav with empty about field.
+	// (This test lives in the parser package for section shape; generate has the nav entry test.)
+	headings := []Heading{
+		{Line: 1, Depth: 2, Text: "First"},
+		{Line: 2, Depth: 2, Text: "Second"},
+	}
+	sections := ComputeSections(headings, 5)
+	if len(sections) != 2 {
+		t.Fatalf("expected 2 sections, got %d", len(sections))
+	}
+	if sections[0].Len() != 1 {
+		t.Errorf("First section Len() = %d, want 1 (empty section)", sections[0].Len())
+	}
+}
+
 func TestComputeSections_DesignDocScenario(t *testing.T) {
 	// Simulates the heading structure of agentmap-design.md
 	// with h2 "##3. Format Specification" containing h3 children

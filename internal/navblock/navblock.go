@@ -30,9 +30,10 @@ type SeeEntry struct {
 }
 
 // ParseNavBlock extracts an AGENT:NAV block from file content.
-// Returns the block, its start line, end line (1-indexed), and whether one was found.
+// Returns the block, its start line, end line (1-indexed), whether one was found,
+// and whether the block is corrupted (malformed entries).
 // Skips nav blocks inside fenced code blocks.
-func ParseNavBlock(content string) (block NavBlock, startLine, endLine int, found bool) {
+func ParseNavBlock(content string) (block NavBlock, startLine, endLine int, found bool, corrupted bool) {
 	lines := strings.Split(content, "\n")
 	blockStart := -1
 	blockEnd := -1
@@ -74,24 +75,26 @@ func ParseNavBlock(content string) (block NavBlock, startLine, endLine int, foun
 	}
 
 	if blockStart < 0 || blockEnd < 0 {
-		return NavBlock{}, 0, 0, false
+		return NavBlock{}, 0, 0, false, false
 	}
 
 	// Parse lines inside the block
-	block.Purpose, block.Nav, block.See = parseNavLines(lines[blockStart+1 : blockEnd])
+	var parseCorrupted bool
+	block.Purpose, block.Nav, block.See, parseCorrupted = parseNavLines(lines[blockStart+1 : blockEnd])
 
-	// Validate N > 0 for all nav entries; warn and clamp to 0 if invalid
+	// Validate N >= 1 for all nav entries; invalid N means corruption.
 	for i := range block.Nav {
 		if block.Nav[i].N <= 0 {
 			fmt.Fprintf(os.Stderr, "warning: nav entry %q has invalid line count %d, treating as 0\n", block.Nav[i].Name, block.Nav[i].N)
 			block.Nav[i].N = 0
+			parseCorrupted = true
 		}
 	}
 
-	return block, blockStart + 1, blockEnd + 1, true // 1-indexed
+	return block, blockStart + 1, blockEnd + 1, true, parseCorrupted // 1-indexed
 }
 
-func parseNavLines(lines []string) (purpose string, nav []NavEntry, see []SeeEntry) {
+func parseNavLines(lines []string) (purpose string, nav []NavEntry, see []SeeEntry, corrupted bool) {
 	parsingNav := false
 	parsingSee := false
 
@@ -122,7 +125,10 @@ func parseNavLines(lines []string) (purpose string, nav []NavEntry, see []SeeEnt
 		}
 
 		if parsingNav {
-			entry := parseNavEntry(line)
+			entry, entryCorrupted := parseNavEntry(line)
+			if entryCorrupted {
+				corrupted = true
+			}
 			nav = append(nav, entry)
 		}
 
@@ -132,13 +138,13 @@ func parseNavLines(lines []string) (purpose string, nav []NavEntry, see []SeeEnt
 		}
 	}
 
-	return purpose, nav, see
+	return purpose, nav, see, corrupted
 }
 
-func parseNavEntry(line string) NavEntry {
+func parseNavEntry(line string) (NavEntry, bool) {
 	parts := strings.SplitN(line, ",", 4)
 	if len(parts) < 3 {
-		return NavEntry{}
+		return NavEntry{}, true // corrupted: fewer than 3 fields
 	}
 
 	start, _ := strconv.Atoi(parts[0])
@@ -149,7 +155,7 @@ func parseNavEntry(line string) NavEntry {
 		about = parts[3]
 	}
 
-	return NavEntry{Start: start, N: n, Name: name, About: about}
+	return NavEntry{Start: start, N: n, Name: name, About: about}, false
 }
 
 func parseSeeEntry(line string) SeeEntry {

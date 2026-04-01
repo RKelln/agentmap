@@ -9,6 +9,92 @@ import (
 	"testing"
 )
 
+func TestParseNavBlock_Corrupted(t *testing.T) {
+	// §11.6: corrupted nav block → corrupted=true, treat as no block.
+	tests := []struct {
+		name      string
+		content   string
+		wantFound bool
+		wantCorr  bool
+	}{
+		{
+			name: "truncated block missing closing -->",
+			content: `<!-- AGENT:NAV
+purpose:test
+nav[1]{s,n,name,about}:
+1,10,#Heading,desc
+`,
+			wantFound: false, // no closing -->, so not found at all
+			wantCorr:  false,
+		},
+		{
+			name: "nav entry with only 1 field (missing n, name, about)",
+			content: `<!-- AGENT:NAV
+purpose:test
+nav[1]{s,n,name,about}:
+badentry
+-->
+`,
+			wantFound: true,
+			wantCorr:  true,
+		},
+		{
+			name: "nav entry with only 2 fields",
+			content: `<!-- AGENT:NAV
+purpose:test
+nav[1]{s,n,name,about}:
+1,10
+-->
+`,
+			wantFound: true,
+			wantCorr:  true,
+		},
+		{
+			name: "n < 1 in a block",
+			content: `<!-- AGENT:NAV
+purpose:test
+nav[1]{s,n,name,about}:
+1,0,#Heading,desc
+-->
+`,
+			wantFound: true,
+			wantCorr:  true,
+		},
+		{
+			name: "valid block is not corrupted",
+			content: `<!-- AGENT:NAV
+purpose:test
+nav[1]{s,n,name,about}:
+1,10,#Heading,desc
+-->
+`,
+			wantFound: true,
+			wantCorr:  false,
+		},
+		{
+			name: "purpose-only block is not corrupted",
+			content: `<!-- AGENT:NAV
+purpose:test
+-->
+`,
+			wantFound: true,
+			wantCorr:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, _, _, found, corrupted := ParseNavBlock(tt.content)
+			if found != tt.wantFound {
+				t.Errorf("found = %v, want %v", found, tt.wantFound)
+			}
+			if corrupted != tt.wantCorr {
+				t.Errorf("corrupted = %v, want %v", corrupted, tt.wantCorr)
+			}
+		})
+	}
+}
+
 func TestParseNavBlock_Full(t *testing.T) {
 	content := `<!-- AGENT:NAV
 purpose:token lifecycle; OAuth2 exchange
@@ -22,7 +108,7 @@ src/config.py,default timeout and token TTL values
 # Real content starts here
 `
 
-	block, start, end, found := ParseNavBlock(content)
+	block, start, end, found, _ := ParseNavBlock(content)
 	if !found {
 		t.Fatal("expected nav block to be found")
 	}
@@ -57,7 +143,7 @@ purpose:helper utilities
 # Tiny file
 `
 
-	block, _, _, found := ParseNavBlock(content)
+	block, _, _, found, _ := ParseNavBlock(content)
 	if !found {
 		t.Fatal("expected nav block to be found")
 	}
@@ -74,7 +160,7 @@ purpose:helper utilities
 
 func TestParseNavBlock_NotFound(t *testing.T) {
 	content := "# No nav block here\n"
-	_, _, _, found := ParseNavBlock(content)
+	_, _, _, found, _ := ParseNavBlock(content)
 	if found {
 		t.Error("expected nav block not found")
 	}
@@ -88,7 +174,7 @@ nav[1]{s,n,name,about}:
 -->
 `
 
-	block, _, _, found := ParseNavBlock(content)
+	block, _, _, found, _ := ParseNavBlock(content)
 	if !found {
 		t.Fatal("expected nav block to be found")
 	}
@@ -145,7 +231,7 @@ func TestParseNavBlock_RoundTrip(t *testing.T) {
 	}
 
 	rendered := RenderNavBlock(original)
-	parsed, _, _, found := ParseNavBlock(rendered)
+	parsed, _, _, found, _ := ParseNavBlock(rendered)
 	if !found {
 		t.Fatal("expected nav block to be found after render")
 	}
@@ -208,7 +294,7 @@ func TestNavBlockRoundTrip(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			first := RenderNavBlock(tt.block)
-			parsed, _, _, found := ParseNavBlock(first)
+			parsed, _, _, found, _ := ParseNavBlock(first)
 			if !found {
 				t.Fatal("expected nav block to be found after first render")
 			}
@@ -231,7 +317,7 @@ func TestNavBlockRoundTrip_EmptyAbout(t *testing.T) {
 	}
 
 	first := RenderNavBlock(block)
-	parsed, _, _, found := ParseNavBlock(first)
+	parsed, _, _, found, _ := ParseNavBlock(first)
 	if !found {
 		t.Fatal("expected nav block to be found")
 	}
@@ -287,7 +373,7 @@ nav[3]{s,n,name,about}:
 			r, w, _ := os.Pipe()
 			os.Stderr = w
 
-			block, _, _, found := ParseNavBlock(tt.content)
+			block, _, _, found, _ := ParseNavBlock(tt.content)
 			if err := w.Close(); err != nil {
 				t.Fatalf("pipe close: %v", err)
 			}

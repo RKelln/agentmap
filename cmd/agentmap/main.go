@@ -74,7 +74,7 @@ var generateCmd = &cobra.Command{
 				lines := strings.Split(string(content), "\n")
 				headings := parser.ParseHeadings(string(content), cfg.MaxDepth)
 				sections := parser.ComputeSections(headings, len(lines))
-				existingBlock, _, _, found := navblock.ParseNavBlock(string(content))
+				existingBlock, _, _, found, _ := navblock.ParseNavBlock(string(content))
 
 				fmt.Printf("File: %s (%d lines)\n\n", root, len(lines))
 
@@ -217,7 +217,7 @@ func init() {
 	updateCmd.Flags().Bool("quiet", false, "Suppress report output")
 	updateCmd.Flags().Bool("dry-run", false, "Print without writing files")
 
-	rootCmd.AddCommand(generateCmd, updateCmd, checkCmd, versionCmd)
+	rootCmd.AddCommand(generateCmd, updateCmd, checkCmd, versionCmd, hookCmd)
 }
 
 func main() {

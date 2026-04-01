@@ -66,7 +66,11 @@ func CheckFile(path string, cfg config.Config) (bool, string, error) {
 	lines := strings.Split(string(content), "\n")
 	totalLines := len(lines)
 
-	oldBlock, _, _, hasBlock := navblock.ParseNavBlock(string(content))
+	oldBlock, _, _, hasBlock, corrupted := navblock.ParseNavBlock(string(content))
+	if corrupted {
+		fmt.Fprintf(os.Stderr, "warning: %s: nav block is corrupted — run 'agentmap generate' to regenerate\n", path)
+		return false, "", nil
+	}
 	if !hasBlock {
 		// No nav block to validate - that's valid
 		return false, "", nil

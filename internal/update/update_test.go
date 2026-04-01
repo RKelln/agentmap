@@ -8,6 +8,7 @@ import (
 
 	"github.com/ryankelln/agentmap/internal/config"
 	"github.com/ryankelln/agentmap/internal/navblock"
+	"github.com/ryankelln/agentmap/internal/parser"
 )
 
 func writeTempFile(t *testing.T, dir, name, content string) string {
@@ -17,6 +18,40 @@ func writeTempFile(t *testing.T, dir, name, content string) string {
 		t.Fatal(err)
 	}
 	return path
+}
+
+func TestBuildUpdatedBlock_CommaStripping(t *testing.T) {
+	// §11.2: commas must be stripped from heading names (they break CSV parsing).
+	// update preserves comma-stripped names (via buildUpdatedBlock).
+	oldBlock := navblock.NavBlock{
+		Purpose: "test",
+		Nav: []navblock.NavEntry{
+			{Start: 12, N: 5, Name: "##Setup Configuration", About: "existing desc"},
+		},
+	}
+
+	sections := []parser.Section{
+		{
+			Heading: parser.Heading{Line: 14, Depth: 2, Text: "Setup, Configuration"},
+			Start:   14,
+			End:     18,
+		},
+	}
+
+	updated := buildUpdatedBlock(oldBlock, sections, nil)
+	if len(updated.Nav) != 1 {
+		t.Fatalf("nav count = %d, want 1", len(updated.Nav))
+	}
+	if strings.Contains(updated.Nav[0].Name, ",") {
+		t.Errorf("Name = %q must not contain a comma", updated.Nav[0].Name)
+	}
+	want := "##Setup Configuration"
+	if updated.Nav[0].Name != want {
+		t.Errorf("Name = %q, want %q", updated.Nav[0].Name, want)
+	}
+	if updated.Nav[0].About != "existing desc" {
+		t.Errorf("About = %q, want %q", updated.Nav[0].About, "existing desc")
+	}
 }
 
 func TestFile_Shifted(t *testing.T) {
@@ -64,7 +99,7 @@ Silent rotation and sliding-window expiry.
 	}
 
 	data, _ := os.ReadFile(path)
-	newBlock, _, _, found := navblock.ParseNavBlock(string(data))
+	newBlock, _, _, found, _ := navblock.ParseNavBlock(string(data))
 	if !found {
 		t.Fatal("file should still have nav block after update")
 	}
@@ -127,7 +162,7 @@ Logout and forced invalidation.
 	}
 
 	data, _ := os.ReadFile(path)
-	newBlock, _, _, found := navblock.ParseNavBlock(string(data))
+	newBlock, _, _, found, _ := navblock.ParseNavBlock(string(data))
 	if !found {
 		t.Fatal("file should have nav block after update")
 	}
@@ -186,7 +221,7 @@ OAuth2 code-for-token flow.
 	}
 
 	data, _ := os.ReadFile(path)
-	newBlock, _, _, found := navblock.ParseNavBlock(string(data))
+	newBlock, _, _, found, _ := navblock.ParseNavBlock(string(data))
 	if !found {
 		t.Fatal("file should have nav block after update")
 	}
@@ -312,7 +347,7 @@ Silent rotation.
 	}
 
 	data, _ := os.ReadFile(path)
-	block, _, _, found := navblock.ParseNavBlock(string(data))
+	block, _, _, found, _ := navblock.ParseNavBlock(string(data))
 	if !found {
 		t.Fatal("nav block should exist after update")
 	}
@@ -410,7 +445,7 @@ Second examples section.
 	}
 
 	data, _ := os.ReadFile(path)
-	block, _, _, found := navblock.ParseNavBlock(string(data))
+	block, _, _, found, _ := navblock.ParseNavBlock(string(data))
 	if !found {
 		t.Fatal("nav block should exist")
 	}
@@ -455,7 +490,7 @@ Content.
 	}
 
 	data, _ := os.ReadFile(path)
-	block, _, _, found := navblock.ParseNavBlock(string(data))
+	block, _, _, found, _ := navblock.ParseNavBlock(string(data))
 	if !found {
 		t.Fatal("nav block should be updated")
 	}
@@ -498,7 +533,7 @@ Content.
 	}
 
 	data, _ := os.ReadFile(path)
-	block, _, _, found := navblock.ParseNavBlock(string(data))
+	block, _, _, found, _ := navblock.ParseNavBlock(string(data))
 	if !found {
 		t.Fatal("nav block should exist")
 	}
@@ -551,7 +586,7 @@ New content.
 	}
 
 	data, _ := os.ReadFile(path)
-	block, _, _, found := navblock.ParseNavBlock(string(data))
+	block, _, _, found, _ := navblock.ParseNavBlock(string(data))
 	if !found {
 		t.Fatal("nav block should exist")
 	}
@@ -599,7 +634,7 @@ Description here.
 	}
 
 	data, _ := os.ReadFile(path)
-	block, _, _, found := navblock.ParseNavBlock(string(data))
+	block, _, _, found, _ := navblock.ParseNavBlock(string(data))
 	if !found {
 		t.Fatal("nav block should exist")
 	}
@@ -648,7 +683,7 @@ Description here.
 	}
 
 	data, _ := os.ReadFile(path)
-	block, _, _, found := navblock.ParseNavBlock(string(data))
+	block, _, _, found, _ := navblock.ParseNavBlock(string(data))
 	if !found {
 		t.Fatal("nav block should exist")
 	}
@@ -695,7 +730,7 @@ Content.
 	}
 
 	data, _ := os.ReadFile(path)
-	block, _, _, found := navblock.ParseNavBlock(string(data))
+	block, _, _, found, _ := navblock.ParseNavBlock(string(data))
 	if !found {
 		t.Fatal("nav block should exist")
 	}

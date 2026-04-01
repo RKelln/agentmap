@@ -17,6 +17,7 @@ import (
 const (
 	frontmatterDelim = "---"
 	navBlockEnd      = "-->"
+	maxNavEntries    = 20
 )
 
 // Generate discovers markdown files under root and generates nav blocks for each.
@@ -354,7 +355,7 @@ func buildNavEntries(sections []parser.Section, content string, cfg config.Confi
 				entries = append(entries, navblock.NavEntry{
 					Start: s.Start,
 					N:     s.Len(),
-					Name:  prefix + s.Text,
+					Name:  prefix + strings.ReplaceAll(s.Text, ",", ""),
 					About: about,
 				})
 				for _, child := range h3Children {
@@ -364,7 +365,7 @@ func buildNavEntries(sections []parser.Section, content string, cfg config.Confi
 					entries = append(entries, navblock.NavEntry{
 						Start: child.Start,
 						N:     child.Len(),
-						Name:  childPrefix + child.Text,
+						Name:  childPrefix + strings.ReplaceAll(child.Text, ",", ""),
 						About: childAbout,
 					})
 				}
@@ -392,9 +393,28 @@ func buildNavEntries(sections []parser.Section, content string, cfg config.Confi
 		entries = append(entries, navblock.NavEntry{
 			Start: s.Start,
 			N:     s.Len(),
-			Name:  prefix + s.Text,
+			Name:  prefix + strings.ReplaceAll(s.Text, ",", ""),
 			About: about,
 		})
+	}
+
+	// §11.4: if more than maxNavEntries entries, filter to h1/h2 only.
+	if len(entries) > maxNavEntries {
+		var filtered []navblock.NavEntry
+		for _, e := range entries {
+			depth := 0
+			for _, ch := range e.Name {
+				if ch == '#' {
+					depth++
+				} else {
+					break
+				}
+			}
+			if depth <= 2 {
+				filtered = append(filtered, e)
+			}
+		}
+		entries = filtered
 	}
 
 	return entries

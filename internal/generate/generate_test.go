@@ -296,6 +296,142 @@ Content here.
 	}
 }
 
+func TestBuildNavEntries_LargeFileCap(t *testing.T) {
+	// §11.4: if more than 20 nav entries would be generated,
+	// filter to only h1 and h2 entries.
+	var sections []parser.Section
+	// Build 5 h1 + 5 h2 + 15 h3 = 25 total headings
+	line := 1
+	for i := 0; i < 5; i++ {
+		sections = append(sections, parser.Section{
+			Heading: parser.Heading{Line: line, Depth: 1, Text: fmt.Sprintf("Chapter %d", i+1)},
+			Start:   line,
+			End:     line + 4,
+		})
+		line++
+		sections = append(sections, parser.Section{
+			Heading: parser.Heading{Line: line, Depth: 2, Text: fmt.Sprintf("Section %d.1", i+1)},
+			Start:   line,
+			End:     line + 2,
+		})
+		line++
+		sections = append(sections, parser.Section{
+			Heading: parser.Heading{Line: line, Depth: 3, Text: fmt.Sprintf("Sub %d.1.1", i+1)},
+			Start:   line,
+			End:     line + 1,
+		})
+		line += 2
+		sections = append(sections, parser.Section{
+			Heading: parser.Heading{Line: line, Depth: 3, Text: fmt.Sprintf("Sub %d.1.2", i+1)},
+			Start:   line,
+			End:     line + 1,
+		})
+		line += 2
+		sections = append(sections, parser.Section{
+			Heading: parser.Heading{Line: line, Depth: 3, Text: fmt.Sprintf("Sub %d.1.3", i+1)},
+			Start:   line,
+			End:     line + 1,
+		})
+		line += 2
+	}
+
+	cfg := config.Defaults()
+	cfg.SubThreshold = 1
+	cfg.ExpandThreshold = 1
+
+	// Build dummy content (just newlines)
+	content := strings.Repeat("\n", line+1)
+
+	got := buildNavEntries(sections, content, cfg)
+
+	// With 25 headings (5 h1 + 5 h2 + 15 h3) > maxNavEntries (20),
+	// should filter to h1 and h2 only = 10 entries
+	for _, e := range got {
+		depth := 0
+		for _, ch := range e.Name {
+			if ch == '#' {
+				depth++
+			} else {
+				break
+			}
+		}
+		if depth > 2 {
+			t.Errorf("entry %q: depth %d > 2 (should be filtered out when >20 entries)", e.Name, depth)
+		}
+	}
+
+	// Count h1+h2 in input
+	wantCount := 0
+	for _, s := range sections {
+		if s.Depth <= 2 {
+			wantCount++
+		}
+	}
+	if len(got) != wantCount {
+		t.Errorf("len(entries) = %d, want %d (h1+h2 only)", len(got), wantCount)
+	}
+}
+
+func TestBuildNavEntries_EmptySection(t *testing.T) {
+	// §11.3: empty section (heading immediately followed by another heading) → n=1
+	// and is included in nav with empty about field.
+	content := `## First
+
+## Second
+
+Some content here.
+`
+	sections := []parser.Section{
+		{Heading: parser.Heading{Line: 1, Depth: 2, Text: "First"}, Start: 1, End: 1},
+		{Heading: parser.Heading{Line: 3, Depth: 2, Text: "Second"}, Start: 3, End: 6},
+	}
+	cfg := config.Defaults()
+
+	got := buildNavEntries(sections, content, cfg)
+
+	if len(got) != 2 {
+		t.Fatalf("len(entries) = %d, want 2", len(got))
+	}
+	// First entry: n=1, about empty
+	if got[0].N != 1 {
+		t.Errorf("empty section N = %d, want 1", got[0].N)
+	}
+	if got[0].Name != "##First" {
+		t.Errorf("Name = %q, want %q", got[0].Name, "##First")
+	}
+	// Empty section has no extractable content so about should be empty or minimal
+	// The key requirement: it IS included in nav (not skipped)
+}
+
+func TestBuildNavEntries_CommaStripping(t *testing.T) {
+	// §11.2: commas must be stripped from heading names (they break CSV parsing).
+	content := `# Setup, Configuration
+
+Some setup content.
+`
+	sections := []parser.Section{
+		{
+			Heading: parser.Heading{Line: 1, Depth: 2, Text: "Setup, Configuration"},
+			Start:   1,
+			End:     4,
+		},
+	}
+
+	cfg := config.Defaults()
+	got := buildNavEntries(sections, content, cfg)
+
+	if len(got) != 1 {
+		t.Fatalf("len(entries) = %d, want 1", len(got))
+	}
+	if strings.Contains(got[0].Name, ",") {
+		t.Errorf("entry Name = %q, must not contain a comma", got[0].Name)
+	}
+	want := "##Setup Configuration"
+	if got[0].Name != want {
+		t.Errorf("entry Name = %q, want %q", got[0].Name, want)
+	}
+}
+
 func TestBuildNavEntries(t *testing.T) {
 	content := `# Authentication
 

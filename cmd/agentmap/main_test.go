@@ -19,6 +19,46 @@ func executeCommand(args ...string) (output string, err error) {
 	return buf.String(), err
 }
 
+func TestHookCommand_DefaultOutput(t *testing.T) {
+	output, err := executeCommand("hook")
+	if err != nil {
+		t.Fatalf("ExecuteC() error = %v", err)
+	}
+
+	wantFragments := []string{
+		"#!/bin/sh",
+		"agentmap check .",
+		"AGENT:NAV blocks are out of sync",
+		"agentmap update .",
+		"exit 1",
+	}
+	for _, want := range wantFragments {
+		if !strings.Contains(output, want) {
+			t.Errorf("hook output missing %q\nfull output: %s", want, output)
+		}
+	}
+}
+
+func TestHookCommand_YAMLFlag(t *testing.T) {
+	output, err := executeCommand("hook", "--yaml")
+	if err != nil {
+		t.Fatalf("ExecuteC() error = %v", err)
+	}
+
+	wantFragments := []string{
+		"repos:",
+		"agentmap-check",
+		"Validate AGENT:NAV blocks",
+		"agentmap check",
+		"markdown",
+	}
+	for _, want := range wantFragments {
+		if !strings.Contains(output, want) {
+			t.Errorf("hook --yaml output missing %q\nfull output: %s", want, output)
+		}
+	}
+}
+
 func TestRootCommand_ListsSubcommands(t *testing.T) {
 	output, err := executeCommand("--help")
 	if err != nil {
