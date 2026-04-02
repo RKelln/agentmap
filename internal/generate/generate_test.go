@@ -1375,3 +1375,132 @@ func mustReadBenchmarkFixture(b *testing.B, path string) string {
 	}
 	return string(data)
 }
+
+func TestTildePrefix_PurposeAndAbout(t *testing.T) {
+	content := `# Authentication
+
+Token lifecycle management for API access.
+
+## Token Exchange
+
+OAuth2 code-for-token flow implementation.
+
+## Token Refresh
+
+Silent rotation and expiry detection logic.
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "auth.md")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := config.Defaults()
+	cfg.MinLines = 10
+
+	_, err := File(path, cfg, false)
+	if err != nil {
+		t.Fatalf("File() error = %v", err)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := string(data)
+
+	if !strings.Contains(got, "purpose:~") {
+		t.Error("purpose line should be prefixed with ~ for keyword-generated content")
+	}
+
+	pr := navblock.ParseNavBlock(got)
+	if !pr.Found {
+		t.Fatal("nav block not found")
+	}
+	for _, entry := range pr.Block.Nav {
+		if entry.About != "" && !strings.HasPrefix(entry.About, "~") {
+			t.Errorf("entry %q About = %q, want ~ prefix for keyword-generated", entry.Name, entry.About)
+		}
+	}
+}
+
+func TestTildePrefix_NotAddedWhenEmpty(t *testing.T) {
+	// Content where all tokens are stopwords or too short → no keywords extracted
+	sections := []parser.Section{
+		{Heading: parser.Heading{Line: 1, Depth: 1, Text: "A"}, Start: 1, End: 1},
+	}
+	content := "# A\n"
+	cfg := config.Defaults()
+
+	got := buildNavEntries(sections, content, cfg)
+
+	if len(got) != 1 {
+		t.Fatalf("len(entries) = %d, want 1", len(got))
+	}
+	// Section with no extractable keywords should have empty About, not "~"
+	if got[0].About != "" {
+		t.Errorf("About = %q, want empty for section with no extractable keywords", got[0].About)
+	}
+}
+
+func TestTildePrefix_HintAppending(t *testing.T) {
+	content := `# Main
+
+Intro text here.
+
+## Section A
+
+Section A content with some meaningful words for keyword extraction.
+More detailed content about authentication and token management.
+
+### Subsection A1
+
+Detail for A1.
+
+### Subsection A2
+
+Detail for A2.
+
+## Section B
+
+Section B content.
+`
+	sections := []parser.Section{
+		{Heading: parser.Heading{Line: 1, Depth: 1, Text: "Main"}, Start: 1, End: 30},
+		{Heading: parser.Heading{Line: 5, Depth: 2, Text: "Section A"}, Start: 5, End: 20},
+		{Heading: parser.Heading{Line: 11, Depth: 3, Text: "Subsection A1"}, Start: 11, End: 13},
+		{Heading: parser.Heading{Line: 15, Depth: 3, Text: "Subsection A2"}, Start: 15, End: 17},
+		{Heading: parser.Heading{Line: 22, Depth: 2, Text: "Section B"}, Start: 22, End: 30},
+	}
+
+	cfg := config.Config{
+		SubThreshold:    10,
+		ExpandThreshold: 100,
+	}
+
+	got := buildNavEntries(sections, content, cfg)
+
+	var sectionA *navblock.NavEntry
+	for i := range got {
+		if got[i].Name == "##Section A" {
+			sectionA = &got[i]
+			break
+		}
+	}
+	if sectionA == nil {
+		t.Fatal("Section A entry not found")
+	}
+	if sectionA.About == "" {
+		t.Fatal("Section A About is empty")
+	}
+	if !strings.HasPrefix(sectionA.About, "~") {
+		t.Errorf("Section A About = %q, want ~ prefix", sectionA.About)
+	}
+	if !strings.Contains(sectionA.About, ">") {
+		t.Errorf("Section A About = %q, should contain > hints for subsections", sectionA.About)
+	}
+	if strings.Contains(sectionA.About, ">~") {
+		t.Errorf("Section A About = %q, ~ should come before > not after", sectionA.About)
+	}
+}
