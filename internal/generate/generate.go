@@ -71,10 +71,16 @@ func File(path string, cfg config.Config, dryRun bool, outputPath ...string) (st
 
 	if totalLines < cfg.MinLines || len(headings) == 0 {
 		purpose := keywords.ExtractPurpose(string(content))
+		if purpose != "" {
+			purpose = "~" + purpose
+		}
 		blockText = navblock.RenderPurposeOnly(purpose)
 		report = fmt.Sprintf("Skipped: %s (purpose-only)", path)
 	} else {
 		purpose := keywords.ExtractPurpose(string(content))
+		if purpose != "" {
+			purpose = "~" + purpose
+		}
 		// Build nav entries with keyword descriptions from original content (uncapped).
 		// buildNavEntries always returns one entry per section, preserving index alignment.
 		originalEntries := buildNavEntries(sections, string(content), cfg)
@@ -354,6 +360,9 @@ func buildNavEntries(sections []parser.Section, content string, cfg config.Confi
 
 		prefix := strings.Repeat("#", s.Depth)
 		about := keywords.ExtractKeywords(sectionContent, 5)
+		if about != "" {
+			about = "~" + about
+		}
 
 		// Apply subsection logic for h2 entries (depth 2) with h3 children
 		if s.Depth == 2 {
@@ -371,6 +380,9 @@ func buildNavEntries(sections []parser.Section, content string, cfg config.Confi
 				for _, child := range h3Children {
 					childContent := getSectionContent(lines, child.Start, child.End)
 					childAbout := keywords.ExtractKeywords(childContent, 5)
+					if childAbout != "" {
+						childAbout = "~" + childAbout
+					}
 					childPrefix := strings.Repeat("#", child.Depth)
 					entries = append(entries, navblock.NavEntry{
 						Start:     child.Start,
