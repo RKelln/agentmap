@@ -377,8 +377,8 @@ The `~` prefix is used by downstream commands (index, check) to detect unreviewe
 
 **Example output:**
 ```
-12,65,#Authentication,~OAuth2 PKCE redirect token lifecycle
-36,50,##Token Refresh,~silent rotation expiry detection
+12,65,#Authentication,~OAuth2;PKCE;redirect;token;lifecycle
+36,50,##Token Refresh,~silent;rotation;expiry;detection
 ```
 
 Crude but useful — the agent sees topical keywords and can decide relevance without reading the section.
