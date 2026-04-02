@@ -15,11 +15,11 @@ import (
 )
 
 // Check discovers markdown files under root and validates each.
-// Returns an error if any file fails validation.
-func Check(root string, cfg config.Config, warnUnreviewed bool) error {
+// Returns the count of files checked and an error if any file fails validation.
+func Check(root string, cfg config.Config, warnUnreviewed bool) (int, error) {
 	files, err := discovery.DiscoverFiles(root, cfg.Exclude)
 	if err != nil {
-		return fmt.Errorf("check: discover files: %w", err)
+		return 0, fmt.Errorf("check: discover files: %w", err)
 	}
 
 	var failedFiles []string
@@ -63,12 +63,12 @@ func Check(root string, cfg config.Config, warnUnreviewed bool) error {
 			fmt.Printf("%d files failed validation.\n", len(failedFiles))
 		}
 		if len(failedFiles) == 1 {
-			return fmt.Errorf("1 file failed validation")
+			return len(files), fmt.Errorf("1 file failed validation")
 		}
-		return fmt.Errorf("%d files failed validation", len(failedFiles))
+		return len(files), fmt.Errorf("%d files failed validation", len(failedFiles))
 	}
 
-	return nil
+	return len(files), nil
 }
 
 // CheckFile validates a single markdown file's nav block against its headings.
