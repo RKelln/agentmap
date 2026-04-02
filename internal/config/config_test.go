@@ -16,7 +16,8 @@ func TestDefaults(t *testing.T) {
 		MaxDepth:        3,
 		MaxNavEntries:   20,
 		NavStubWords:    20,
-		Exclude:         []string{},
+		IndexInlineMax:  20,
+		Exclude:         []string{".agentmap", ".agentmap/**"},
 	}
 	if !reflect.DeepEqual(cfg, expected) {
 		t.Errorf("Defaults() = %+v, want %+v", cfg, expected)
@@ -56,7 +57,8 @@ func TestLoad(t *testing.T) {
 				MaxDepth:        3,
 				MaxNavEntries:   20,
 				NavStubWords:    20,
-				Exclude:         []string{},
+				IndexInlineMax:  20,
+				Exclude:         []string{".agentmap", ".agentmap/**"},
 			},
 		},
 		{
@@ -76,6 +78,7 @@ exclude:
 				MaxDepth:        2,
 				MaxNavEntries:   20,
 				NavStubWords:    20,
+				IndexInlineMax:  20,
 				Exclude:         []string{"dist/**", "CHANGELOG.md"},
 			},
 		},
@@ -91,6 +94,7 @@ exclude:
 				MaxDepth:        3,
 				MaxNavEntries:   20,
 				NavStubWords:    20,
+				IndexInlineMax:  20,
 				Exclude:         []string{"vendor/**"},
 			},
 		},

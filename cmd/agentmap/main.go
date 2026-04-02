@@ -9,6 +9,7 @@ import (
 	"github.com/ryankelln/agentmap/internal/check"
 	"github.com/ryankelln/agentmap/internal/config"
 	"github.com/ryankelln/agentmap/internal/generate"
+	"github.com/ryankelln/agentmap/internal/index"
 	"github.com/ryankelln/agentmap/internal/navblock"
 	"github.com/ryankelln/agentmap/internal/parser"
 	"github.com/ryankelln/agentmap/internal/update"
@@ -225,6 +226,77 @@ var versionCmd = &cobra.Command{
 	},
 }
 
+var indexCmd = &cobra.Command{
+	Use:   "index [path]",
+	Short: "Bulk index markdown files and generate task list",
+	Long: `Discover markdown files, generate nav block skeletons for unindexed files,
+and write .agentmap/index-tasks.md with a checklist for agent-written descriptions.
+
+Files with no nav block → generate skeleton; add to task list.
+Files with ~ descriptions → add to task list; keep existing nav block.
+Files with no ~ anywhere → skip (already fully indexed).`,
+	Args: cobra.MaximumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		root := "."
+		if len(args) > 0 {
+			root = args[0]
+		}
+
+		cfgPath, err := config.FindConfig(root)
+		if err != nil {
+			return fmt.Errorf("find config: %w", err)
+		}
+
+		cfg := config.Defaults()
+		if cfgPath != "" {
+			loaded, err := config.Load(cfgPath)
+			if err != nil {
+				return fmt.Errorf("load config: %w", err)
+			}
+			cfg = loaded
+		}
+
+		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		force, _ := cmd.Flags().GetBool("force")
+		filesOnly, _ := cmd.Flags().GetBool("files-only")
+
+		if !filesOnly {
+			result, err := index.BuildIndex(root, cfg, dryRun, force)
+			if err != nil {
+				return err
+			}
+			fmt.Printf("Generated: %d  Tasks: %d  Skipped: %d\n",
+				result.Generated, result.TaskFiles, result.Skipped)
+			if result.TaskPath != "" {
+				fmt.Printf("Task list: %s\n", result.TaskPath)
+			} else if dryRun {
+				fmt.Println("(dry-run: no files written)")
+			}
+		}
+
+		// Build and write files block.
+		entries, err := index.BuildFilesBlock(root, cfg)
+		if err != nil {
+			return err
+		}
+		if len(entries) > 0 {
+			dest, err := index.WriteFilesBlock(root, entries, cfg, dryRun)
+			if err != nil {
+				return err
+			}
+			if dryRun {
+				fmt.Printf("Files block: would write to %s (%d entries)\n", dest, len(entries))
+			} else {
+				fmt.Printf("Files block: %s (%d entries)\n", dest, len(entries))
+			}
+		} else if filesOnly {
+			fmt.Println("No indexed files found; run agentmap index first.")
+		}
+
+		return nil
+	},
+}
+
 func init() {
 	// generate flags
 	generateCmd.Flags().Int("min-lines", 50, "Minimum file size for full nav block")
@@ -241,7 +313,12 @@ func init() {
 	// check flags
 	checkCmd.Flags().Bool("warn-unreviewed", false, "Warn about auto-generated descriptions that haven't been reviewed")
 
-	rootCmd.AddCommand(generateCmd, updateCmd, checkCmd, versionCmd, hookCmd)
+	// index flags
+	indexCmd.Flags().Bool("dry-run", false, "Print without writing files")
+	indexCmd.Flags().Bool("force", false, "Regenerate nav blocks even for files with existing nav blocks")
+	indexCmd.Flags().Bool("files-only", false, "Skip task list; only generate files block")
+
+	rootCmd.AddCommand(generateCmd, updateCmd, checkCmd, versionCmd, hookCmd, indexCmd)
 }
 
 func main() {
