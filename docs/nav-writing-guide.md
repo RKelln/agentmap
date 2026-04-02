@@ -1,14 +1,15 @@
 <!-- AGENT:NAV
 purpose:practical guide for writing AGENT:NAV block descriptions; quality criteria; examples
-nav[8]{s,n,name,about}:
-14,156,#Nav Writing Guide,canonical how-to reference for nav block descriptions
-23,14,##Quick Reference,nav block format at a glance
-37,17,##1. Before You Write,read nav block first; use line ranges to skim sections
-54,20,##2. Writing `purpose` Lines,one-line file summary; word limit; no commas; good vs bad examples
-74,36,##3. Writing `about` Fields,one-line section summaries; > hints handling; good vs bad examples
-110,23,##4. Adding `see` Entries,when and how to add cross-file links; format
-133,20,##5. The `~` Prefix,auto-generated marker; when to remove it; index behavior
-153,17,##6. Quality Checklist,four criteria for decision-quality descriptions
+nav[9]{s,n,name,about}:
+15,169,#Nav Writing Guide,canonical how-to reference for nav block descriptions
+24,14,##Quick Reference,nav block format at a glance
+38,17,##1. Before You Write,read nav block first; use line ranges to skim sections
+55,13,##2. Starting from Scratch,generate-then-edit workflow for new files; avoid overwriting hand-written nav
+68,20,##3. Writing `purpose` Lines,one-line file summary; word limit; no commas; good vs bad examples
+88,36,##4. Writing `about` Fields,one-line section summaries; > hints handling; good vs bad examples
+124,23,##5. Adding `see` Entries,when and how to add cross-file links; format
+147,20,##6. The `~` Prefix,auto-generated marker; when to remove it; index behavior
+167,17,##7. Quality Checklist,four criteria for decision-quality descriptions
 -->
 
 # Nav Writing Guide
@@ -51,7 +52,20 @@ alone is usually wrong — the actual content often surprises. For sections with
 
 ---
 
-## 2. Writing `purpose` Lines
+## 2. Starting from Scratch
+
+Don't craft a nav block by hand and then run `agentmap generate` — it will overwrite your work.
+
+The correct workflow for a new file:
+1. Write the file content (no nav block yet).
+2. Run `agentmap generate <file>` — writes a skeleton with `~`-prefixed descriptions.
+3. Rewrite each `~` description with human-quality text.
+4. Run `agentmap update <file>` to confirm line numbers are current.
+5. Commit.
+
+---
+
+## 3. Writing `purpose` Lines
 
 `purpose` is a one-line summary of the **entire file**. An agent reading only this line should know
 whether the file is relevant to their task.
@@ -71,7 +85,7 @@ The good example tells an agent exactly what topics are covered and whether to k
 
 ---
 
-## 3. Writing `about` Fields
+## 4. Writing `about` Fields
 
 `about` is a one-line summary of **one section**. An agent reading only this line should know
 whether to read that section.
@@ -107,7 +121,7 @@ you only rewrite the description before the `>`.
 
 ---
 
-## 4. Adding `see` Entries
+## 5. Adding `see` Entries
 
 `see` lists files that are closely related — files an agent working here would likely need next.
 
@@ -130,7 +144,7 @@ docs/error-policy.md,error handling for auth failures
 
 ---
 
-## 5. The `~` Prefix
+## 6. The `~` Prefix
 
 `~` at the start of a `purpose` or `about` value means: **auto-generated; never reviewed**.
 
@@ -150,7 +164,7 @@ Do not remove `~` from a description you haven't actually improved — that defe
 
 ---
 
-## 6. Quality Checklist
+## 7. Quality Checklist
 
 Before committing a description, check these four criteria:
 

@@ -200,10 +200,20 @@ var checkCmd = &cobra.Command{
 				fmt.Println("1 file failed validation.")
 				return fmt.Errorf("validation failed")
 			}
+			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "All nav blocks in sync (1 file checked)")
 			return nil
 		}
 
-		return check.Check(root, cfg, warnUnreviewed)
+		n, err := check.Check(root, cfg, warnUnreviewed)
+		if err != nil {
+			return err
+		}
+		if n == 1 {
+			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "All nav blocks in sync (1 file checked)")
+		} else {
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "All nav blocks in sync (%d files checked)\n", n)
+		}
+		return nil
 	},
 }
 

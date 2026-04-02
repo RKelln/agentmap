@@ -19,6 +19,9 @@ func executeCommand(args ...string) (output string, err error) {
 	return buf.String(), err
 }
 
+// simpleMarkdown is a minimal markdown file used across multiple check tests.
+const simpleMarkdown = "# Test\n\nSome content.\n"
+
 func TestHookCommand_DefaultOutput(t *testing.T) {
 	output, err := executeCommand("hook")
 	if err != nil {
@@ -140,11 +143,7 @@ func TestUpdateCommand_FlagParsing(t *testing.T) {
 
 func TestCheckCommand_ValidFile(t *testing.T) {
 	tmpDir := t.TempDir()
-	content := `# Test
-
-Some content.
-`
-	if err := os.WriteFile(filepath.Join(tmpDir, "test.md"), []byte(content), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(tmpDir, "test.md"), []byte(simpleMarkdown), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -153,7 +152,64 @@ Some content.
 		t.Fatalf("ExecuteC() error = %v", err)
 	}
 
-	if strings.TrimSpace(output) != "" {
-		t.Errorf("check output = %q, want empty output", output)
+	if !strings.Contains(output, "in sync") {
+		t.Errorf("check output = %q, want success message containing 'in sync'", output)
+	}
+}
+
+func TestCheckCommand_SuccessMessage(t *testing.T) {
+	tests := []struct {
+		name    string
+		files   int
+		wantMsg string
+	}{
+		{
+			name:    "single file",
+			files:   1,
+			wantMsg: "All nav blocks in sync (1 file checked)",
+		},
+		{
+			name:    "multiple files",
+			files:   3,
+			wantMsg: "All nav blocks in sync (3 files checked)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			for i := 0; i < tt.files; i++ {
+				fname := filepath.Join(tmpDir, strings.Repeat("a", i+1)+".md")
+				if err := os.WriteFile(fname, []byte(simpleMarkdown), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			output, err := executeCommand("check", tmpDir)
+			if err != nil {
+				t.Fatalf("ExecuteC() error = %v", err)
+			}
+
+			if !strings.Contains(output, tt.wantMsg) {
+				t.Errorf("check output = %q, want %q", output, tt.wantMsg)
+			}
+		})
+	}
+}
+
+func TestCheckCommand_SingleFileSingular(t *testing.T) {
+	tmpDir := t.TempDir()
+	fname := filepath.Join(tmpDir, "only.md")
+	if err := os.WriteFile(fname, []byte(simpleMarkdown), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	output, err := executeCommand("check", fname)
+	if err != nil {
+		t.Fatalf("ExecuteC() error = %v", err)
+	}
+
+	if !strings.Contains(output, "All nav blocks in sync (1 file checked)") {
+		t.Errorf("check single file output = %q, want singular success message", output)
 	}
 }
