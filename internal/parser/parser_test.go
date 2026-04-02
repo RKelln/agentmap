@@ -123,8 +123,52 @@ func TestParseHeadings_CodeFences(t *testing.T) {
 }
 
 func TestParseHeadings_HTMLComments(t *testing.T) {
-	input := "<!--\n## Hidden heading\n-->\n## Visible heading\n"
-	want := []Heading{{Line: 4, Depth: 2, Text: "Visible heading"}}
+	tests := []struct {
+		name  string
+		input string
+		want  []Heading
+	}{
+		{
+			name:  "block comment hides heading",
+			input: "<!--\n## Hidden heading\n-->\n## Visible heading\n",
+			want:  []Heading{{Line: 4, Depth: 2, Text: "Visible heading"}},
+		},
+		{
+			name:  "inline <!-- in prose does not open comment",
+			input: "Find files with `<!-- AGENT:NAV` block.\n## Still visible\n",
+			want:  []Heading{{Line: 2, Depth: 2, Text: "Still visible"}},
+		},
+		{
+			name:  "inline <!-- and --> on same prose line does not swallow next headings",
+			input: "Blocks like `<!-- -->` are skipped.\n## Still visible\n",
+			want:  []Heading{{Line: 2, Depth: 2, Text: "Still visible"}},
+		},
+		{
+			name: "inline <!-- without --> on prose line does not swallow subsequent headings",
+			input: "See `<!-- AGENT:NAV` for the format.\n" +
+				"## Section A\n" +
+				"Content about `-->` syntax.\n" +
+				"## Section B\n",
+			want: []Heading{
+				{Line: 2, Depth: 2, Text: "Section A"},
+				{Line: 4, Depth: 2, Text: "Section B"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ParseHeadings(tt.input, 3)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("ParseHeadings() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseHeadings_Frontmatter(t *testing.T) {
+	input := "---\ntitle: Test\n---\n# Heading\n"
+	want := []Heading{{Line: 4, Depth: 1, Text: "Heading"}}
 
 	got := ParseHeadings(input, 3)
 	if !reflect.DeepEqual(got, want) {
@@ -132,9 +176,20 @@ func TestParseHeadings_HTMLComments(t *testing.T) {
 	}
 }
 
-func TestParseHeadings_Frontmatter(t *testing.T) {
-	input := "---\ntitle: Test\n---\n# Heading\n"
-	want := []Heading{{Line: 4, Depth: 1, Text: "Heading"}}
+func TestParseHeadings_RegressionInlineCommentMarker(t *testing.T) {
+	// Prose lines containing inline `<!-- AGENT:NAV` (backtick-quoted) were
+	// wrongly opening an HTML comment state, swallowing all headings until the
+	// next --> appeared anywhere in the document.
+	input := "## Section 4.2\n" +
+		"Find files that have an existing `<!-- AGENT:NAV` block.\n" +
+		"## Section 4.3\n" +
+		"Content referencing `-->` syntax.\n" +
+		"## Section 5\n"
+	want := []Heading{
+		{Line: 1, Depth: 2, Text: "Section 4.2"},
+		{Line: 3, Depth: 2, Text: "Section 4.3"},
+		{Line: 5, Depth: 2, Text: "Section 5"},
+	}
 
 	got := ParseHeadings(input, 3)
 	if !reflect.DeepEqual(got, want) {

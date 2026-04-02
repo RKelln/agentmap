@@ -49,8 +49,11 @@ func ParseHeadings(content string, maxDepth int) []Heading {
 			continue
 		}
 
-		// Track HTML comments (multi-line)
-		if strings.Contains(line, "<!--") && !strings.Contains(line, "-->") {
+		// Track HTML block comments (multi-line).
+		// Only treat <!-- as a comment opener when it starts the trimmed line —
+		// this avoids false positives from prose that mentions <!-- in inline
+		// code spans (e.g. "Find files with `<!-- AGENT:NAV` block.").
+		if strings.HasPrefix(trimmed, "<!--") && !strings.Contains(line, "-->") {
 			inComment = true
 			continue
 		}
@@ -60,8 +63,8 @@ func ParseHeadings(content string, maxDepth int) []Heading {
 			}
 			continue
 		}
-		if strings.Contains(line, "<!--") && strings.Contains(line, "-->") {
-			// Single-line comment, skip
+		if strings.HasPrefix(trimmed, "<!--") && strings.Contains(line, "-->") {
+			// Single-line block comment, skip
 			continue
 		}
 
