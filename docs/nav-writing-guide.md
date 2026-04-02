@@ -1,14 +1,14 @@
 <!-- AGENT:NAV
 purpose:practical guide for writing AGENT:NAV block descriptions; quality criteria; examples
 nav[8]{s,n,name,about}:
-14,153,#Nav Writing Guide,canonical how-to reference for nav block descriptions
+14,156,#Nav Writing Guide,canonical how-to reference for nav block descriptions
 23,14,##Quick Reference,nav block format at a glance
 37,17,##1. Before You Write,read nav block first; use line ranges to skim sections
 54,20,##2. Writing `purpose` Lines,one-line file summary; word limit; no commas; good vs bad examples
-74,34,##3. Writing `about` Fields,one-line section summaries; > hints handling; good vs bad examples
-108,23,##4. Adding `see` Entries,when and how to add cross-file links; format
-131,19,##5. The `~` Prefix,auto-generated marker; when to remove it; index behavior
-150,17,##6. Quality Checklist,four criteria for decision-quality descriptions
+74,36,##3. Writing `about` Fields,one-line section summaries; > hints handling; good vs bad examples
+110,23,##4. Adding `see` Entries,when and how to add cross-file links; format
+133,20,##5. The `~` Prefix,auto-generated marker; when to remove it; index behavior
+153,17,##6. Quality Checklist,four criteria for decision-quality descriptions
 -->
 
 # Nav Writing Guide
@@ -56,7 +56,7 @@ alone is usually wrong — the actual content often surprises. For sections with
 `purpose` is a one-line summary of the **entire file**. An agent reading only this line should know
 whether the file is relevant to their task.
 
-**Rules:** under 10 words preferred; no commas (use semicolons); no `~` prefix after you write it.
+**Rules:** under 10 words; no commas (use semicolons); no `~` prefix after you write it.
 
 | | Example |
 |---|---|
@@ -76,7 +76,7 @@ The good example tells an agent exactly what topics are covered and whether to k
 `about` is a one-line summary of **one section**. An agent reading only this line should know
 whether to read that section.
 
-**Rules:** under 10 words preferred; no commas; no `~` prefix after you write it.
+**Rules:** under 10 words; no commas; no `~` prefix after you write it.
 
 | | Example |
 |---|---|
@@ -84,8 +84,9 @@ whether to read that section.
 | Bad | `Overview of token refresh` |
 | Good | `silent rotation and sliding-window expiry` |
 
-The bad keyword example lacks structure. The bad prose example uses `overview` — a filler word that
-adds no information. The good example is specific: it names the mechanisms.
+The bad keyword example still has `~` — it is auto-generated and unreviewed. The bad prose example
+uses `overview` — a filler word that adds no information. The good example is specific: it names
+the mechanisms.
 
 **For sections with `>` hints:** The hints list child subsections (e.g. `>PKCE;implicit;device-code`).
 Read those subsections, then write an `about` that covers the parent as a whole — don't just repeat
@@ -99,7 +100,8 @@ the hint names as the description.
 51,80,##Token Exchange,OAuth2 code-for-token flow>PKCE;implicit;device-code
 ```
 
-The `>` hints survive unchanged; you only rewrite the description before the `>`.
+The `~` prefixes the entire `about` value (the text before `>`). The `>` hints survive unchanged;
+you only rewrite the description before the `>`.
 
 **Ask yourself:** if I read only this line, would I know whether to read this section vs. its siblings?
 
@@ -116,7 +118,7 @@ The `>` hints survive unchanged; you only rewrite the description before the `>`
 
 **When not to add:** don't list every adjacent file. Only add entries that save a real search.
 
-**Format:** `relative/path.md,reason without commas`
+**Format:** `relative/path/from/repo/root.md,reason without commas`
 
 ```
 see[2]{path,why}:
@@ -138,9 +140,10 @@ purpose:token lifecycle; OAuth2 exchange flow   # agent-reviewed
 ```
 
 When you rewrite a description, remove the `~`. This signals that a human or agent has reviewed it.
+`agentmap update` preserves `~` unchanged — only a deliberate rewrite removes it.
 
-**Why it matters:** `agentmap index` only includes files and sections that still have `~` descriptions
-in its task list. Removing `~` marks that section as done. Files where every description has been
+**Why it matters:** The index task list only includes files and sections that still have `~`
+descriptions. Removing `~` marks that section as done. Files where every description has been
 reviewed drop off the work list.
 
 Do not remove `~` from a description you haven't actually improved — that defeats the tracking.
