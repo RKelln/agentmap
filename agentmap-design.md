@@ -10,7 +10,7 @@ nav[23]{s,n,name,about}:
 74,28,###3.2 Field Definitions,purpose; nav header; entries; see block
 102,21,###3.3 Heading Depth Convention,# count mirrors markdown; absolute depth
 123,35,###3.4 Complete Example,full nav block with three-tier demo
-158,6,###3.5 Placement Rules,after frontmatter; first 20 lines
+158,7,###3.5 Placement Rules,after frontmatter; first 40 lines; 40-line budget rationale
 164,7,###3.6 Constraints,no commas; no escaping; descriptions optional
 171,12,###3.7 Purpose-Only Block,minimal block for small files
 183,34,###3.8 Subsection Hints,> suffix; three-tier threshold logic
@@ -54,7 +54,7 @@ Code files have LSPs, treesitter, go-to-definition, and symbol search. Markdown 
 2. A section index with line ranges (which section do I need, and exactly which lines?)
 3. Cross-references to related files (is the answer actually somewhere else?)
 
-Agents are instructed (via AGENTS.md) to read the first ~20 lines of any markdown file before reading the rest. This gives them the nav block, which collapses multi-step navigation into a single precise `Read(offset=s, limit=n)` call.
+Agents are instructed (via AGENTS.md) to read the first 40 lines of any markdown file before reading the rest. This gives them the nav block, which collapses multi-step navigation into a single precise `Read(offset=s, limit=n)` call.
 
 ## 3. Format Specification
 
@@ -159,7 +159,7 @@ This example shows all three tiers from section 3.8:
 
 1. After frontmatter (if present), before the first heading.
 2. Always wrapped in an HTML comment (`<!-- AGENT:NAV ... -->`).
-3. The nav block should appear immediately in the file (after frontmatter) and be limited in length. This allows AGENTS.md to instruct agents to "read the first 40 lines" and reliably get the nav block.
+3. The nav block should appear immediately in the file (after frontmatter) and be limited in length. This allows AGENTS.md to instruct agents to "read the first 40 lines" and reliably get the nav block. The 40-line budget assumes frontmatter up to ~10 lines and a nav block up to ~20 lines (the default configurable limit), leaving headroom for both.
 
 ### 3.6 Constraints
 
@@ -492,7 +492,7 @@ Every markdown file over 50 lines has an AGENT:NAV block in the first
 **Reading a file:**
 ```
 1. Agent needs information about authentication.
-2. Agent reads first 20 lines of docs/authentication.md.
+2. Agent reads first 40 lines of docs/authentication.md.
 3. Sees nav block:
    purpose:token lifecycle; OAuth2 exchange; refresh and revocation
    nav[6]{s,n,name,about}:
