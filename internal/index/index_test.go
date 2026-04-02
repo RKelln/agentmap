@@ -85,6 +85,76 @@ func writeFile(t *testing.T, path, content string) {
 	}
 }
 
+// --- matchExclude tests ---
+
+func TestMatchExclude(t *testing.T) {
+	tests := []struct {
+		pattern string
+		rel     string
+		want    bool
+	}{
+		// Exact filename match.
+		{"CHANGELOG.md", "CHANGELOG.md", true},
+		{"CHANGELOG.md", "docs/CHANGELOG.md", true}, // base match
+		// Single-level glob.
+		{"*.md", "README.md", true},
+		{"*.md", "docs/README.md", true}, // base match
+		// Directory glob with **.
+		{"docs/**", "docs/auth.md", true},
+		{"docs/**", "docs/sub/auth.md", true},
+		{"docs/**", "other/auth.md", false},
+		// ** pattern matches the dir itself (rel == prefix) — in practice only
+		// files reach matchExclude; directories are pruned by the walk callback.
+		{"docs/**", "docs", true},
+		// Single-level pattern does not match nested.
+		{"docs/*", "docs/auth.md", true},
+		{"docs/*", "docs/sub/auth.md", false},
+		// No match.
+		{"vendor/**", "docs/auth.md", false},
+	}
+
+	for _, tt := range tests {
+		got := matchExclude(tt.pattern, tt.rel)
+		if got != tt.want {
+			t.Errorf("matchExclude(%q, %q) = %v, want %v", tt.pattern, tt.rel, got, tt.want)
+		}
+	}
+}
+
+// --- buildTaskEntry tests ---
+
+func TestBuildTaskEntry_LineCount(t *testing.T) {
+	// A normal file ends with a trailing newline. strings.Split would produce a
+	// spurious empty element and inflate lineCount by 1; strings.Count must be
+	// used instead.
+	tests := []struct {
+		name      string
+		content   string
+		wantLines int
+	}{
+		{name: "single line with trailing newline", content: "hello\n", wantLines: 1},
+		{name: "three lines with trailing newline", content: "a\nb\nc\n", wantLines: 3},
+		{name: "no trailing newline", content: "a\nb\nc", wantLines: 2},
+		{name: "empty file", content: "", wantLines: 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeFile(t, filepath.Join(dir, "test.md"), tt.content)
+			cfg := config.Defaults()
+			cfg.MinLines = 0
+			entry, err := buildTaskEntry(dir, "test.md", cfg)
+			if err != nil {
+				t.Fatalf("buildTaskEntry() error = %v", err)
+			}
+			if entry.LineCount != tt.wantLines {
+				t.Errorf("LineCount = %d, want %d", entry.LineCount, tt.wantLines)
+			}
+		})
+	}
+}
+
 // --- Classify tests ---
 
 func TestBuildIndex_NoNavBlock_GeneratesSkeleton(t *testing.T) {

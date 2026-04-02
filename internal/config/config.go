@@ -46,13 +46,51 @@ func Load(path string) (Config, error) {
 		return Config{}, fmt.Errorf("config: read file: %w", err)
 	}
 
-	cfg := Defaults()
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
+	// Unmarshal into a zero-value struct to detect which fields were set.
+	// Numeric zero values are ambiguous, but for Exclude we can detect nil
+	// (not specified) vs. non-nil (user provided a list, possibly empty).
+	var user Config
+	if err := yaml.Unmarshal(data, &user); err != nil {
 		return Config{}, fmt.Errorf("config: parse yaml: %w", err)
 	}
 
-	if cfg.Exclude == nil {
-		cfg.Exclude = []string{}
+	cfg := Defaults()
+
+	// Merge scalar fields: use user value if non-zero.
+	if user.MinLines != 0 {
+		cfg.MinLines = user.MinLines
+	}
+	if user.SubThreshold != 0 {
+		cfg.SubThreshold = user.SubThreshold
+	}
+	if user.ExpandThreshold != 0 {
+		cfg.ExpandThreshold = user.ExpandThreshold
+	}
+	if user.MaxDepth != 0 {
+		cfg.MaxDepth = user.MaxDepth
+	}
+	if user.MaxNavEntries != 0 {
+		cfg.MaxNavEntries = user.MaxNavEntries
+	}
+	if user.NavStubWords != 0 {
+		cfg.NavStubWords = user.NavStubWords
+	}
+	if user.IndexInlineMax != 0 {
+		cfg.IndexInlineMax = user.IndexInlineMax
+	}
+
+	// Merge exclude: if user specified exclude:, prepend their patterns then
+	// always append the defaults so .agentmap protection is never silently lost.
+	if user.Exclude != nil {
+		seen := make(map[string]bool)
+		var merged []string
+		for _, p := range append(user.Exclude, cfg.Exclude...) {
+			if !seen[p] {
+				seen[p] = true
+				merged = append(merged, p)
+			}
+		}
+		cfg.Exclude = merged
 	}
 
 	return cfg, nil

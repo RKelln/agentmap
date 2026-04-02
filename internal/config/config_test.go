@@ -79,7 +79,8 @@ exclude:
 				MaxNavEntries:   20,
 				NavStubWords:    20,
 				IndexInlineMax:  20,
-				Exclude:         []string{"dist/**", "CHANGELOG.md"},
+				// User patterns prepended; default .agentmap patterns always appended.
+				Exclude: []string{"dist/**", "CHANGELOG.md", ".agentmap", ".agentmap/**"},
 			},
 		},
 		{
@@ -95,7 +96,8 @@ exclude:
 				MaxNavEntries:   20,
 				NavStubWords:    20,
 				IndexInlineMax:  20,
-				Exclude:         []string{"vendor/**"},
+				// User patterns prepended; default .agentmap patterns always appended.
+				Exclude: []string{"vendor/**", ".agentmap", ".agentmap/**"},
 			},
 		},
 	}
@@ -115,6 +117,47 @@ exclude:
 				t.Errorf("Load() = %+v, want %+v", cfg, tt.expected)
 			}
 		})
+	}
+}
+
+func TestLoad_ExcludePreservesDefaults(t *testing.T) {
+	// When user specifies exclude: in agentmap.yml, default .agentmap patterns
+	// must still be present in the merged result.
+	dir := t.TempDir()
+	path := filepath.Join(dir, "agentmap.yml")
+	yaml := "exclude:\n  - CHANGELOG.md\n"
+	if err := os.WriteFile(path, []byte(yaml), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	hasAgentmap := false
+	hasAgentmapGlob := false
+	for _, p := range cfg.Exclude {
+		if p == ".agentmap" {
+			hasAgentmap = true
+		}
+		if p == ".agentmap/**" {
+			hasAgentmapGlob = true
+		}
+	}
+	if !hasAgentmap {
+		t.Errorf("Exclude should contain .agentmap; got %v", cfg.Exclude)
+	}
+	if !hasAgentmapGlob {
+		t.Errorf("Exclude should contain .agentmap/**; got %v", cfg.Exclude)
+	}
+	// User pattern must also be present.
+	hasChangelog := false
+	for _, p := range cfg.Exclude {
+		if p == "CHANGELOG.md" {
+			hasChangelog = true
+		}
+	}
+	if !hasChangelog {
+		t.Errorf("Exclude should contain CHANGELOG.md; got %v", cfg.Exclude)
 	}
 }
 

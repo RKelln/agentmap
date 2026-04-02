@@ -77,12 +77,7 @@ func discoverMD(root string, excludePatterns []string) ([]string, error) {
 			return nil
 		}
 		for _, pat := range excludePatterns {
-			matched, _ := filepath.Match(pat, rel)
-			if matched {
-				return nil
-			}
-			matched, _ = filepath.Match(pat, filepath.Base(rel))
-			if matched {
+			if matchExclude(pat, rel) {
 				return nil
 			}
 		}
@@ -96,7 +91,35 @@ func discoverMD(root string, excludePatterns []string) ([]string, error) {
 	return files, nil
 }
 
-// buildTaskEntry builds a TaskEntry for a file by reading its content.
+// matchExclude reports whether relPath should be excluded by pat.
+// filepath.Match does not support the ** glob (matches only one path segment).
+// This function handles two extra cases:
+//   - "dir/**": excludes any file whose path starts with "dir/"
+//   - "dir": also matches as a directory prefix (equivalent to "dir/**")
+func matchExclude(pat, rel string) bool {
+	// Exact match or single-level glob via filepath.Match.
+	if matched, _ := filepath.Match(pat, rel); matched {
+		return true
+	}
+	// Match against just the filename component.
+	if matched, _ := filepath.Match(pat, filepath.Base(rel)); matched {
+		return true
+	}
+	// Handle "dir/**" recursive pattern: match any file under that directory.
+	if strings.HasSuffix(pat, "/**") {
+		prefix := pat[:len(pat)-3] // strip "/**"
+		if rel == prefix || strings.HasPrefix(rel, prefix+"/") {
+			return true
+		}
+	}
+	// Handle bare "dir" pattern: treat it as a directory prefix match too.
+	if !strings.Contains(pat, "/") && !strings.ContainsAny(pat, "*?[") {
+		// bare name: already handled by filepath.Base match above
+		return false
+	}
+	return false
+}
+
 func buildTaskEntry(root, relPath string, cfg config.Config) (TaskEntry, error) {
 	fullPath := filepath.Join(root, relPath)
 	data, err := os.ReadFile(fullPath)
@@ -104,8 +127,9 @@ func buildTaskEntry(root, relPath string, cfg config.Config) (TaskEntry, error) 
 		return TaskEntry{}, fmt.Errorf("read %s: %w", relPath, err)
 	}
 	content := string(data)
-	lines := strings.Split(content, "\n")
-	lineCount := len(lines)
+	// Use strings.Count to count actual newlines; strings.Split on a trailing
+	// newline would produce a spurious empty element and inflate the count by 1.
+	lineCount := strings.Count(content, "\n")
 
 	pr := navblock.ParseNavBlock(content)
 	purpose := ""
