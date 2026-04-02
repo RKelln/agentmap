@@ -754,3 +754,56 @@ Content.
 		}
 	}
 }
+
+func TestUpdate_PreservesTildePrefix(t *testing.T) {
+	dir := t.TempDir()
+
+	oldContent := `<!-- AGENT:NAV
+purpose:~token OAuth2 authentication flow
+nav[2]{s,n,name,about}:
+12,39,#Authentication,~OAuth2 PKCE redirect token lifecycle
+14,17,##Token Exchange,~code exchange redirect
+-->
+# Authentication
+
+Token lifecycle management.
+
+## Token Exchange
+
+OAuth2 code-for-token flow.
+`
+
+	path := writeTempFile(t, dir, "auth.md", oldContent)
+
+	cfg := config.Defaults()
+	cfg.MaxDepth = 3
+
+	report, err := File(path, cfg, false, false)
+	if err != nil {
+		t.Fatalf("File() error = %v", err)
+	}
+
+	if report == noChanges {
+		t.Error("expected changes report, got noChanges")
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	pr := navblock.ParseNavBlock(string(data))
+	block, found := pr.Block, pr.Found
+	if !found {
+		t.Fatal("file should still have nav block after update")
+	}
+
+	if !strings.HasPrefix(block.Purpose, "~") {
+		t.Errorf("Purpose should preserve ~ prefix, got %q", block.Purpose)
+	}
+
+	for _, entry := range block.Nav {
+		if !strings.HasPrefix(entry.About, "~") {
+			t.Errorf("About for %q should preserve ~ prefix, got %q", entry.Name, entry.About)
+		}
+	}
+}

@@ -159,7 +159,7 @@ var checkCmd = &cobra.Command{
 	Args:          cobra.MaximumNArgs(1),
 	SilenceErrors: true,
 	SilenceUsage:  true,
-	RunE: func(_ *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		root := "."
 		if len(args) > 0 {
 			root = args[0]
@@ -179,11 +179,21 @@ var checkCmd = &cobra.Command{
 			cfg = loaded
 		}
 
+		warnUnreviewed, _ := cmd.Flags().GetBool("warn-unreviewed")
+
 		info, err := os.Stat(root)
 		if err == nil && !info.IsDir() {
-			failed, report, err := check.CheckFile(root, cfg)
+			failed, report, warnings, err := check.CheckFile(root, cfg, warnUnreviewed)
 			if err != nil {
 				return err
+			}
+			if len(warnings) > 0 {
+				fmt.Printf("WARN: %s has unreviewed descriptions\n", root)
+				for _, w := range warnings {
+					fmt.Println(w)
+				}
+				fmt.Println()
+				fmt.Println("1 file with unreviewed descriptions.")
 			}
 			if failed {
 				fmt.Println(report)
@@ -193,7 +203,7 @@ var checkCmd = &cobra.Command{
 			return nil
 		}
 
-		return check.Check(root, cfg)
+		return check.Check(root, cfg, warnUnreviewed)
 	},
 }
 
@@ -217,6 +227,9 @@ func init() {
 	// update flags
 	updateCmd.Flags().Bool("quiet", false, "Suppress report output")
 	updateCmd.Flags().Bool("dry-run", false, "Print without writing files")
+
+	// check flags
+	checkCmd.Flags().Bool("warn-unreviewed", false, "Warn about auto-generated descriptions that haven't been reviewed")
 
 	rootCmd.AddCommand(generateCmd, updateCmd, checkCmd, versionCmd, hookCmd)
 }
