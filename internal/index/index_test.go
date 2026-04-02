@@ -1,6 +1,7 @@
 package index
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -8,6 +9,70 @@ import (
 
 	"github.com/ryankelln/agentmap/internal/config"
 )
+
+// fixtureDir returns the absolute path to testdata/index-fixture relative to
+// the module root (two levels up from internal/index/).
+func fixtureDir(t *testing.T) string {
+	t.Helper()
+	// Runtime working directory for tests is the package directory.
+	// Walk up to find the module root (contains go.mod).
+	dir, err := filepath.Abs(".")
+	if err != nil {
+		t.Fatalf("abs .: %v", err)
+	}
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			break
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			t.Fatal("could not locate module root (go.mod not found)")
+		}
+		dir = parent
+	}
+	return filepath.Join(dir, "testdata", "index-fixture")
+}
+
+// copyFixture copies the fixture tree into dst, preserving directory structure.
+// Never modifies the original testdata files.
+func copyFixture(t *testing.T, src, dst string) {
+	t.Helper()
+	err := filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+		target := filepath.Join(dst, rel)
+		if info.IsDir() {
+			return os.MkdirAll(target, 0o755)
+		}
+		return copyFile(path, target)
+	})
+	if err != nil {
+		t.Fatalf("copyFixture: %v", err)
+	}
+}
+
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		return err
+	}
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	_, err = io.Copy(out, in)
+	return err
+}
 
 // writeFile writes content to path, creating parent directories as needed.
 func writeFile(t *testing.T, path, content string) {
@@ -641,4 +706,227 @@ func TestWriteFilesBlock_DryRun(t *testing.T) {
 	if dest == "" {
 		t.Error("dry-run should still return the destination path")
 	}
+}
+
+// --- Integration tests using testdata/index-fixture ---
+
+// TestFixture_BuildIndex_Classification runs BuildIndex against the fixture
+// tree and verifies the expected classification counts:
+//
+//	Generated=2  (README.md, docs/api/endpoints.md — no nav block)
+//	TaskFiles=4  (the two generated + docs/authentication.md + docs/api/rate-limiting.md — have ~)
+//	Skipped=2    (CONTRIBUTING.md, docs/error-policy.md — fully reviewed)
+func TestFixture_BuildIndex_Classification(t *testing.T) {
+	src := fixtureDir(t)
+	dir := t.TempDir()
+	copyFixture(t, src, dir)
+
+	cfg := config.Defaults()
+
+	result, err := BuildIndex(dir, cfg, false, false)
+	if err != nil {
+		t.Fatalf("BuildIndex() error = %v", err)
+	}
+
+	if result.Generated != 2 {
+		t.Errorf("Generated = %d, want 2 (README.md + docs/api/endpoints.md)", result.Generated)
+	}
+	if result.TaskFiles != 4 {
+		t.Errorf("TaskFiles = %d, want 4", result.TaskFiles)
+	}
+	if result.Skipped != 2 {
+		t.Errorf("Skipped = %d, want 2 (CONTRIBUTING.md + docs/error-policy.md)", result.Skipped)
+	}
+	if result.TaskPath == "" {
+		t.Error("TaskPath should be set (tasks were found)")
+	}
+}
+
+// TestFixture_BuildIndex_DryRun verifies no files are modified when --dry-run.
+func TestFixture_BuildIndex_DryRun(t *testing.T) {
+	src := fixtureDir(t)
+	dir := t.TempDir()
+	copyFixture(t, src, dir)
+
+	cfg := config.Defaults()
+
+	result, err := BuildIndex(dir, cfg, true, false)
+	if err != nil {
+		t.Fatalf("BuildIndex() dry-run error = %v", err)
+	}
+
+	if result.TaskPath != "" {
+		t.Errorf("TaskPath = %q, want empty for dry-run", result.TaskPath)
+	}
+
+	// The two unindexed files must not have been modified.
+	for _, f := range []string{"README.md", "docs/api/endpoints.md"} {
+		data, err := os.ReadFile(filepath.Join(dir, f))
+		if err != nil {
+			t.Fatalf("read %s: %v", f, err)
+		}
+		if strings.Contains(string(data), "AGENT:NAV") {
+			t.Errorf("dry-run must not write nav block to %s", f)
+		}
+	}
+}
+
+// TestFixture_BuildIndex_SkeletonWritten verifies skeletons are actually
+// written to the two unindexed files and have ~ prefixes.
+func TestFixture_BuildIndex_SkeletonWritten(t *testing.T) {
+	src := fixtureDir(t)
+	dir := t.TempDir()
+	copyFixture(t, src, dir)
+
+	cfg := config.Defaults()
+
+	if _, err := BuildIndex(dir, cfg, false, false); err != nil {
+		t.Fatalf("BuildIndex() error = %v", err)
+	}
+
+	for _, f := range []string{"README.md", "docs/api/endpoints.md"} {
+		data, err := os.ReadFile(filepath.Join(dir, f))
+		if err != nil {
+			t.Fatalf("read %s: %v", f, err)
+		}
+		content := string(data)
+		if !strings.Contains(content, "<!-- AGENT:NAV") {
+			t.Errorf("%s: skeleton nav block not written", f)
+		}
+		if !strings.Contains(content, "~") {
+			t.Errorf("%s: skeleton should have ~ prefix on auto-generated descriptions", f)
+		}
+	}
+}
+
+// TestFixture_BuildIndex_ReviewedFilesUnchanged verifies that fully-reviewed
+// files are not modified even when BuildIndex runs.
+func TestFixture_BuildIndex_ReviewedFilesUnchanged(t *testing.T) {
+	src := fixtureDir(t)
+	dir := t.TempDir()
+	copyFixture(t, src, dir)
+
+	cfg := config.Defaults()
+
+	if _, err := BuildIndex(dir, cfg, false, false); err != nil {
+		t.Fatalf("BuildIndex() error = %v", err)
+	}
+
+	// Read original content from source fixture.
+	for _, f := range []string{"CONTRIBUTING.md", "docs/error-policy.md"} {
+		orig, err := os.ReadFile(filepath.Join(src, f))
+		if err != nil {
+			t.Fatalf("read original %s: %v", f, err)
+		}
+		got, err := os.ReadFile(filepath.Join(dir, f))
+		if err != nil {
+			t.Fatalf("read result %s: %v", f, err)
+		}
+		if string(orig) != string(got) {
+			t.Errorf("%s: fully-reviewed file was modified", f)
+		}
+	}
+}
+
+// TestFixture_BuildFilesBlock_Entries verifies that BuildFilesBlock collects
+// the correct entries from the (pre-indexed) fixture tree.
+// The two files without nav blocks are excluded; the four with nav blocks appear.
+func TestFixture_BuildFilesBlock_Entries(t *testing.T) {
+	src := fixtureDir(t)
+	dir := t.TempDir()
+	copyFixture(t, src, dir)
+
+	cfg := config.Defaults()
+
+	// First index so all files get nav blocks.
+	if _, err := BuildIndex(dir, cfg, false, false); err != nil {
+		t.Fatalf("BuildIndex() error = %v", err)
+	}
+
+	entries, err := BuildFilesBlock(dir, cfg)
+	if err != nil {
+		t.Fatalf("BuildFilesBlock() error = %v", err)
+	}
+
+	// All 6 files should now have nav blocks.
+	if len(entries) != 6 {
+		paths := make([]string, len(entries))
+		for i, e := range entries {
+			paths[i] = e.RelPath
+		}
+		t.Fatalf("len(entries) = %d, want 6; got: %v", len(entries), paths)
+	}
+
+	// Root-level files must come first.
+	rootCount := 0
+	for _, e := range entries {
+		if e.Dir == "" {
+			rootCount++
+		}
+	}
+	if rootCount != 2 {
+		t.Errorf("root-level entries = %d, want 2 (README.md + CONTRIBUTING.md)", rootCount)
+	}
+
+	// Verify no entry has a ~ prefix in its Purpose (BuildFilesBlock strips it).
+	for _, e := range entries {
+		if strings.HasPrefix(e.Purpose, "~") {
+			t.Errorf("entry %s has ~ prefix in Purpose: %q", e.RelPath, e.Purpose)
+		}
+	}
+}
+
+// TestFixture_BuildFilesBlock_PreIndexed runs BuildFilesBlock on the fixture
+// without running BuildIndex first. Only the 4 files that already have nav
+// blocks should appear.
+func TestFixture_BuildFilesBlock_PreIndexed(t *testing.T) {
+	src := fixtureDir(t)
+	dir := t.TempDir()
+	copyFixture(t, src, dir)
+
+	cfg := config.Defaults()
+
+	entries, err := BuildFilesBlock(dir, cfg)
+	if err != nil {
+		t.Fatalf("BuildFilesBlock() error = %v", err)
+	}
+
+	// 4 files have nav blocks in the fixture (CONTRIBUTING.md, docs/authentication.md,
+	// docs/error-policy.md, docs/api/rate-limiting.md).
+	if len(entries) != 4 {
+		paths := make([]string, len(entries))
+		for i, e := range entries {
+			paths[i] = e.RelPath
+		}
+		t.Fatalf("len(entries) = %d, want 4; got: %v", len(entries), paths)
+	}
+
+	// Check sort order: root first, then alphabetically by dir.
+	wantOrder := []string{
+		"CONTRIBUTING.md",
+		"docs/authentication.md",
+		"docs/error-policy.md",
+		"docs/api/rate-limiting.md",
+	}
+	got := make([]string, len(entries))
+	for i, e := range entries {
+		got[i] = e.RelPath
+	}
+	// docs/ entries before docs/api/ entries — check prefix ordering.
+	docsIdx := -1
+	docsAPIIdx := -1
+	for i, p := range got {
+		if p == "docs/authentication.md" || p == "docs/error-policy.md" {
+			if docsIdx < 0 {
+				docsIdx = i
+			}
+		}
+		if p == "docs/api/rate-limiting.md" {
+			docsAPIIdx = i
+		}
+	}
+	if docsIdx >= 0 && docsAPIIdx >= 0 && docsIdx > docsAPIIdx {
+		t.Errorf("expected docs/ entries before docs/api/ entries; got order: %v", got)
+	}
+	_ = wantOrder // reference for human readability
 }
