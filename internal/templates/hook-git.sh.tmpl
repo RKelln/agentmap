@@ -1,0 +1,9 @@
+#!/bin/sh
+# agentmap: validate
+if command -v agentmap >/dev/null 2>&1; then
+  agentmap check . || {
+    echo "AGENT:NAV blocks are out of sync. Run: agentmap update ."
+    exit 1
+  }
+fi
+# /agentmap: validate

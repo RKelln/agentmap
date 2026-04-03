@@ -1,0 +1,9 @@
+# agentmap: validate
+- repo: local
+  hooks:
+    - id: agentmap-check
+      name: Validate AGENT:NAV blocks
+      entry: agentmap check
+      language: system
+      types: [markdown]
+# /agentmap: validate
