@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ryankelln/agentmap/internal/config"
+	"github.com/RKelln/agentmap/internal/config"
 )
 
 // fixtureDir returns the absolute path to testdata/index-fixture relative to

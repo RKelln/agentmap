@@ -460,7 +460,7 @@ func UninstallInstructions(method InstallMethod) string {
 	case InstallMethodScoop:
 		return "Installed via Scoop. Run: scoop uninstall agentmap"
 	case InstallMethodGo:
-		return "Installed via go install. Run: go clean -i github.com/ryankelln/agentmap/cmd/agentmap"
+		return "Installed via go install. Run: go clean -i github.com/RKelln/agentmap/cmd/agentmap"
 	default:
 		return ""
 	}

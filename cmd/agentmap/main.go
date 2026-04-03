@@ -6,14 +6,14 @@ import (
 	"os"
 	"strings"
 
-	"github.com/ryankelln/agentmap/internal/check"
-	"github.com/ryankelln/agentmap/internal/config"
-	"github.com/ryankelln/agentmap/internal/generate"
-	"github.com/ryankelln/agentmap/internal/index"
-	"github.com/ryankelln/agentmap/internal/initcmd"
-	"github.com/ryankelln/agentmap/internal/navblock"
-	"github.com/ryankelln/agentmap/internal/parser"
-	"github.com/ryankelln/agentmap/internal/update"
+	"github.com/RKelln/agentmap/internal/check"
+	"github.com/RKelln/agentmap/internal/config"
+	"github.com/RKelln/agentmap/internal/generate"
+	"github.com/RKelln/agentmap/internal/index"
+	"github.com/RKelln/agentmap/internal/initcmd"
+	"github.com/RKelln/agentmap/internal/navblock"
+	"github.com/RKelln/agentmap/internal/parser"
+	"github.com/RKelln/agentmap/internal/update"
 	"github.com/spf13/cobra"
 )
 

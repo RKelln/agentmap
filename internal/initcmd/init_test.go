@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ryankelln/agentmap/internal/initcmd"
+	"github.com/RKelln/agentmap/internal/initcmd"
 )
 
 // mkDir creates a directory inside a temp dir.

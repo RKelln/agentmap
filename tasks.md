@@ -384,7 +384,7 @@ Add an agent-oriented section to README.md so agents pointed at the repo can sel
    curl -sSfL https://raw.githubusercontent.com/ryankelln/agentmap/main/install.sh | sh
    
    # Go
-   go install github.com/ryankelln/agentmap/cmd/agentmap@latest
+   go install github.com/RKelln/agentmap/cmd/agentmap@latest
    
    # Upgrade
    agentmap upgrade
@@ -428,7 +428,7 @@ Add an agent-oriented section to README.md so agents pointed at the repo can sel
    - Platform-aware messaging:
      - If installed via Homebrew: "Installed via Homebrew. Run: brew uninstall agentmap"
      - If installed via Scoop: "Installed via Scoop. Run: scoop uninstall agentmap"
-     - If installed via `go install`: "Installed via go install. Run: go clean -i github.com/ryankelln/agentmap/cmd/agentmap"
+     - If installed via `go install`: "Installed via go install. Run: go clean -i github.com/RKelln/agentmap/cmd/agentmap"
      - Otherwise: removes the binary directly (with sudo prompt if needed)
    - Detection heuristic for install method:
      - Binary path contains `/Cellar/` or `/homebrew/` -> Homebrew

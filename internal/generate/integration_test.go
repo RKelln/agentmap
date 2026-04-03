@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ryankelln/agentmap/internal/config"
-	"github.com/ryankelln/agentmap/internal/navblock"
+	"github.com/RKelln/agentmap/internal/config"
+	"github.com/RKelln/agentmap/internal/navblock"
 )
 
 // writeTempFile creates a file in dir with the given name and content.

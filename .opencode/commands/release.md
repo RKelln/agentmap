@@ -284,7 +284,7 @@ Install methods:
   brew install RKelln/agentmap/agentmap
   scoop bucket add agentmap https://github.com/RKelln/scoop-agentmap
   scoop install agentmap
-  go install github.com/ryankelln/agentmap/cmd/agentmap@v{new}
+  go install github.com/RKelln/agentmap/cmd/agentmap@v{new}
   curl -fsSL https://raw.githubusercontent.com/RKelln/agentmap/main/install.sh | sh
 
 Files modified:

@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ryankelln/agentmap/internal/config"
-	"github.com/ryankelln/agentmap/internal/navblock"
-	"github.com/ryankelln/agentmap/internal/parser"
+	"github.com/RKelln/agentmap/internal/config"
+	"github.com/RKelln/agentmap/internal/navblock"
+	"github.com/RKelln/agentmap/internal/parser"
 )
 
 func TestFile_WithHeadings(t *testing.T) {

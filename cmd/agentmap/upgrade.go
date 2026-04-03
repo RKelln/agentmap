@@ -9,7 +9,7 @@ import (
 	selfupdate "github.com/creativeprojects/go-selfupdate"
 	"github.com/spf13/cobra"
 
-	"github.com/ryankelln/agentmap/internal/initcmd"
+	"github.com/RKelln/agentmap/internal/initcmd"
 )
 
 var upgradeCmd = &cobra.Command{

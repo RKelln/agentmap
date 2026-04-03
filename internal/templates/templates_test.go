@@ -6,7 +6,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/ryankelln/agentmap/internal/templates"
+	"github.com/RKelln/agentmap/internal/templates"
 )
 
 // mdTemplates lists the .md.tmpl files that must have <!-- agentmap:init --> markers.

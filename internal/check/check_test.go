@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ryankelln/agentmap/internal/config"
+	"github.com/RKelln/agentmap/internal/config"
 )
 
 func TestCheckFile_MatchingNav(t *testing.T) {

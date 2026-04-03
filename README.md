@@ -57,7 +57,7 @@ irm https://raw.githubusercontent.com/RKelln/agentmap/main/install.ps1 | iex
 brew install RKelln/agentmap/agentmap
 
 # Go
-go install github.com/ryankelln/agentmap/cmd/agentmap@latest
+go install github.com/RKelln/agentmap/cmd/agentmap@latest
 
 # Upgrade
 agentmap upgrade

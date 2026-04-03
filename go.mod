@@ -1,4 +1,4 @@
-module github.com/ryankelln/agentmap
+module github.com/RKelln/agentmap
 
 go 1.24.12
 

@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/ryankelln/agentmap/internal/templates"
+	"github.com/RKelln/agentmap/internal/templates"
 )
 
 // ActionStatus describes the outcome of an init action.

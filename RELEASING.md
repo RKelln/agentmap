@@ -172,7 +172,7 @@ curl -fsSL https://raw.githubusercontent.com/RKelln/agentmap/main/install.sh | s
 irm https://raw.githubusercontent.com/RKelln/agentmap/main/install.ps1 | iex
 
 # go install (any platform with Go installed)
-go install github.com/ryankelln/agentmap/cmd/agentmap@latest
+go install github.com/RKelln/agentmap/cmd/agentmap@latest
 ```
 
 ## Upgrade path

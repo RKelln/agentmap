@@ -7,12 +7,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/ryankelln/agentmap/internal/config"
-	"github.com/ryankelln/agentmap/internal/discovery"
-	"github.com/ryankelln/agentmap/internal/generate"
-	"github.com/ryankelln/agentmap/internal/gitutil"
-	"github.com/ryankelln/agentmap/internal/navblock"
-	"github.com/ryankelln/agentmap/internal/parser"
+	"github.com/RKelln/agentmap/internal/config"
+	"github.com/RKelln/agentmap/internal/discovery"
+	"github.com/RKelln/agentmap/internal/generate"
+	"github.com/RKelln/agentmap/internal/gitutil"
+	"github.com/RKelln/agentmap/internal/navblock"
+	"github.com/RKelln/agentmap/internal/parser"
 )
 
 // ReportType indicates the type of update report entry.
