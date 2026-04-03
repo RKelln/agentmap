@@ -66,6 +66,7 @@ internal/
   keywords/         -- Tier 1 keyword extraction (TF-IDF; stopwords)
   gitutil/          -- git diff integration (changed line ranges -> sections)
   config/           -- agentmap.yml loader and defaults
+  templates/        -- embedded agent skill templates (Go embed; written by init)
 testdata/           -- sample markdown files for tests
 ```
 
@@ -81,7 +82,7 @@ testdata/           -- sample markdown files for tests
 
 ## Key Design Constraints (from agentmap-design.md)
 
-- No commas in `about` or `why` fields -- use semicolons
+- No commas in nav block field values (`about`; `why`; `purpose`; subsection hints) -- use semicolons as separators
 - No quoting or escaping in nav blocks
 - `update` never writes descriptions -- only refreshes line numbers
 - `check` never modifies files -- only validates
@@ -95,7 +96,7 @@ Read the AGENT:NAV block at the top after any other the frontmatter.
 Read the first 40 lines of a file before reading the rest of the file.
 
 - If purpose doesn't match your task; stop reading.
-- Use s,n line ranges: Read(offset=s, limit=n) for the section you need.
+- Use s,n line ranges: Read(offset=s; limit=n) for the section you need.
 - Check see before searching; the file you need may be listed.
 
 ## Before Committing Markdown Changes

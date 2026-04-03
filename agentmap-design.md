@@ -163,7 +163,7 @@ This example shows all three tiers from section 3.8:
 
 ### 3.6 Constraints
 
-- **No commas** in `about` or `why` fields. Use semicolons as the natural substitute. The generator should warn (not error) if a description contains a comma.
+- **No commas in nav block field values** — this applies to `about`, `why`, `purpose`, and subsection hints (the `>` suffix). These fields are parsed as CSV; a comma would be treated as a field delimiter and corrupt the entry. Use **semicolons** as the preferred separator — they read naturally in both lists ("rotation; expiry; revocation") and descriptions ("silent rotation and expiry detection"). The generator should warn (not error) if a nav field contains a comma. This constraint is scoped to nav block fields only; regular markdown content, headings, body text, and code examples are unaffected.
 - **No quoting or escaping.** Simplicity over flexibility. The comma restriction eliminates the need for any escape mechanism.
 - **Descriptions are optional.** A new or ungenerated entry may have an empty `about` field: `12,45,#Authentication,`
 - **`see` block is optional.** Omit it entirely (not `see[0]:`) if there are no related files.
@@ -474,7 +474,7 @@ Every markdown file over 50 lines has an AGENT:NAV block in the first
 20 lines. Read it before reading the rest of the file.
 
 - If purpose doesn't match your task; stop reading.
-- Use s,n line ranges: Read(offset=s, limit=n) for the section you need.
+- Use s;n line ranges: Read(offset=s; limit=n) for the section you need.
 - If a description has `>` hints (e.g. `topic>sub1;sub2;sub3`); scan the hints to find the right subsection before reading the whole parent section.
 - Check see before searching; the file you need may be listed.
 - If line numbers seem off; grep for the heading as fallback.
@@ -867,7 +867,7 @@ The nav block is small and constrained. Adding quoting rules (even simple ones) 
 - Agents need to understand the quoting convention.
 - Edge cases multiply.
 
-Banning commas in descriptions and using semicolons instead is a simpler constraint that eliminates the problem entirely. If a description naturally contains a comma, rewrite it with a semicolon. The generator can warn about this.
+Banning commas in nav field values and using semicolons instead is a simpler constraint that eliminates the problem entirely. Semicolons work well as description separators — they're visually distinct from the CSV delimiters, read naturally in prose ("rotation; expiry; revocation"), and are unambiguous. If a description naturally contains a comma, rewrite it with a semicolon. The generator can warn about this.
 
 ### Why `check` in the hook, not `update`?
 
