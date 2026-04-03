@@ -638,7 +638,8 @@ func TestRenderFilesBlock(t *testing.T) {
 					{RelPath: "AGENTS.md", About: "agent workflow instructions"},
 				},
 			},
-			want: "<!-- AGENT:NAV\npurpose:project file index for myrepo\nfiles[2]{path,about}:\nREADME.md,project overview and quickstart\nAGENTS.md,agent workflow instructions\n-->",
+			// RenderFilesBlock sorts entries; AGENTS.md < README.md alphabetically.
+			want: "<!-- AGENT:NAV\npurpose:project file index for myrepo\nfiles[2]{path,about}:\nAGENTS.md,agent workflow instructions\nREADME.md,project overview and quickstart\n-->",
 		},
 		{
 			name: "files grouped by directory",
@@ -667,6 +668,34 @@ func TestRenderFilesBlock(t *testing.T) {
 			name:  "empty entries",
 			block: FilesBlock{Purpose: "empty project"},
 			want:  "<!-- AGENT:NAV\npurpose:empty project\nfiles[0]{path,about}:\n-->",
+		},
+		{
+			name: "unsorted input is sorted by dir then name",
+			block: FilesBlock{
+				Purpose: "unsorted input test",
+				Entries: []FilesEntry{
+					// Deliberately out of order: deep dir, then root, then shallow dir.
+					{RelPath: "docs/api/endpoints.md", About: "api endpoints"},
+					{RelPath: "README.md", About: "project overview"},
+					{RelPath: "docs/authentication.md", About: "auth guide"},
+					{RelPath: "docs/api/rate-limiting.md", About: "rate limits"},
+				},
+			},
+			// After sort: root-level first, then docs/, then docs/api/.
+			want: "<!-- AGENT:NAV\npurpose:unsorted input test\nfiles[4]{path,about}:\nREADME.md,project overview\ndocs/\nauthentication.md,auth guide\ndocs/api/\nendpoints.md,api endpoints\nrate-limiting.md,rate limits\n-->",
+		},
+		{
+			name: "same directory emitted only once even when input alternates dirs",
+			block: FilesBlock{
+				Purpose: "alternating dirs test",
+				Entries: []FilesEntry{
+					{RelPath: "a/x.md", About: "x"},
+					{RelPath: "b/y.md", About: "y"},
+					{RelPath: "a/z.md", About: "z"}, // same dir as first; would duplicate header without sort
+				},
+			},
+			// After sort: a/ group first (x, z), then b/ group (y).
+			want: "<!-- AGENT:NAV\npurpose:alternating dirs test\nfiles[3]{path,about}:\na/\nx.md,x\nz.md,z\nb/\ny.md,y\n-->",
 		},
 	}
 

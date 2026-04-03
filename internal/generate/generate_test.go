@@ -1341,6 +1341,7 @@ func BenchmarkFileDryRun(b *testing.B) {
 		{name: "medium", content: benchmarkMarkdown(64, 2, 4)},
 		{name: "large", content: benchmarkMarkdown(180, 3, 8)},
 		{name: "design-clean", content: mustReadBenchmarkFixture(b, filepath.Join("..", "..", "testdata", "design-clean.md"))},
+		{name: "authentication", content: mustReadBenchmarkFixture(b, filepath.Join("..", "..", "testdata", "authentication.md"))},
 	}
 
 	for _, tt := range tests {

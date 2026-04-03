@@ -267,6 +267,10 @@ Files with no ~ anywhere → skip (already fully indexed).`,
 		force, _ := cmd.Flags().GetBool("force")
 		filesOnly, _ := cmd.Flags().GetBool("files-only")
 
+		if force && filesOnly {
+			fmt.Fprintf(os.Stderr, "WARN: --force has no effect when combined with --files-only (nav block regeneration is skipped)\n")
+		}
+
 		if !filesOnly {
 			result, err := index.BuildIndex(root, cfg, dryRun, force)
 			if err != nil {

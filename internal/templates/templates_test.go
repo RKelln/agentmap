@@ -138,6 +138,52 @@ func TestGetNonexistentReturnsError(t *testing.T) {
 	}
 }
 
+func TestAllNamesExcludesUnderscorePrefixed(t *testing.T) {
+	names := templates.AllNames()
+	for _, name := range names {
+		if strings.HasPrefix(name, "_") {
+			t.Errorf("AllNames() returned %q; files starting with _ should be excluded", name)
+		}
+	}
+}
+
+func TestBodyIsReadable(t *testing.T) {
+	body, err := templates.Body()
+	if err != nil {
+		t.Fatalf("Body() error: %v", err)
+	}
+	if body == "" {
+		t.Fatal("Body() returned empty string")
+	}
+	// The body must contain the two canonical section headings.
+	if !strings.Contains(body, "## Reading Markdown Files") {
+		t.Error("Body() missing '## Reading Markdown Files' section")
+	}
+	if !strings.Contains(body, "## Before Committing Markdown Changes") {
+		t.Error("Body() missing '## Before Committing Markdown Changes' section")
+	}
+}
+
+func TestMarkdownTemplatesContainBody(t *testing.T) {
+	body, err := templates.Body()
+	if err != nil {
+		t.Fatalf("Body() error: %v", err)
+	}
+
+	for _, name := range mdTemplates {
+		t.Run(name, func(t *testing.T) {
+			data, err := templates.Get(name)
+			if err != nil {
+				t.Fatalf("Get(%q) error: %v", name, err)
+			}
+			content := string(data)
+			if !strings.Contains(content, body) {
+				t.Errorf("%s: content does not contain the shared Body() text", name)
+			}
+		})
+	}
+}
+
 func TestHookTemplatesHaveValidateMarkers(t *testing.T) {
 	for _, name := range hookTemplates {
 		t.Run(name, func(t *testing.T) {

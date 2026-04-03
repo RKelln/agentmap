@@ -778,6 +778,36 @@ func TestWriteFilesBlock_DryRun(t *testing.T) {
 	}
 }
 
+func TestWriteFilesBlock_BoundaryExactlyInlineMax(t *testing.T) {
+	// When len(entries) == IndexInlineMax, the condition (<=) must route to inline
+	// (AGENTS.md), not to the dedicated AGENTMAP.md path.
+	dir := t.TempDir()
+
+	const inlineMax = 20
+	entries := make([]FileEntry, inlineMax) // exactly at the boundary
+	for i := range entries {
+		entries[i] = FileEntry{RelPath: "file.md", Dir: "", Name: "file.md", Purpose: "a file"}
+	}
+
+	cfg := config.Defaults()
+	cfg.IndexInlineMax = inlineMax
+
+	dest, err := WriteFilesBlock(dir, entries, cfg, false)
+	if err != nil {
+		t.Fatalf("WriteFilesBlock() error = %v", err)
+	}
+
+	wantDest := filepath.Join(dir, "AGENTS.md")
+	if dest != wantDest {
+		t.Errorf("dest = %q, want %q (exactly IndexInlineMax entries should go inline)", dest, wantDest)
+	}
+
+	// AGENTMAP.md must NOT be created at the boundary.
+	if _, err := os.Stat(filepath.Join(dir, "AGENTMAP.md")); !os.IsNotExist(err) {
+		t.Error("AGENTMAP.md should not exist when len(entries) == IndexInlineMax")
+	}
+}
+
 // --- Integration tests using testdata/index-fixture ---
 
 // TestFixture_BuildIndex_Classification runs BuildIndex against the fixture

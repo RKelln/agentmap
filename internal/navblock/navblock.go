@@ -4,6 +4,7 @@ package navblock
 import (
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -291,22 +292,41 @@ type FilesBlock struct {
 // RenderFilesBlock produces the full AGENT:NAV block text for a files block.
 // Directory prefix lines (no comma) are emitted before the files in each directory.
 // Root-level files appear before any directory prefix.
+// Entries are sorted by directory then by filename before rendering so that
+// directory prefix lines are never duplicated even when the caller provides
+// an unsorted slice.
 func RenderFilesBlock(block FilesBlock) string {
 	var b strings.Builder
 
+	// Sort a copy so callers that provide a pre-sorted slice pay no penalty
+	// and callers that provide an unsorted slice get correct output.
+	entries := make([]FilesEntry, len(block.Entries))
+	copy(entries, block.Entries)
+	sort.Slice(entries, func(i, j int) bool {
+		di := dirOf(entries[i].RelPath)
+		dj := dirOf(entries[j].RelPath)
+		if di != dj {
+			// Root-level files (empty dir) sort before any subdirectory.
+			if di == "" {
+				return true
+			}
+			if dj == "" {
+				return false
+			}
+			return di < dj
+		}
+		return entries[i].RelPath < entries[j].RelPath
+	})
+
 	b.WriteString("<!-- AGENT:NAV\n")
 	b.WriteString("purpose:" + block.Purpose + "\n")
-	fmt.Fprintf(&b, "files[%d]{path,about}:\n", len(block.Entries))
+	fmt.Fprintf(&b, "files[%d]{path,about}:\n", len(entries))
 
 	var lastDir string
-	for _, e := range block.Entries {
-		slash := strings.LastIndex(e.RelPath, "/")
-		var dir, name string
-		if slash < 0 {
-			dir = ""
-			name = e.RelPath
-		} else {
-			dir = e.RelPath[:slash+1] // include trailing slash
+	for _, e := range entries {
+		dir := dirOf(e.RelPath)
+		name := e.RelPath
+		if slash := strings.LastIndex(e.RelPath, "/"); slash >= 0 {
 			name = e.RelPath[slash+1:]
 		}
 
@@ -321,6 +341,16 @@ func RenderFilesBlock(block FilesBlock) string {
 
 	b.WriteString("-->")
 	return b.String()
+}
+
+// dirOf returns the directory portion of relPath with a trailing slash,
+// or "" for root-level files.
+func dirOf(relPath string) string {
+	slash := strings.LastIndex(relPath, "/")
+	if slash < 0 {
+		return ""
+	}
+	return relPath[:slash+1]
 }
 
 // ParseFilesBlock extracts a files block from content.
