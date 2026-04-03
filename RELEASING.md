@@ -102,11 +102,16 @@ Three levels of pre-release testing, in increasing effort:
 
 Exercises the compiled binary against real testdata — catches ldflags
 injection failures, embedded asset problems, and CLI issues that unit tests
-(which use the package API) cannot:
+(which use the package API) cannot. Also tests the upgrade pre-checks
+(Homebrew/Scoop detection, dev-build rejection):
 
 ```bash
 make smoke
 ```
+
+`make smoke` includes an `upgrade --check` step that makes one real GitHub API
+call. It will say "no releases found" before v0.1.0 is tagged, which is
+expected and non-fatal.
 
 To test a GoReleaser snapshot build instead of the local dev binary:
 
@@ -168,6 +173,35 @@ irm https://raw.githubusercontent.com/RKelln/agentmap/main/install.ps1 | iex
 
 # go install (any platform with Go installed)
 go install github.com/ryankelln/agentmap/cmd/agentmap@latest
+```
+
+## Upgrade path
+
+`agentmap upgrade` self-updates the binary in place using the GitHub Releases
+checksums for verification. There are no migrations to run on upgrade — agentmap
+has no database, no versioned state files, and no persistent cache. Upgrades are
+safe atomic binary replacement.
+
+**Install-method behaviour:**
+
+| Install method | `agentmap upgrade` behaviour |
+|---|---|
+| Direct (`install.sh`, `install.ps1`) | Downloads and replaces binary |
+| `go install` | Downloads and replaces binary |
+| Homebrew | Refuses — prints `brew upgrade agentmap` |
+| Scoop | Refuses — prints `scoop update agentmap` |
+
+**Testing the upgrade path** (requires a real release to exist):
+
+```bash
+# Check for updates without downloading
+agentmap upgrade --check
+
+# Full upgrade (direct installs only)
+agentmap upgrade
+
+# Verify after upgrade
+agentmap version
 ```
 
 ## Changelog

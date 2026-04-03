@@ -8,6 +8,8 @@ import (
 
 	selfupdate "github.com/creativeprojects/go-selfupdate"
 	"github.com/spf13/cobra"
+
+	"github.com/ryankelln/agentmap/internal/initcmd"
 )
 
 var upgradeCmd = &cobra.Command{
@@ -15,6 +17,9 @@ var upgradeCmd = &cobra.Command{
 	Short: "Upgrade agentmap to the latest version",
 	Long: `Check GitHub Releases for the latest version of agentmap and update the
 binary in place. Refuses to operate on dev builds (version == "dev").
+
+If agentmap was installed via Homebrew or Scoop, use your package manager
+instead — agentmap upgrade does not support managed installs.
 
 Use --check to only report whether an update is available.`,
 	Args: cobra.NoArgs,
@@ -24,6 +29,15 @@ Use --check to only report whether an update is available.`,
 func runUpgrade(cmd *cobra.Command, _ []string) error {
 	if version == "dev" {
 		return fmt.Errorf("cannot upgrade a dev build; install a release version first")
+	}
+
+	// Refuse to self-update binaries managed by Homebrew or Scoop — doing so
+	// would corrupt their tracking state. Direct the user to their package manager.
+	exe, exeErr := selfupdate.ExecutablePath()
+	if exeErr == nil {
+		if err := detectManagedInstall(exe); err != nil {
+			return err
+		}
 	}
 
 	checkOnly, _ := cmd.Flags().GetBool("check")
@@ -56,9 +70,8 @@ func runUpgrade(cmd *cobra.Command, _ []string) error {
 		return nil
 	}
 
-	exe, err := selfupdate.ExecutablePath()
-	if err != nil {
-		return fmt.Errorf("locating executable: %w", err)
+	if exeErr != nil {
+		return fmt.Errorf("locating executable: %w", exeErr)
 	}
 
 	fmt.Printf("Downloading agentmap %s...\n", latest.Version())
@@ -70,5 +83,19 @@ func runUpgrade(cmd *cobra.Command, _ []string) error {
 	}
 
 	fmt.Printf("Updated agentmap %s -> %s\n", version, latest.Version())
+	return nil
+}
+
+// detectManagedInstall returns an error with upgrade instructions if the binary
+// at exePath was installed by a package manager that manages its own upgrades.
+// Returns nil for direct installs and go-install installs.
+func detectManagedInstall(exePath string) error {
+	method := initcmd.DetectInstallMethod(exePath, os.Getenv("GOPATH"), os.Getenv("GOBIN"))
+	switch method {
+	case initcmd.InstallMethodHomebrew:
+		return fmt.Errorf("agentmap was installed via Homebrew; upgrade with:\n\n  brew upgrade agentmap")
+	case initcmd.InstallMethodScoop:
+		return fmt.Errorf("agentmap was installed via Scoop; upgrade with:\n\n  scoop update agentmap")
+	}
 	return nil
 }
