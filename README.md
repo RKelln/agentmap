@@ -54,7 +54,7 @@ curl -sSfL https://raw.githubusercontent.com/RKelln/agentmap/main/install.sh | s
 irm https://raw.githubusercontent.com/RKelln/agentmap/main/install.ps1 | iex
 
 # Homebrew
-brew install RKelln/tap/agentmap
+brew install RKelln/agentmap/agentmap
 
 # Go
 go install github.com/ryankelln/agentmap/cmd/agentmap@latest

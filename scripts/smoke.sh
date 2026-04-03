@@ -91,6 +91,15 @@ run_check "init --dry-run in temp dir" \
 run_no_panic "upgrade --check does not panic" \
     "$BIN" upgrade --check
 
+# 8. uninit --dry-run --yes in a temp dir — verifies uninit path doesn't crash
+run_check "uninit --dry-run in temp dir" \
+    "$BIN" uninit "$tmpdir" --dry-run --yes
+
+# 9. uninstall --dry-run --yes — verifies uninstall path doesn't crash
+#    (binary is not in a Homebrew/Scoop/GOPATH path, so it takes the direct-install path)
+run_check "uninstall --dry-run does not crash" \
+    "$BIN" uninstall --dry-run --yes
+
 # ── summary ──────────────────────────────────────────────────────────────────
 
 echo ""
