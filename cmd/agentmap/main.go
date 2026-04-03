@@ -10,6 +10,7 @@ import (
 	"github.com/ryankelln/agentmap/internal/config"
 	"github.com/ryankelln/agentmap/internal/generate"
 	"github.com/ryankelln/agentmap/internal/index"
+	"github.com/ryankelln/agentmap/internal/initcmd"
 	"github.com/ryankelln/agentmap/internal/navblock"
 	"github.com/ryankelln/agentmap/internal/parser"
 	"github.com/ryankelln/agentmap/internal/update"
@@ -303,6 +304,44 @@ Files with no ~ anywhere → skip (already fully indexed).`,
 	},
 }
 
+var initCmd = &cobra.Command{
+	Use:   "init [path]",
+	Short: "Configure agent tools to use agentmap",
+	Long: `Detect agent tool configs (AGENTS.md; CLAUDE.md; .cursor/rules; .windsurf/rules;
+.continue/rules; .roo/rules; .amazonq/rules; .opencode; .aider.conf.yml) and
+append agentmap instructions. Optionally install a pre-commit hook.
+
+If no tool configs are detected, creates AGENTS.md (works with all major agent tools).`,
+	Args: cobra.MaximumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		root := "."
+		if len(args) > 0 {
+			root = args[0]
+		}
+
+		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		yes, _ := cmd.Flags().GetBool("yes")
+		noHook, _ := cmd.Flags().GetBool("no-hook")
+		tool, _ := cmd.Flags().GetString("tool")
+
+		opts := initcmd.Options{
+			Root:       root,
+			DryRun:     dryRun,
+			Yes:        yes,
+			NoHook:     noHook,
+			ToolFilter: tool,
+		}
+
+		plan, err := initcmd.Apply(opts)
+		if err != nil {
+			return err
+		}
+
+		fmt.Print(plan.String())
+		return nil
+	},
+}
+
 func init() {
 	// generate flags
 	generateCmd.Flags().Int("min-lines", 50, "Minimum file size for full nav block")
@@ -324,7 +363,13 @@ func init() {
 	indexCmd.Flags().Bool("force", false, "Regenerate nav blocks even for files with existing nav blocks")
 	indexCmd.Flags().Bool("files-only", false, "Skip task list; only generate files block")
 
-	rootCmd.AddCommand(generateCmd, updateCmd, checkCmd, versionCmd, hookCmd, indexCmd)
+	// init flags
+	initCmd.Flags().Bool("dry-run", false, "Preview changes without writing files")
+	initCmd.Flags().BoolP("yes", "y", false, "Skip confirmation prompt")
+	initCmd.Flags().Bool("no-hook", false, "Skip pre-commit hook installation")
+	initCmd.Flags().String("tool", "", "Only configure a specific tool (cursor; claude; windsurf; continue; roo; amazonq; opencode; aider)")
+
+	rootCmd.AddCommand(generateCmd, updateCmd, checkCmd, versionCmd, hookCmd, indexCmd, initCmd)
 }
 
 func main() {
