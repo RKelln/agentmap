@@ -94,6 +94,62 @@ goreleaser check
 goreleaser build --snapshot --clean
 ```
 
+## Testing a release
+
+Three levels of pre-release testing, in increasing effort:
+
+### 1. Binary smoke test (fast, no extra tools)
+
+Exercises the compiled binary against real testdata — catches ldflags
+injection failures, embedded asset problems, and CLI issues that unit tests
+(which use the package API) cannot:
+
+```bash
+make smoke
+```
+
+To test a GoReleaser snapshot build instead of the local dev binary:
+
+```bash
+make smoke BINARY=dist/agentmap_Linux_x86_64_v1/agentmap
+```
+
+### 2. GoReleaser snapshot (catch packaging issues)
+
+Runs the full GoReleaser pipeline locally without publishing — builds all 6
+platform binaries, creates archives, generates checksums:
+
+```bash
+goreleaser release --snapshot --clean
+# Then smoke test the Linux build:
+make smoke BINARY=dist/agentmap_Linux_x86_64_v1/agentmap
+```
+
+### 3. Install script smoke test (requires Docker)
+
+Tests `install.sh` end-to-end in a clean Ubuntu container — the closest thing
+to a real user install:
+
+```bash
+make smoke-install
+```
+
+This pulls `install.sh` from the `main` branch on GitHub, so it only works
+after changes to the script are already pushed.
+
+### 4. Pre-release tag
+
+Push a release candidate tag to trigger the full GoReleaser workflow without
+polluting the stable release channel:
+
+```bash
+git tag -a v0.1.0-rc.1 -m "v0.1.0-rc.1 release candidate"
+git push origin v0.1.0-rc.1
+```
+
+Then verify the GitHub Release, Homebrew formula, and Scoop manifest are
+created correctly before tagging the final release.
+
 ## Installing from a release
 
 ```bash

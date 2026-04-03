@@ -1,4 +1,4 @@
-.PHONY: build test lint fmt install clean check-sample bench bench-update
+.PHONY: build test lint fmt install clean check-sample bench bench-update smoke smoke-install
 
 BINARY := agentmap
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
@@ -54,3 +54,18 @@ bench:
 
 bench-update:
 	scripts/agent-bench.sh --write benchmarks.md
+
+# Smoke tests: run the compiled binary against real testdata.
+# Catches ldflags injection, embedded asset loading, and CLI issues
+# that unit tests (which use the package API) cannot catch.
+# Pass BINARY=<path> to test a specific build (e.g. a goreleaser snapshot).
+smoke: build
+	scripts/smoke.sh ./$(BINARY)
+
+# Smoke test the install.sh script inside a clean Ubuntu container.
+# Requires Docker. Tests the end-to-end install path for new users.
+smoke-install:
+	docker run --rm ubuntu:22.04 bash -c "\
+		apt-get update -qq && apt-get install -q -y curl && \
+		curl -fsSL https://raw.githubusercontent.com/RKelln/agentmap/main/install.sh | sh && \
+		agentmap version"
