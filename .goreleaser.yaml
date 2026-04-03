@@ -41,9 +41,9 @@ changelog:
 
 brews:
   - repository:
-      owner: ryankelln
+      owner: RKelln
       name: homebrew-agentmap
-    homepage: https://github.com/ryankelln/agentmap
+    homepage: https://github.com/RKelln/agentmap
     description: Navigation maps for AI agents in markdown files
     license: MIT
     install: |

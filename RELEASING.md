@@ -4,10 +4,10 @@ How to cut a release. GoReleaser handles builds; archives; checksums; GitHub rel
 
 ## Prerequisites (one-time setup)
 
-1. **Create the Homebrew tap repo** -- `ryankelln/homebrew-agentmap` must exist on GitHub as an empty public repo. GoReleaser writes the formula to it on every release. Without it the release workflow fails.
+1. **Create the Homebrew tap repo** -- `RKelln/homebrew-agentmap` must exist on GitHub as an empty public repo. GoReleaser writes the formula to it on every release. Without it the release workflow fails.
 
    ```bash
-   gh repo create ryankelln/homebrew-agentmap --public --description "Homebrew tap for agentmap"
+   gh repo create RKelln/homebrew-agentmap --public --description "Homebrew tap for agentmap"
    ```
 
 2. **`GITHUB_TOKEN` permissions** -- The default `GITHUB_TOKEN` in GitHub Actions has `contents: write` (set in `release.yml`). This is sufficient for creating releases and pushing to repos in the same account. No additional secrets needed.
@@ -33,7 +33,7 @@ The `release.yml` workflow runs on the tag push and:
 - Creates archives: `.tar.gz` for Linux/macOS; `.zip` for Windows
 - Generates `checksums.txt` (SHA256 of all archives)
 - Creates a GitHub Release with all artifacts attached
-- Pushes an updated `agentmap.rb` formula to `ryankelln/homebrew-agentmap`
+- Pushes an updated `agentmap.rb` formula to `RKelln/homebrew-agentmap`
 
 ## Verifying a release locally (without publishing)
 
@@ -51,13 +51,13 @@ goreleaser build --snapshot --clean
 
 ```bash
 # Homebrew (macOS/Linux)
-brew install ryankelln/tap/agentmap
+brew install RKelln/tap/agentmap
 
 # go install (any platform with Go installed)
-go install github.com/ryankelln/agentmap/cmd/agentmap@latest
+go install github.com/RKelln/agentmap/cmd/agentmap@latest
 
 # Direct download (Linux/macOS)
-curl -fsSL https://github.com/ryankelln/agentmap/releases/latest/download/agentmap_Linux_x86_64.tar.gz | tar xz
+curl -fsSL https://github.com/RKelln/agentmap/releases/latest/download/agentmap_Linux_x86_64.tar.gz | tar xz
 ```
 
 ## Changelog filtering
