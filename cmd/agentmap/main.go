@@ -342,6 +342,100 @@ If no tool configs are detected, creates AGENTS.md (works with all major agent t
 	},
 }
 
+var uninitCmd = &cobra.Command{
+	Use:   "uninit [path]",
+	Short: "Remove agentmap configuration injected by init",
+	Long: `Reverse agentmap init: find <!-- agentmap:init --> markers and remove the
+injected blocks. Delete files that were created entirely by init. Remove
+pre-commit hook entries. Never touches AGENT:NAV blocks or other content.`,
+	Args: cobra.MaximumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		root := "."
+		if len(args) > 0 {
+			root = args[0]
+		}
+
+		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		yes, _ := cmd.Flags().GetBool("yes")
+
+		opts := initcmd.UninitOptions{
+			Root:   root,
+			DryRun: dryRun,
+			Yes:    yes,
+		}
+
+		plan, err := initcmd.Uninit(opts)
+		if err != nil {
+			return err
+		}
+
+		fmt.Print(plan.String())
+		return nil
+	},
+}
+
+var uninstallCmd = &cobra.Command{
+	Use:   "uninstall",
+	Short: "Remove agentmap binary and config",
+	Long: `Detect how agentmap was installed and print uninstall instructions (for
+Homebrew/Scoop/go install), or remove the binary directly for direct installs.
+Runs uninit first unless --keep-config is set.`,
+	Args: cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, _ []string) error {
+		keepConfig, _ := cmd.Flags().GetBool("keep-config")
+		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		yes, _ := cmd.Flags().GetBool("yes")
+
+		// Run uninit first (unless --keep-config).
+		if !keepConfig {
+			opts := initcmd.UninitOptions{
+				Root:   ".",
+				DryRun: dryRun,
+				Yes:    yes,
+			}
+			plan, err := initcmd.Uninit(opts)
+			if err != nil {
+				return fmt.Errorf("uninit: %w", err)
+			}
+			if len(plan.Actions) > 0 {
+				fmt.Print(plan.String())
+			}
+		}
+
+		// Detect install method.
+		exePath, err := os.Executable()
+		if err != nil {
+			return fmt.Errorf("resolve executable: %w", err)
+		}
+		resolved, err := os.Readlink(exePath)
+		if err != nil {
+			resolved = exePath
+		}
+
+		gopath := os.Getenv("GOPATH")
+		gobin := os.Getenv("GOBIN")
+		method := initcmd.DetectInstallMethod(resolved, gopath, gobin)
+
+		if instructions := initcmd.UninstallInstructions(method); instructions != "" {
+			fmt.Println(instructions)
+			return nil
+		}
+
+		// Direct install: remove the binary.
+		if dryRun {
+			fmt.Printf("[dry-run] Would remove: %s\n", resolved)
+			return nil
+		}
+
+		fmt.Printf("Removing: %s\n", resolved)
+		if err := os.Remove(resolved); err != nil {
+			return fmt.Errorf("remove binary: %w", err)
+		}
+		fmt.Println("agentmap uninstalled.")
+		return nil
+	},
+}
+
 func init() {
 	// generate flags
 	generateCmd.Flags().Int("min-lines", 50, "Minimum file size for full nav block")
@@ -369,7 +463,16 @@ func init() {
 	initCmd.Flags().Bool("no-hook", false, "Skip pre-commit hook installation")
 	initCmd.Flags().String("tool", "", "Only configure a specific tool (cursor; claude; windsurf; continue; roo; amazonq; opencode; aider)")
 
-	rootCmd.AddCommand(generateCmd, updateCmd, checkCmd, versionCmd, hookCmd, indexCmd, initCmd)
+	// uninit flags
+	uninitCmd.Flags().Bool("dry-run", false, "Preview changes without writing files")
+	uninitCmd.Flags().BoolP("yes", "y", false, "Skip confirmation prompt")
+
+	// uninstall flags
+	uninstallCmd.Flags().Bool("dry-run", false, "Preview changes without writing files")
+	uninstallCmd.Flags().BoolP("yes", "y", false, "Skip confirmation prompt")
+	uninstallCmd.Flags().Bool("keep-config", false, "Only remove binary; skip uninit")
+
+	rootCmd.AddCommand(generateCmd, updateCmd, checkCmd, versionCmd, hookCmd, indexCmd, initCmd, uninitCmd, uninstallCmd)
 }
 
 func main() {

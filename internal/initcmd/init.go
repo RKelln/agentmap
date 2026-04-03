@@ -1,4 +1,4 @@
-// Package initcmd implements the `agentmap init` command.
+// Package initcmd implements the agentmap init; uninit; and uninstall commands.
 // It detects agent tool configurations in a repository root; appends or creates
 // agentmap instruction blocks; and optionally installs pre-commit hooks.
 package initcmd
