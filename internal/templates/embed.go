@@ -3,6 +3,7 @@ package templates
 
 import (
 	"embed"
+	"fmt"
 	"io/fs"
 )
 
@@ -18,10 +19,11 @@ func Get(name string) ([]byte, error) {
 }
 
 // AllNames returns the names of all embedded template files.
+// Panics if the embedded filesystem is unreadable (indicates a corrupt binary).
 func AllNames() []string {
 	entries, err := fs.ReadDir(FS, ".")
 	if err != nil {
-		return nil
+		panic(fmt.Sprintf("templates: embedded FS unreadable: %v", err))
 	}
 
 	names := make([]string, 0, len(entries))

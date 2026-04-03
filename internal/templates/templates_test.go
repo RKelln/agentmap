@@ -12,12 +12,18 @@ import (
 // mdTemplates lists the .md.tmpl files that must have <!-- agentmap:init --> markers.
 var mdTemplates = []string{
 	"agents.md.tmpl",
-	"cursor.md.tmpl",
-	"windsurf.md.tmpl",
-	"continue.md.tmpl",
-	"roo.md.tmpl",
 	"amazonq.md.tmpl",
+	"continue.md.tmpl",
+	"cursor.md.tmpl",
 	"opencode-skill.md.tmpl",
+	"roo.md.tmpl",
+	"windsurf.md.tmpl",
+}
+
+// hookTemplates lists the hook templates that must have # agentmap: validate markers.
+var hookTemplates = []string{
+	"hook-git.sh.tmpl",
+	"hook-precommit.yml.tmpl",
 }
 
 // frontmatterTemplates lists the templates that carry YAML frontmatter.
@@ -129,5 +135,23 @@ func TestGetNonexistentReturnsError(t *testing.T) {
 	_, err := templates.Get("nonexistent.tmpl")
 	if err == nil {
 		t.Error("Get(\"nonexistent.tmpl\") expected error, got nil")
+	}
+}
+
+func TestHookTemplatesHaveValidateMarkers(t *testing.T) {
+	for _, name := range hookTemplates {
+		t.Run(name, func(t *testing.T) {
+			data, err := templates.Get(name)
+			if err != nil {
+				t.Fatalf("Get(%q) error: %v", name, err)
+			}
+			content := string(data)
+			if !strings.Contains(content, "# agentmap: validate") {
+				t.Errorf("%s: missing opening marker '# agentmap: validate'", name)
+			}
+			if !strings.Contains(content, "# /agentmap: validate") {
+				t.Errorf("%s: missing closing marker '# /agentmap: validate'", name)
+			}
+		})
 	}
 }
