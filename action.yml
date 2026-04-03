@@ -1,0 +1,28 @@
+name: 'agentmap check'
+description: 'Validate AGENT:NAV blocks are in sync with markdown headings'
+branding:
+  icon: 'map'
+  color: 'blue'
+
+inputs:
+  version:
+    description: 'agentmap version to install (e.g. v0.1.0 or "latest")'
+    required: false
+    default: 'latest'
+  path:
+    description: 'Path to check (default: current directory)'
+    required: false
+    default: '.'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install agentmap
+      shell: bash
+      run: |
+        curl -sSfL https://raw.githubusercontent.com/RKelln/agentmap/main/install.sh \
+          | sh -s -- --yes --version "${{ inputs.version }}"
+
+    - name: Check nav blocks
+      shell: bash
+      run: agentmap check "${{ inputs.path }}"
