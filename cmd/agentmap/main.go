@@ -18,6 +18,8 @@ import (
 
 var version = "dev"
 
+var commit = ""
+
 var rootCmd = &cobra.Command{
 	Use:   "agentmap",
 	Short: "Navigation maps for AI agents",
@@ -222,7 +224,11 @@ var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Print version",
 	Run: func(cmd *cobra.Command, _ []string) {
-		cmd.Println(version)
+		if commit != "" {
+			cmd.Printf("%s (%s)\n", version, commit)
+		} else {
+			cmd.Println(version)
+		}
 	},
 }
 

@@ -1,0 +1,46 @@
+version: 2
+
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -trimpath
+      - -X main.version={{.Version}}
+      - -X main.commit={{.ShortCommit}}
+    main: ./cmd/agentmap
+
+archives:
+  - name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else }}{{ .Arch }}{{ end }}
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore:'
+
+brews:
+  - repository:
+      owner: ryankelln
+      name: homebrew-agentmap
+    homepage: https://github.com/ryankelln/agentmap
+    description: Navigation maps for AI agents in markdown files
+    license: MIT

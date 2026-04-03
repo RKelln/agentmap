@@ -213,3 +213,46 @@ func TestCheckCommand_SingleFileSingular(t *testing.T) {
 		t.Errorf("check single file output = %q, want singular success message", output)
 	}
 }
+
+func TestVersionCmd_NoCommit(t *testing.T) {
+	orig := commit
+	commit = ""
+	defer func() { commit = orig }()
+
+	output, err := executeCommand("version")
+	if err != nil {
+		t.Fatalf("ExecuteC() error = %v", err)
+	}
+
+	want := version + "\n"
+	if output != want {
+		t.Errorf("version output = %q, want %q", output, want)
+	}
+}
+
+func TestVersionCmd_WithCommit(t *testing.T) {
+	origCommit := commit
+	origVersion := version
+	commit = "abc1234"
+	version = "v1.2.3"
+	defer func() {
+		commit = origCommit
+		version = origVersion
+	}()
+
+	output, err := executeCommand("version")
+	if err != nil {
+		t.Fatalf("ExecuteC() error = %v", err)
+	}
+
+	want := "v1.2.3 (abc1234)\n"
+	if output != want {
+		t.Errorf("version output = %q, want %q", output, want)
+	}
+}
+
+func TestVersionCmd_DevDefault(t *testing.T) {
+	if version != "dev" {
+		t.Errorf("default version = %q, want %q", version, "dev")
+	}
+}

@@ -2,7 +2,7 @@
 
 BINARY := agentmap
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
-LDFLAGS := -ldflags "-X main.version=$(VERSION)"
+LDFLAGS := -ldflags "-X main.version=$(VERSION) -X main.commit=$(shell git rev-parse --short HEAD 2>/dev/null || echo '')"
 GOBIN := $(shell go env GOPATH)/bin
 
 build:
