@@ -472,7 +472,10 @@ func init() {
 	uninstallCmd.Flags().BoolP("yes", "y", false, "Skip confirmation prompt")
 	uninstallCmd.Flags().Bool("keep-config", false, "Only remove binary; skip uninit")
 
-	rootCmd.AddCommand(generateCmd, updateCmd, checkCmd, versionCmd, hookCmd, indexCmd, initCmd, uninitCmd, uninstallCmd)
+	// upgrade flags
+	upgradeCmd.Flags().Bool("check", false, "Only check if an update is available; do not update")
+
+	rootCmd.AddCommand(generateCmd, updateCmd, checkCmd, versionCmd, hookCmd, indexCmd, initCmd, uninitCmd, uninstallCmd, upgradeCmd)
 }
 
 func main() {
