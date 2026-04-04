@@ -324,6 +324,7 @@ const (
 )
 
 // buildFilesBlockText converts FileEntry list to navblock.FilesBlock and renders it.
+// It reads each file to compute an accurate content line count (total newlines minus nav block).
 func buildFilesBlockText(root string, entries []FileEntry) string {
 	repoName := filepath.Base(filepath.Clean(root))
 	if repoName == "." || repoName == "" {
@@ -336,8 +337,22 @@ func buildFilesBlockText(root string, entries []FileEntry) string {
 		Purpose: "project file index for " + repoName,
 	}
 	for _, e := range entries {
+		contentLines := 0
+		fullPath := filepath.Join(root, e.RelPath)
+		if data, err := os.ReadFile(fullPath); err == nil {
+			pr := navblock.ParseNavBlock(string(data))
+			navBlockLines := 0
+			if pr.Found {
+				navBlockLines = pr.End - pr.Start + 1
+			}
+			contentLines = strings.Count(string(data), "\n") - navBlockLines
+			if contentLines < 0 {
+				contentLines = 0
+			}
+		}
 		fb.Entries = append(fb.Entries, navblock.FilesEntry{
 			RelPath: e.RelPath,
+			Lines:   contentLines,
 			About:   e.Purpose,
 		})
 	}

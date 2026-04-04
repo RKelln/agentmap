@@ -271,7 +271,7 @@ title: Test
 Content.
 `
 
-	got := insertNavBlock(content, navblock.RenderPurposeOnly("test purpose"))
+	got := insertNavBlock(content, navblock.RenderPurposeOnly("test purpose", 0))
 	if !strings.Contains(got, "---\n") {
 		t.Error("frontmatter should be preserved")
 	}
@@ -290,7 +290,7 @@ func TestInsertNavBlock_InsertsAtLine1(t *testing.T) {
 Content here.
 `
 
-	got := insertNavBlock(content, navblock.RenderPurposeOnly("test purpose"))
+	got := insertNavBlock(content, navblock.RenderPurposeOnly("test purpose", 0))
 	if !strings.HasPrefix(got, "<!-- AGENT:NAV") {
 		t.Error("nav block should be at the start of the file")
 	}

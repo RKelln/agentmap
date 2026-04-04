@@ -125,11 +125,36 @@ func File(path string, cfg config.Config, dryRun, quiet bool, changedLines ...[]
 		return noChanges, nil
 	}
 
+	// Compute content lines (total newlines minus the nav block itself).
+	contentLines := strings.Count(string(content), "\n") - (pr.End - pr.Start + 1)
+	if contentLines < 0 {
+		contentLines = 0
+	}
+
 	headings := parser.ParseHeadings(string(content), cfg.MaxDepth)
 	sections := parser.ComputeSections(headings, totalLines)
 
+	// Handle purpose-only files: no headings, but lines:N may still need updating.
 	if len(headings) == 0 {
-		return noChanges, nil
+		// Only refresh lines:N if the block already has it (non-zero).
+		linesChanged := oldBlock.Lines != 0 && oldBlock.Lines != contentLines
+		if !linesChanged {
+			return noChanges, nil
+		}
+		oldLinesCount := oldBlock.Lines
+		oldBlock.Lines = contentLines
+		blockText := navblock.RenderNavBlock(oldBlock)
+		if dryRun {
+			return fmt.Sprintf("Updated: %s\n  lines-updated: %d -> %d", path, oldLinesCount, contentLines), nil
+		}
+		newContent := insertNavBlock(string(content), blockText)
+		if err := os.WriteFile(path, []byte(newContent), 0o644); err != nil {
+			return "", fmt.Errorf("update: write file: %w", err)
+		}
+		if quiet {
+			return noChanges, nil
+		}
+		return fmt.Sprintf("Updated: %s\n  lines-updated: %d -> %d", path, oldLinesCount, contentLines), nil
 	}
 
 	// Use pre-computed ranges if provided, otherwise fall back to per-file git diff.
@@ -141,7 +166,7 @@ func File(path string, cfg config.Config, dryRun, quiet bool, changedLines ...[]
 	}
 	entryReports := buildEntryReports(oldBlock.Nav, sections, fileChanges)
 
-	hasChanges := false
+	hasChanges := (oldBlock.Lines != 0 && oldBlock.Lines != contentLines)
 	for _, er := range entryReports {
 		if er.Type != ReportOK {
 			hasChanges = true
@@ -153,7 +178,7 @@ func File(path string, cfg config.Config, dryRun, quiet bool, changedLines ...[]
 		return noChanges, nil
 	}
 
-	block := buildUpdatedBlock(oldBlock, sections, entryReports, lines, cfg)
+	block := buildUpdatedBlock(oldBlock, sections, entryReports, lines, cfg, contentLines)
 	blockText := navblock.RenderNavBlock(block)
 
 	if dryRun {
@@ -254,7 +279,7 @@ func buildEntryReports(oldNav []navblock.NavEntry, sections []parser.Section, ch
 	return reports
 }
 
-func buildUpdatedBlock(oldBlock navblock.NavBlock, sections []parser.Section, _ []ReportEntry, lines []string, cfg config.Config) navblock.NavBlock {
+func buildUpdatedBlock(oldBlock navblock.NavBlock, sections []parser.Section, _ []ReportEntry, lines []string, cfg config.Config, contentLines int) navblock.NavBlock {
 	oldByName := make(map[string]navblock.NavEntry)
 	for _, e := range oldBlock.Nav {
 		key := navblock.NormalizeHeading(e.Name)
@@ -289,8 +314,15 @@ func buildUpdatedBlock(oldBlock navblock.NavBlock, sections []parser.Section, _ 
 		}
 	}
 
+	// Only carry forward lines:N if the original block had it.
+	outLines := 0
+	if oldBlock.Lines != 0 {
+		outLines = contentLines
+	}
+
 	return navblock.NavBlock{
 		Purpose: oldBlock.Purpose,
+		Lines:   outLines,
 		Nav:     generate.FilterNavEntries(newNav, cfg.MaxNavEntries, cfg.NavStubWords),
 		See:     oldBlock.See,
 	}

@@ -10,6 +10,8 @@ import (
 	"testing"
 )
 
+const navClose = "-->"
+
 func TestNormalizeHeading(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -321,19 +323,20 @@ nav[1]{s,n,name,about}:
 }
 
 func TestRenderNavBlock(t *testing.T) {
-	block := NavBlock{
-		Purpose: "test purpose",
-		Nav: []NavEntry{
-			{Start: 5, N: 41, Name: "#Authentication", About: "token lifecycle"},
-			{Start: 8, N: 13, Name: "##Token Exchange", About: "OAuth2 flow"},
-		},
-		See: []SeeEntry{
-			{Path: "src/config.py", Why: "default timeout values"},
-		},
-	}
+	t.Run("without lines field", func(t *testing.T) {
+		block := NavBlock{
+			Purpose: "test purpose",
+			Nav: []NavEntry{
+				{Start: 5, N: 41, Name: "#Authentication", About: "token lifecycle"},
+				{Start: 8, N: 13, Name: "##Token Exchange", About: "OAuth2 flow"},
+			},
+			See: []SeeEntry{
+				{Path: "src/config.py", Why: "default timeout values"},
+			},
+		}
 
-	got := RenderNavBlock(block)
-	want := `<!-- AGENT:NAV
+		got := RenderNavBlock(block)
+		want := `<!-- AGENT:NAV
 purpose:test purpose
 nav[2]{s,n,name,about}:
 5,41,#Authentication,token lifecycle
@@ -342,17 +345,49 @@ see[1]{path,why}:
 src/config.py,default timeout values
 -->`
 
-	if got != want {
-		t.Errorf("RenderNavBlock() =\n%s\n\nwant:\n%s", got, want)
-	}
+		if got != want {
+			t.Errorf("RenderNavBlock() =\n%s\n\nwant:\n%s", got, want)
+		}
+	})
+
+	t.Run("with lines field", func(t *testing.T) {
+		block := NavBlock{
+			Purpose: "test purpose",
+			Lines:   120,
+			Nav: []NavEntry{
+				{Start: 5, N: 41, Name: "#Authentication", About: "token lifecycle"},
+			},
+		}
+
+		got := RenderNavBlock(block)
+		want := `<!-- AGENT:NAV
+purpose:test purpose
+lines:120
+nav[1]{s,n,name,about}:
+5,41,#Authentication,token lifecycle
+-->`
+
+		if got != want {
+			t.Errorf("RenderNavBlock() with lines =\n%s\n\nwant:\n%s", got, want)
+		}
+	})
 }
 
 func TestRenderPurposeOnly(t *testing.T) {
-	got := RenderPurposeOnly("helper utilities")
-	want := "<!-- AGENT:NAV\npurpose:helper utilities\n-->"
-	if got != want {
-		t.Errorf("RenderPurposeOnly() = %q, want %q", got, want)
-	}
+	t.Run("no lines", func(t *testing.T) {
+		got := RenderPurposeOnly("helper utilities", 0)
+		want := "<!-- AGENT:NAV\npurpose:helper utilities\n-->"
+		if got != want {
+			t.Errorf("RenderPurposeOnly(0) = %q, want %q", got, want)
+		}
+	})
+	t.Run("with lines", func(t *testing.T) {
+		got := RenderPurposeOnly("helper utilities", 42)
+		want := "<!-- AGENT:NAV\npurpose:helper utilities\nlines:42\n-->"
+		if got != want {
+			t.Errorf("RenderPurposeOnly(42) = %q, want %q", got, want)
+		}
+	})
 }
 
 func TestParseNavBlock_RoundTrip(t *testing.T) {
@@ -635,40 +670,40 @@ func TestRenderFilesBlock(t *testing.T) {
 			block: FilesBlock{
 				Purpose: "project file index for myrepo",
 				Entries: []FilesEntry{
-					{RelPath: "README.md", About: "project overview and quickstart"},
-					{RelPath: "AGENTS.md", About: "agent workflow instructions"},
+					{RelPath: "README.md", Lines: 0, About: "project overview and quickstart"},
+					{RelPath: "AGENTS.md", Lines: 0, About: "agent workflow instructions"},
 				},
 			},
 			// RenderFilesBlock sorts entries; AGENTS.md < README.md alphabetically.
-			want: "<!-- AGENT:NAV\npurpose:project file index for myrepo\nfiles[2]{path,about}:\nAGENTS.md,agent workflow instructions\nREADME.md,project overview and quickstart\n-->",
+			want: "<!-- AGENT:NAV\npurpose:project file index for myrepo\nfiles[2]{path,lines,about}:\nAGENTS.md,0,agent workflow instructions\nREADME.md,0,project overview and quickstart\n-->",
 		},
 		{
 			name: "files grouped by directory",
 			block: FilesBlock{
 				Purpose: "project file index for myrepo",
 				Entries: []FilesEntry{
-					{RelPath: "README.md", About: "project overview"},
-					{RelPath: "docs/authentication.md", About: "token lifecycle; OAuth2 exchange"},
-					{RelPath: "docs/api/endpoints.md", About: "REST endpoint catalog"},
+					{RelPath: "README.md", Lines: 10, About: "project overview"},
+					{RelPath: "docs/authentication.md", Lines: 80, About: "token lifecycle; OAuth2 exchange"},
+					{RelPath: "docs/api/endpoints.md", Lines: 50, About: "REST endpoint catalog"},
 				},
 			},
-			want: "<!-- AGENT:NAV\npurpose:project file index for myrepo\nfiles[3]{path,about}:\nREADME.md,project overview\ndocs/\nauthentication.md,token lifecycle; OAuth2 exchange\ndocs/api/\nendpoints.md,REST endpoint catalog\n-->",
+			want: "<!-- AGENT:NAV\npurpose:project file index for myrepo\nfiles[3]{path,lines,about}:\nREADME.md,10,project overview\ndocs/\nauthentication.md,80,token lifecycle; OAuth2 exchange\ndocs/api/\nendpoints.md,50,REST endpoint catalog\n-->",
 		},
 		{
 			name: "N count is total file entries not directory prefix lines",
 			block: FilesBlock{
 				Purpose: "project file index",
 				Entries: []FilesEntry{
-					{RelPath: "docs/a.md", About: "doc a"},
-					{RelPath: "docs/b.md", About: "doc b"},
+					{RelPath: "docs/a.md", Lines: 0, About: "doc a"},
+					{RelPath: "docs/b.md", Lines: 0, About: "doc b"},
 				},
 			},
-			want: "<!-- AGENT:NAV\npurpose:project file index\nfiles[2]{path,about}:\ndocs/\na.md,doc a\nb.md,doc b\n-->",
+			want: "<!-- AGENT:NAV\npurpose:project file index\nfiles[2]{path,lines,about}:\ndocs/\na.md,0,doc a\nb.md,0,doc b\n-->",
 		},
 		{
 			name:  "empty entries",
 			block: FilesBlock{Purpose: "empty project"},
-			want:  "<!-- AGENT:NAV\npurpose:empty project\nfiles[0]{path,about}:\n-->",
+			want:  "<!-- AGENT:NAV\npurpose:empty project\nfiles[0]{path,lines,about}:\n-->",
 		},
 		{
 			name: "unsorted input is sorted by dir then name",
@@ -676,27 +711,27 @@ func TestRenderFilesBlock(t *testing.T) {
 				Purpose: "unsorted input test",
 				Entries: []FilesEntry{
 					// Deliberately out of order: deep dir, then root, then shallow dir.
-					{RelPath: "docs/api/endpoints.md", About: "api endpoints"},
-					{RelPath: "README.md", About: "project overview"},
-					{RelPath: "docs/authentication.md", About: "auth guide"},
-					{RelPath: "docs/api/rate-limiting.md", About: "rate limits"},
+					{RelPath: "docs/api/endpoints.md", Lines: 0, About: "api endpoints"},
+					{RelPath: "README.md", Lines: 0, About: "project overview"},
+					{RelPath: "docs/authentication.md", Lines: 0, About: "auth guide"},
+					{RelPath: "docs/api/rate-limiting.md", Lines: 0, About: "rate limits"},
 				},
 			},
 			// After sort: root-level first, then docs/, then docs/api/.
-			want: "<!-- AGENT:NAV\npurpose:unsorted input test\nfiles[4]{path,about}:\nREADME.md,project overview\ndocs/\nauthentication.md,auth guide\ndocs/api/\nendpoints.md,api endpoints\nrate-limiting.md,rate limits\n-->",
+			want: "<!-- AGENT:NAV\npurpose:unsorted input test\nfiles[4]{path,lines,about}:\nREADME.md,0,project overview\ndocs/\nauthentication.md,0,auth guide\ndocs/api/\nendpoints.md,0,api endpoints\nrate-limiting.md,0,rate limits\n-->",
 		},
 		{
 			name: "same directory emitted only once even when input alternates dirs",
 			block: FilesBlock{
 				Purpose: "alternating dirs test",
 				Entries: []FilesEntry{
-					{RelPath: "a/x.md", About: "x"},
-					{RelPath: "b/y.md", About: "y"},
-					{RelPath: "a/z.md", About: "z"}, // same dir as first; would duplicate header without sort
+					{RelPath: "a/x.md", Lines: 0, About: "x"},
+					{RelPath: "b/y.md", Lines: 0, About: "y"},
+					{RelPath: "a/z.md", Lines: 0, About: "z"}, // same dir as first; would duplicate header without sort
 				},
 			},
 			// After sort: a/ group first (x, z), then b/ group (y).
-			want: "<!-- AGENT:NAV\npurpose:alternating dirs test\nfiles[3]{path,about}:\na/\nx.md,x\nz.md,z\nb/\ny.md,y\n-->",
+			want: "<!-- AGENT:NAV\npurpose:alternating dirs test\nfiles[3]{path,lines,about}:\na/\nx.md,0,x\nz.md,0,z\nb/\ny.md,0,y\n-->",
 		},
 	}
 
@@ -718,7 +753,24 @@ func TestParseFilesBlock(t *testing.T) {
 		wantBlock FilesBlock
 	}{
 		{
-			name: "root-level files only",
+			name: "new format with lines column",
+			content: `<!-- AGENT:NAV
+purpose:project file index for myrepo
+files[2]{path,lines,about}:
+README.md,30,project overview and quickstart
+AGENTS.md,15,agent workflow instructions
+-->`,
+			wantFound: true,
+			wantBlock: FilesBlock{
+				Purpose: "project file index for myrepo",
+				Entries: []FilesEntry{
+					{RelPath: "README.md", Lines: 30, About: "project overview and quickstart"},
+					{RelPath: "AGENTS.md", Lines: 15, About: "agent workflow instructions"},
+				},
+			},
+		},
+		{
+			name: "legacy format without lines column",
 			content: `<!-- AGENT:NAV
 purpose:project file index for myrepo
 files[2]{path,about}:
@@ -729,29 +781,29 @@ AGENTS.md,agent workflow instructions
 			wantBlock: FilesBlock{
 				Purpose: "project file index for myrepo",
 				Entries: []FilesEntry{
-					{RelPath: "README.md", About: "project overview and quickstart"},
-					{RelPath: "AGENTS.md", About: "agent workflow instructions"},
+					{RelPath: "README.md", Lines: 0, About: "project overview and quickstart"},
+					{RelPath: "AGENTS.md", Lines: 0, About: "agent workflow instructions"},
 				},
 			},
 		},
 		{
-			name: "directory prefix lines",
+			name: "directory prefix lines (new format)",
 			content: `<!-- AGENT:NAV
 purpose:project file index
-files[3]{path,about}:
-README.md,project overview
+files[3]{path,lines,about}:
+README.md,10,project overview
 docs/
-authentication.md,token lifecycle; OAuth2 exchange
+authentication.md,80,token lifecycle; OAuth2 exchange
 docs/api/
-endpoints.md,REST endpoint catalog
+endpoints.md,50,REST endpoint catalog
 -->`,
 			wantFound: true,
 			wantBlock: FilesBlock{
 				Purpose: "project file index",
 				Entries: []FilesEntry{
-					{RelPath: "README.md", About: "project overview"},
-					{RelPath: "docs/authentication.md", About: "token lifecycle; OAuth2 exchange"},
-					{RelPath: "docs/api/endpoints.md", About: "REST endpoint catalog"},
+					{RelPath: "README.md", Lines: 10, About: "project overview"},
+					{RelPath: "docs/authentication.md", Lines: 80, About: "token lifecycle; OAuth2 exchange"},
+					{RelPath: "docs/api/endpoints.md", Lines: 50, About: "REST endpoint catalog"},
 				},
 			},
 		},
@@ -764,7 +816,7 @@ endpoints.md,REST endpoint catalog
 			name: "empty entries",
 			content: `<!-- AGENT:NAV
 purpose:empty project
-files[0]{path,about}:
+files[0]{path,lines,about}:
 -->`,
 			wantFound: true,
 			wantBlock: FilesBlock{
@@ -804,9 +856,9 @@ func TestRenderFilesBlock_RoundTrip(t *testing.T) {
 	block := FilesBlock{
 		Purpose: "project file index for myrepo",
 		Entries: []FilesEntry{
-			{RelPath: "README.md", About: "project overview"},
-			{RelPath: "docs/authentication.md", About: "token lifecycle; OAuth2 exchange"},
-			{RelPath: "docs/api/endpoints.md", About: "REST endpoint catalog"},
+			{RelPath: "README.md", Lines: 10, About: "project overview"},
+			{RelPath: "docs/authentication.md", Lines: 80, About: "token lifecycle; OAuth2 exchange"},
+			{RelPath: "docs/api/endpoints.md", Lines: 50, About: "REST endpoint catalog"},
 		},
 	}
 	rendered := RenderFilesBlock(block)
@@ -833,7 +885,7 @@ func TestLocateNavBlock_FindsBlockAtTop(t *testing.T) {
 	lines := []string{
 		"<!-- AGENT:NAV",
 		"purpose:test",
-		"-->",
+		navClose,
 		"# Heading",
 	}
 	start, end := LocateNavBlock(lines)
@@ -853,7 +905,7 @@ func TestLocateNavBlock_FindsBlockAfterFrontmatter(t *testing.T) {
 		"---",
 		"<!-- AGENT:NAV",
 		"purpose:test",
-		"-->",
+		navClose,
 		"# Heading",
 	}
 	start, end := LocateNavBlock(lines)
@@ -871,10 +923,10 @@ func TestLocateNavBlock_LargeBlock(t *testing.T) {
 	for i := 1; i <= 27; i++ {
 		lines = append(lines, fmt.Sprintf("%d,10,##Section%d,desc", i*10, i))
 	}
-	lines = append(lines, "-->")
+	lines = append(lines, navClose)
 	lines = append(lines, "# Real Heading")
 
-	wantEnd := len(lines) - 2 // index of "-->"
+	wantEnd := len(lines) - 2 // index of navClose
 	start, end := LocateNavBlock(lines)
 	if start != 0 {
 		t.Errorf("start = %d, want 0", start)
@@ -891,7 +943,7 @@ func TestLocateNavBlock_ContentBeforeBlock(t *testing.T) {
 		"",
 		"<!-- AGENT:NAV",
 		"purpose:test",
-		"-->",
+		navClose,
 	}
 	start, end := LocateNavBlock(lines)
 	if start != -1 || end != -1 {
@@ -906,7 +958,7 @@ func TestLocateNavBlock_SingleLineExampleNotANavBlock(t *testing.T) {
 		"<!-- AGENT:NAV purpose:example -->",
 		"<!-- AGENT:NAV",
 		"purpose:real",
-		"-->",
+		navClose,
 	}
 	start, end := LocateNavBlock(lines)
 	if start != -1 || end != -1 {
@@ -933,7 +985,7 @@ func TestLocateNavBlock_FenceAsFirstContent(t *testing.T) {
 		"```markdown",
 		"<!-- AGENT:NAV",
 		"purpose:fake",
-		"-->",
+		navClose,
 		"```",
 		"",
 		"More content.",
@@ -952,7 +1004,7 @@ func TestLocateNavBlock_NavBlockAfterManyBlanks(t *testing.T) {
 	}
 	lines[22] = "<!-- AGENT:NAV"
 	lines[23] = "purpose:test"
-	lines[24] = "-->"
+	lines[24] = navClose
 
 	start, end := LocateNavBlock(lines)
 	if start != 22 {
