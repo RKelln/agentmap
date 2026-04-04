@@ -2,6 +2,7 @@ package navblock
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"os"
 	"reflect"
@@ -825,6 +826,144 @@ func TestRenderFilesBlock_RoundTrip(t *testing.T) {
 		}
 	}
 }
+
+// --- LocateNavBlock tests ---
+
+func TestLocateNavBlock_FindsBlockAtTop(t *testing.T) {
+	lines := []string{
+		"<!-- AGENT:NAV",
+		"purpose:test",
+		"-->",
+		"# Heading",
+	}
+	start, end := LocateNavBlock(lines)
+	if start != 0 {
+		t.Errorf("start = %d, want 0", start)
+	}
+	if end != 2 {
+		t.Errorf("end = %d, want 2", end)
+	}
+}
+
+func TestLocateNavBlock_FindsBlockAfterFrontmatter(t *testing.T) {
+	// Frontmatter is handled internally; nav block immediately after --- is found.
+	lines := []string{
+		"---",
+		"title: Test",
+		"---",
+		"<!-- AGENT:NAV",
+		"purpose:test",
+		"-->",
+		"# Heading",
+	}
+	start, end := LocateNavBlock(lines)
+	if start != 3 {
+		t.Errorf("start = %d, want 3", start)
+	}
+	if end != 5 {
+		t.Errorf("end = %d, want 5", end)
+	}
+}
+
+func TestLocateNavBlock_LargeBlock(t *testing.T) {
+	// 27-entry block: --> falls well past line 20; no window cap should apply.
+	lines := []string{"<!-- AGENT:NAV", "purpose:large"}
+	for i := 1; i <= 27; i++ {
+		lines = append(lines, fmt.Sprintf("%d,10,##Section%d,desc", i*10, i))
+	}
+	lines = append(lines, "-->")
+	lines = append(lines, "# Real Heading")
+
+	wantEnd := len(lines) - 2 // index of "-->"
+	start, end := LocateNavBlock(lines)
+	if start != 0 {
+		t.Errorf("start = %d, want 0", start)
+	}
+	if end != wantEnd {
+		t.Errorf("end = %d, want %d", end, wantEnd)
+	}
+}
+
+func TestLocateNavBlock_ContentBeforeBlock(t *testing.T) {
+	// Any non-blank content before the nav block means no nav block.
+	lines := []string{
+		"# Real Heading",
+		"",
+		"<!-- AGENT:NAV",
+		"purpose:test",
+		"-->",
+	}
+	start, end := LocateNavBlock(lines)
+	if start != -1 || end != -1 {
+		t.Errorf("LocateNavBlock() = %d, %d; want -1, -1 (content before nav block)", start, end)
+	}
+}
+
+func TestLocateNavBlock_SingleLineExampleNotANavBlock(t *testing.T) {
+	// A single-line <!-- AGENT:NAV ... --> is not a nav block opener.
+	// It IS the first non-blank content, so no nav block is found.
+	lines := []string{
+		"<!-- AGENT:NAV purpose:example -->",
+		"<!-- AGENT:NAV",
+		"purpose:real",
+		"-->",
+	}
+	start, end := LocateNavBlock(lines)
+	if start != -1 || end != -1 {
+		t.Errorf("LocateNavBlock() = %d, %d; want -1, -1 (single-line example is first content; not a nav block)", start, end)
+	}
+}
+
+func TestLocateNavBlock_UnclosedBlock(t *testing.T) {
+	// Block opened but never closed → returns -1,-1
+	lines := []string{
+		"<!-- AGENT:NAV",
+		"purpose:test",
+		"# Heading without closing",
+	}
+	start, end := LocateNavBlock(lines)
+	if start != -1 || end != -1 {
+		t.Errorf("LocateNavBlock() = %d, %d; want -1, -1 (unclosed block)", start, end)
+	}
+}
+
+func TestLocateNavBlock_FenceAsFirstContent(t *testing.T) {
+	// A code fence as first content means no nav block (nav block is inside the fence).
+	lines := []string{
+		"```markdown",
+		"<!-- AGENT:NAV",
+		"purpose:fake",
+		"-->",
+		"```",
+		"",
+		"More content.",
+	}
+	start, end := LocateNavBlock(lines)
+	if start != -1 || end != -1 {
+		t.Errorf("LocateNavBlock() = %d, %d; want -1, -1 (nav block inside fence)", start, end)
+	}
+}
+
+func TestLocateNavBlock_NavBlockAfterManyBlanks(t *testing.T) {
+	// No window cap: nav block preceded only by blank lines is found.
+	lines := make([]string, 25)
+	for i := range lines {
+		lines[i] = ""
+	}
+	lines[22] = "<!-- AGENT:NAV"
+	lines[23] = "purpose:test"
+	lines[24] = "-->"
+
+	start, end := LocateNavBlock(lines)
+	if start != 22 {
+		t.Errorf("start = %d, want 22", start)
+	}
+	if end != 24 {
+		t.Errorf("end = %d, want 24", end)
+	}
+}
+
+// --- end LocateNavBlock tests ---
 
 func TestParseNavBlock_InvalidLineCount(t *testing.T) {
 	tests := []struct {
