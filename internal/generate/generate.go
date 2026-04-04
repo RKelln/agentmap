@@ -228,15 +228,15 @@ func findNavBlock(lines []string) (start, end int) {
 func insertNavBlock(content string, blockText string) string {
 	lines := strings.Split(content, "\n")
 
-	// Check for existing nav block (only in first 20 lines after frontmatter)
+	// Check for existing nav block. The start must appear within the first
+	// maxExistingBlockLine lines (nav block must be near the top by design),
+	// but once found, we scan the entire file for the closing --> so that
+	// large blocks (27+ entries) are replaced correctly rather than duplicated.
 	const maxExistingBlockLine = 20
 	blockStart := -1
 	blockEnd := -1
 	inFence := false
 	for i, line := range lines {
-		if i > maxExistingBlockLine {
-			break
-		}
 		trimmed := strings.TrimSpace(line)
 		if strings.HasPrefix(trimmed, "```") || strings.HasPrefix(trimmed, "~~~") {
 			inFence = !inFence
@@ -245,10 +245,16 @@ func insertNavBlock(content string, blockText string) string {
 		if inFence {
 			continue
 		}
-		if strings.Contains(line, "<!-- AGENT:NAV") {
-			blockStart = i
-		}
-		if blockStart >= 0 && trimmed == navBlockEnd {
+		if blockStart < 0 {
+			// Only look for the block start within the first maxExistingBlockLine lines.
+			if i > maxExistingBlockLine {
+				break
+			}
+			if strings.Contains(line, "<!-- AGENT:NAV") {
+				blockStart = i
+			}
+		} else if trimmed == navBlockEnd {
+			// Start found — scan all remaining lines for the closing marker.
 			blockEnd = i
 			break
 		}
@@ -261,7 +267,14 @@ func insertNavBlock(content string, blockText string) string {
 		if blockEnd+1 < len(lines) {
 			after = strings.Join(lines[blockEnd+1:], "\n")
 		}
-		result := before + blockText + "\n" + after
+		// If before is non-empty it lacks a trailing newline (Join doesn't add one),
+		// so add one to prevent the nav block from being fused to the preceding line.
+		var result string
+		if before != "" {
+			result = before + "\n" + blockText + "\n" + after
+		} else {
+			result = blockText + "\n" + after
+		}
 		// Clean up extra blank lines
 		result = cleanBlankLines(result)
 		return result
