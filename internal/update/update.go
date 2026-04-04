@@ -181,6 +181,22 @@ func File(path string, cfg config.Config, dryRun, quiet bool, changedLines ...[]
 	block := buildUpdatedBlock(oldBlock, sections, entryReports, lines, cfg, contentLines)
 	blockText := navblock.RenderNavBlock(block)
 
+	// If the new nav block is a different size than the old one (entries added or
+	// removed), all content line numbers shift by that delta. Apply the same offset
+	// correction that generate uses, so the file is correct in a single pass.
+	newBlockLines := len(strings.Split(blockText, "\n"))
+	oldBlockLineCount := pr.End - pr.Start + 1
+	if offset := newBlockLines - oldBlockLineCount; offset != 0 {
+		for i := range block.Nav {
+			block.Nav[i].Start += offset
+		}
+		for i := range entryReports {
+			entryReports[i].NewStart += offset
+			entryReports[i].NewEnd += offset
+		}
+		blockText = navblock.RenderNavBlock(block)
+	}
+
 	if dryRun {
 		return formatReport(path, entryReports), nil
 	}
