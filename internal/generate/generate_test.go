@@ -1546,6 +1546,11 @@ func TestInsertNavBlock_ReplacesLargeBlock(t *testing.T) {
 	if !strings.Contains(got, "new purpose sentinel") {
 		t.Error("new purpose should be present in result")
 	}
+
+	// Trailing content must be preserved after the block
+	if !strings.Contains(got, "# Real Heading") {
+		t.Error("trailing content after nav block should be preserved")
+	}
 }
 
 // TestFile_IdempotentLargeNavBlock verifies that running generate.File() twice on a
@@ -1616,16 +1621,74 @@ func TestFile_IdempotentLargeNavBlock(t *testing.T) {
 	}
 }
 
+// TestInsertNavBlock_ReplacesLargeBlockWithFrontmatter verifies that when a file has
+// frontmatter (before != "") AND a large nav block (blockEnd > 20), the replacement
+// path correctly inserts a "\n" separator and does not fuse the frontmatter to the block.
+func TestInsertNavBlock_ReplacesLargeBlockWithFrontmatter(t *testing.T) {
+	// Build frontmatter + large nav block content
+	var sb strings.Builder
+	sb.WriteString("---\ntitle: Test File\n---\n")
+	sb.WriteString("<!-- AGENT:NAV\n")
+	sb.WriteString("purpose:old purpose fm sentinel\n")
+	sb.WriteString("nav[25]{s,n,name,about}:\n")
+	for i := 1; i <= 25; i++ {
+		fmt.Fprintf(&sb, "%d,10,##Section%d,desc\n", i*10, i)
+	}
+	sb.WriteString("-->\n")
+	sb.WriteString("\n# Real Heading\n\nContent here.\n")
+	content := sb.String()
+
+	newBlock := navblock.NavBlock{
+		Purpose: "new purpose fm sentinel",
+		Nav: []navblock.NavEntry{
+			{Start: 35, N: 5, Name: "#RealHeading", About: "~new desc"},
+		},
+	}
+	newBlockText := navblock.RenderNavBlock(newBlock)
+
+	got := insertNavBlock(content, newBlockText)
+
+	// Exactly one nav block marker
+	count := strings.Count(got, "<!-- AGENT:NAV")
+	if count != 1 {
+		t.Errorf("got %d <!-- AGENT:NAV markers, want 1", count)
+	}
+
+	// Frontmatter still present and well-formed (not fused to nav block)
+	if !strings.Contains(got, "---\ntitle: Test File\n---\n") {
+		t.Error("frontmatter should be preserved and not fused to the nav block")
+	}
+
+	// Old purpose gone, new purpose present
+	if strings.Contains(got, "old purpose fm sentinel") {
+		t.Error("old purpose should be replaced")
+	}
+	if !strings.Contains(got, "new purpose fm sentinel") {
+		t.Error("new purpose should be present")
+	}
+
+	// Trailing content preserved
+	if !strings.Contains(got, "# Real Heading") {
+		t.Error("trailing content after nav block should be preserved")
+	}
+}
+
 // TestFile_IdempotentDesignClean verifies that running generate.File() on
 // design-clean.md (which has <!-- AGENT:NAV only inside code fences) produces
 // exactly one real nav block at the top, and a second run doesn't add another.
 func TestFile_IdempotentDesignClean(t *testing.T) {
-	// Count <!-- AGENT:NAV occurrences in the original (all inside code fences, no real block)
+	// Count <!-- AGENT:NAV occurrences in the original (all inside code fences, no real block).
+	// Assert the known baseline so test failures are self-documenting.
 	origData, err := os.ReadFile(filepath.Join("..", "..", "testdata", "design-clean.md"))
 	if err != nil {
 		t.Fatalf("read design-clean.md: %v", err)
 	}
 	origCount := strings.Count(string(origData), "<!-- AGENT:NAV")
+	const wantOrigCount = 11 // all inside code-fence examples; none is a real top-level block
+	if origCount != wantOrigCount {
+		t.Fatalf("design-clean.md has %d <!-- AGENT:NAV markers, expected %d; update this test if the file changed",
+			origCount, wantOrigCount)
+	}
 
 	dir := t.TempDir()
 	outPath := filepath.Join(dir, "design-clean-gen.md")
