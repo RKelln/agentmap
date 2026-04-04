@@ -16,8 +16,7 @@ import (
 )
 
 const (
-	frontmatterDelim = "---"
-	navBlockEnd      = "-->"
+	navBlockEnd = "-->"
 )
 
 // Generate discovers markdown files under root and generates nav blocks for each.
@@ -163,64 +162,10 @@ func adjustSections(sections []parser.Section, offset int) []parser.Section {
 }
 
 // findNavBlock returns the 0-indexed start and end lines of an existing nav block.
-// Skips nav blocks inside fenced code blocks. Only searches after frontmatter.
+// A nav block is the first non-blank content after optional frontmatter.
 // Returns -1,-1 if any non-whitespace, non-nav-block content appears before nav block.
 func findNavBlock(lines []string) (start, end int) {
-	// Find frontmatter end first
-	fmEnd := -1
-	if len(lines) > 0 && strings.TrimSpace(lines[0]) == frontmatterDelim {
-		for i := 1; i < len(lines); i++ {
-			if strings.TrimSpace(lines[i]) == frontmatterDelim {
-				fmEnd = i
-				break
-			}
-		}
-	}
-
-	searchStart := 0
-	if fmEnd >= 0 {
-		searchStart = fmEnd + 1
-	}
-
-	inFence := false
-	searchEnd := searchStart + 20
-	if searchEnd > len(lines) {
-		searchEnd = len(lines)
-	}
-	for i := searchStart; i < searchEnd; i++ {
-		trimmed := strings.TrimSpace(lines[i])
-
-		// Track fenced code blocks
-		if strings.HasPrefix(trimmed, "```") || strings.HasPrefix(trimmed, "~~~") {
-			inFence = !inFence
-			continue
-		}
-		if inFence {
-			continue
-		}
-
-		// Empty line - skip (nav block can have leading blank lines)
-		if trimmed == "" {
-			continue
-		}
-
-		// Found nav block start
-		if strings.HasPrefix(trimmed, "<!-- AGENT:NAV") {
-			start = i
-			for j := i + 1; j < len(lines); j++ {
-				if strings.TrimSpace(lines[j]) == "-->" {
-					return start, j
-				}
-			}
-			return -1, -1 // incomplete block
-		}
-
-		// Any other non-empty content - continue searching but no longer in valid zone
-		// Move searchEnd to current position - can't find valid nav block after this
-		searchEnd = i
-	}
-
-	return -1, -1
+	return navblock.LocateNavBlock(lines)
 }
 
 // insertNavBlock inserts or replaces a nav block in file content.
@@ -228,37 +173,8 @@ func findNavBlock(lines []string) (start, end int) {
 func insertNavBlock(content string, blockText string) string {
 	lines := strings.Split(content, "\n")
 
-	// Check for existing nav block. The start must appear within the first
-	// maxExistingBlockLine lines (nav block must be near the top by design),
-	// but once found, we scan the entire file for the closing --> so that
-	// large blocks (27+ entries) are replaced correctly rather than duplicated.
-	const maxExistingBlockLine = 20
-	blockStart := -1
-	blockEnd := -1
-	inFence := false
-	for i, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "```") || strings.HasPrefix(trimmed, "~~~") {
-			inFence = !inFence
-			continue
-		}
-		if inFence {
-			continue
-		}
-		if blockStart < 0 {
-			// Only look for the block start within the first maxExistingBlockLine lines.
-			if i > maxExistingBlockLine {
-				break
-			}
-			if strings.Contains(line, "<!-- AGENT:NAV") {
-				blockStart = i
-			}
-		} else if trimmed == navBlockEnd {
-			// Start found — scan all remaining lines for the closing marker.
-			blockEnd = i
-			break
-		}
-	}
+	// Check for existing nav block using canonical detection.
+	blockStart, blockEnd := navblock.LocateNavBlock(lines)
 
 	if blockStart >= 0 && blockEnd >= 0 {
 		// Replace existing block
@@ -280,19 +196,8 @@ func insertNavBlock(content string, blockText string) string {
 		return result
 	}
 
-	// Check for frontmatter
-	fmEnd := -1
-	if len(lines) > 0 && strings.TrimSpace(lines[0]) == frontmatterDelim {
-		for i := 1; i < len(lines); i++ {
-			if strings.TrimSpace(lines[i]) == frontmatterDelim {
-				fmEnd = i
-				break
-			}
-		}
-	}
-
-	if fmEnd >= 0 {
-		// Insert after frontmatter
+	// Check for frontmatter and insert after it if present
+	if fmEnd := navblock.FindFrontmatterEnd(lines); fmEnd >= 0 {
 		before := strings.Join(lines[:fmEnd+1], "\n")
 		after := strings.Join(lines[fmEnd+1:], "\n")
 		result := before + "\n" + blockText + "\n" + after
