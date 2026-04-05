@@ -316,7 +316,9 @@ func buildNavEntries(sections []parser.Section, content string, cfg config.Confi
 					})
 				}
 				// Skip past h3 children so they're not processed again as standalone entries
-				skipUntil = h3Children[len(h3Children)-1].Start + 1
+				if len(h3Children) > 0 {
+					skipUntil = h3Children[len(h3Children)-1].Start + 1
+				}
 				continue
 			} else if len(h3Children) > 0 {
 				// Small or medium section: skip h3 children

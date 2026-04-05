@@ -1268,6 +1268,32 @@ a1 content
 	}
 }
 
+// TestBuildNavEntries_LargeH2NoH3Children verifies that a large h2 section with no
+// h3 children does not panic (regression for index-out-of-range [-1] bug).
+func TestBuildNavEntries_LargeH2NoH3Children(t *testing.T) {
+	cfg := config.Defaults()
+
+	// Build a content string where the h2 section is larger than ExpandThreshold
+	// but contains zero h3 children.
+	var sb strings.Builder
+	sb.WriteString("# Title\n\n")
+	sb.WriteString("## Big Section\n\n")
+	for i := 0; i < 200; i++ {
+		sb.WriteString("paragraph line here with some words to exceed the expand threshold\n")
+	}
+	content := sb.String()
+
+	sections := parser.ComputeSections(parser.ParseHeadings(content, 3), len(strings.Split(content, "\n")))
+
+	// Must not panic.
+	entries := buildNavEntries(sections, content, cfg)
+
+	// Sanity: we should get at least 2 entries (#Title and ##Big-Section).
+	if len(entries) < 2 {
+		t.Errorf("expected at least 2 entries, got %d", len(entries))
+	}
+}
+
 // TestFilterNavEntries_StubUsesWordCount verifies that the stub pass uses WordCount,
 // not N, to decide which h3 entries to drop.
 func TestFilterNavEntries_StubUsesWordCount(t *testing.T) {
