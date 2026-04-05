@@ -895,6 +895,45 @@ func TestFile_NoNewH3BelowExpandThreshold(t *testing.T) {
 	}
 }
 
+// TestFile_PurposeOnlyBelowMinLines verifies that update does not add nav entries
+// to a file whose existing nav block is purpose-only (no entries) and whose
+// content line count is below MinLines. Generate intentionally writes purpose-only
+// blocks for such files (purpose + optional see, no sections list); update must
+// not contradict that by adding entries — the file is small enough to read whole.
+func TestFile_PurposeOnlyBelowMinLines(t *testing.T) {
+	dir := t.TempDir()
+
+	cfg := config.Defaults() // MinLines=50 by default
+
+	// Sub-case 1: lines:N is already correct → noChanges (nothing to do).
+	// Content has 6 content lines (10 total newlines minus 4 nav block lines).
+	const content = "<!-- AGENT:NAV\npurpose:test\nlines:6\n-->\n\n# Admin UI Guide\n\nThis document has been split.\n\nSee sub-docs.\n"
+	path := writeTempFile(t, dir, "short.md", content)
+
+	report, err := File(path, cfg, true /* dry-run */, false)
+	if err != nil {
+		t.Fatalf("File() error = %v", err)
+	}
+	if report != noChanges {
+		t.Errorf("sub-case 1: report = %q, want noChanges", report)
+	}
+
+	// Sub-case 2: lines:N is stale → reports lines-updated, but still no nav entries.
+	const contentStale = "<!-- AGENT:NAV\npurpose:test\nlines:99\n-->\n\n# Admin UI Guide\n\nThis document has been split.\n\nSee sub-docs.\n"
+	path2 := writeTempFile(t, dir, "short2.md", contentStale)
+
+	report2, err := File(path2, cfg, true /* dry-run */, false)
+	if err != nil {
+		t.Fatalf("File() error = %v", err)
+	}
+	if strings.Contains(report2, "new: #Admin UI Guide") {
+		t.Errorf("sub-case 2: update added nav entry to purpose-only below-MinLines file; report:\n%s", report2)
+	}
+	if !strings.Contains(report2, "lines-updated") {
+		t.Errorf("sub-case 2: expected lines-updated in report; got:\n%s", report2)
+	}
+}
+
 // TestFile_DuplicateHeadingMatching verifies that when a document has two
 // sections with the same heading name, each nav entry is matched to the section
 // at the same absolute line (exact-match first), not greedily to the first

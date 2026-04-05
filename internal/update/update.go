@@ -161,6 +161,30 @@ func File(path string, cfg config.Config, dryRun, quiet bool, changedLines ...[]
 		return fmt.Sprintf("Updated: %s\n  lines-updated: %d -> %d", path, oldLinesCount, contentLines), nil
 	}
 
+	// If the existing nav block has no nav entries and the file is below MinLines,
+	// generate intentionally wrote a purpose-only block for this file. Don't add
+	// new nav entries here — only refresh lines:N to stay consistent with generate.
+	if len(oldBlock.Nav) == 0 && contentLines < cfg.MinLines {
+		linesChanged := oldBlock.Lines != 0 && oldBlock.Lines != contentLines
+		if !linesChanged {
+			return noChanges, nil
+		}
+		oldLinesCount := oldBlock.Lines
+		oldBlock.Lines = contentLines
+		blockText := navblock.RenderNavBlock(oldBlock)
+		if dryRun {
+			return fmt.Sprintf("Updated: %s\n  lines-updated: %d -> %d", path, oldLinesCount, contentLines), nil
+		}
+		newContent := insertNavBlock(string(content), blockText)
+		if err := os.WriteFile(path, []byte(newContent), 0o644); err != nil {
+			return "", fmt.Errorf("update: write file: %w", err)
+		}
+		if quiet {
+			return noChanges, nil
+		}
+		return fmt.Sprintf("Updated: %s\n  lines-updated: %d -> %d", path, oldLinesCount, contentLines), nil
+	}
+
 	// Use pre-computed ranges if provided, otherwise fall back to per-file git diff.
 	var fileChanges []gitutil.LineRange
 	if len(changedLines) > 0 && changedLines[0] != nil {
