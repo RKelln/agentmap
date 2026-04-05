@@ -113,7 +113,10 @@ func File(path string, cfg config.Config, dryRun, quiet bool, changedLines ...[]
 	}
 
 	lines := strings.Split(string(content), "\n")
-	totalLines := len(lines)
+	// Use strings.Count for totalLines rather than len(lines): strings.Split
+	// produces a spurious trailing empty element for POSIX files ending with \n,
+	// overcounting by 1. strings.Count("\n") equals wc -l.
+	totalLines := strings.Count(string(content), "\n")
 
 	pr := navblock.ParseNavBlock(string(content))
 	oldBlock, hasBlock, corrupted := pr.Block, pr.Found, pr.Corrupted
@@ -164,7 +167,7 @@ func File(path string, cfg config.Config, dryRun, quiet bool, changedLines ...[]
 	} else if len(changedLines) == 0 {
 		fileChanges = getChangedLines(path)
 	}
-	entryReports := buildEntryReports(oldBlock.Nav, sections, fileChanges)
+	entryReports := buildEntryReports(oldBlock.Nav, sections, fileChanges, cfg)
 
 	hasChanges := (oldBlock.Lines != 0 && oldBlock.Lines != contentLines)
 	for _, er := range entryReports {
@@ -220,7 +223,7 @@ func getChangedLines(path string) []gitutil.LineRange {
 	return ranges
 }
 
-func buildEntryReports(oldNav []navblock.NavEntry, sections []parser.Section, changedLines []gitutil.LineRange) []ReportEntry {
+func buildEntryReports(oldNav []navblock.NavEntry, sections []parser.Section, changedLines []gitutil.LineRange, cfg config.Config) []ReportEntry {
 	var reports []ReportEntry
 
 	oldByName := make(map[string]navblock.NavEntry)
@@ -229,15 +232,50 @@ func buildEntryReports(oldNav []navblock.NavEntry, sections []parser.Section, ch
 		oldByName[key] = e
 	}
 
+	// Build h2 size map for ExpandThreshold checks (mirrors buildUpdatedBlock logic).
+	h2SizeByKey := make(map[string]int)
+	for _, s := range sections {
+		if s.Depth == 2 {
+			key := navblock.NormalizeHeading(s.Text)
+			h2SizeByKey[key] = s.Len()
+		}
+	}
+
+	// findParentH2Key returns the normalised key of the h2 containing sections[idx], or "".
+	findParentH2Key := func(idx int) string {
+		if sections[idx].Depth != 3 {
+			return ""
+		}
+		for j := idx - 1; j >= 0; j-- {
+			if sections[j].Depth == 2 {
+				return navblock.NormalizeHeading(sections[j].Text)
+			}
+			if sections[j].Depth < 2 {
+				break
+			}
+		}
+		return ""
+	}
+
 	used := make(map[int]bool)
 
-	for _, s := range sections {
+	for i, s := range sections {
 		key := navblock.NormalizeHeading(s.Text)
 		oldEntry, found := oldByName[key]
 		prefix := strings.Repeat("#", s.Depth)
 		name := prefix + navblock.NormalizeHeading(s.Text)
 
 		if !found {
+			// New section not in existing nav block.
+			// Suppress new-h3 reports for h3s whose parent h2 is below ExpandThreshold:
+			// generate would not have included them, so reporting them as new would
+			// mislead the user into thinking they need descriptions.
+			if s.Depth == 3 {
+				parentKey := findParentH2Key(i)
+				if parentKey != "" && h2SizeByKey[parentKey] < cfg.ExpandThreshold {
+					continue
+				}
+			}
 			reports = append(reports, ReportEntry{
 				Type:     ReportNew,
 				Name:     name,
@@ -302,9 +340,37 @@ func buildUpdatedBlock(oldBlock navblock.NavBlock, sections []parser.Section, _ 
 		oldByName[key] = e
 	}
 
+	// Build a map of h2 section size by heading text, so we can apply the same
+	// ExpandThreshold logic as generate's buildNavEntries when deciding whether
+	// to add new h3 entries that were not in the original nav block.
+	h2SizeByKey := make(map[string]int)
+	for _, s := range sections {
+		if s.Depth == 2 {
+			key := navblock.NormalizeHeading(s.Text)
+			h2SizeByKey[key] = s.Len()
+		}
+	}
+
+	// findParentH2Key returns the normalised heading key of the h2 that contains s,
+	// or "" if s is not an h3 or has no h2 parent.
+	findParentH2Key := func(idx int) string {
+		if sections[idx].Depth != 3 {
+			return ""
+		}
+		for j := idx - 1; j >= 0; j-- {
+			if sections[j].Depth == 2 {
+				return navblock.NormalizeHeading(sections[j].Text)
+			}
+			if sections[j].Depth < 2 {
+				break
+			}
+		}
+		return ""
+	}
+
 	var newNav []navblock.NavEntry
 
-	for _, s := range sections {
+	for i, s := range sections {
 		key := navblock.NormalizeHeading(s.Text)
 		oldEntry, found := oldByName[key]
 
@@ -320,6 +386,19 @@ func buildUpdatedBlock(oldBlock navblock.NavBlock, sections []parser.Section, _ 
 				WordCount: wc,
 			})
 		} else {
+			// New section not in the existing nav block.
+			// If this is an h3 and its parent h2 is below ExpandThreshold, generate
+			// would have excluded it (or rolled it into >hints). Don't add it here
+			// either — consistency with generate avoids nav block growth and line shifts.
+			if s.Depth == 3 {
+				parentKey := findParentH2Key(i)
+				if parentKey != "" {
+					parentSize := h2SizeByKey[parentKey]
+					if parentSize < cfg.ExpandThreshold {
+						continue
+					}
+				}
+			}
 			newNav = append(newNav, navblock.NavEntry{
 				Start:     s.Start,
 				N:         s.Len(),

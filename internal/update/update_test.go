@@ -375,10 +375,10 @@ func TestFile_NoChanges(t *testing.T) {
 	oldContent := `<!-- AGENT:NAV
 purpose:docs
 nav[4]{s,n,name,about}:
-9,16,#Document,main doc
+9,15,#Document,main doc
 13,4,##Section A,section A content
 17,4,##Section B,section B content
-21,4,##Section C,section C content
+21,3,##Section C,section C content
 -->
 # Document
 
@@ -805,5 +805,92 @@ OAuth2 code-for-token flow.
 		if !strings.HasPrefix(entry.About, "~") {
 			t.Errorf("About for %q should preserve ~ prefix, got %q", entry.Name, entry.About)
 		}
+	}
+}
+
+// TestFile_TotalLinesOffByOne verifies that update uses strings.Count(content,"\n") for
+// totalLines, not len(strings.Split(...)) which overcounts by 1 for POSIX files ending
+// with \n. Regression for Bug 4 in update (parallel to the same fix in generate).
+//
+// The last section's End should equal totalLines (= wc -l). Previously End was
+// totalLines+1 (= wc -l + 1), causing a spurious "shifted" report on first update.
+func TestFile_TotalLinesOffByOne(t *testing.T) {
+	dir := t.TempDir()
+
+	// Nav block (5 lines) + blank separator (1 line) + body (3 lines) = 9 total \n chars.
+	// strings.Count("\n") = 9 = totalLines. #Doc at line 7, End=9, N=3.
+	// With len(strings.Split) bug: totalLines=10, End=10, N=4 → shifted.
+	oldContent := "" +
+		"<!-- AGENT:NAV\n" + // line 1
+		"purpose:test\n" + // line 2
+		"nav[1]{s,n,name,about}:\n" + // line 3
+		"7,3,#Doc,doc\n" + // line 4 — #Doc at line 7, End=9, N=3 ✓
+		"-->\n" + // line 5
+		"\n" + // line 6 blank separator
+		"# Doc\n" + // line 7
+		"\n" + // line 8
+		"Content.\n" // line 9 (trailing \n → strings.Count=9, totalLines=9)
+
+	path := writeTempFile(t, dir, "doc.md", oldContent)
+
+	cfg := config.Defaults()
+	cfg.MaxDepth = 3
+
+	report, err := File(path, cfg, false, false)
+	if err != nil {
+		t.Fatalf("File() error = %v", err)
+	}
+
+	// The nav block accurately reflects totalLines=9 (strings.Count), so no changes expected.
+	// If totalLines were overcounted as 10 (len(strings.Split)), #Doc.End would be 10 ≠ 9 → shifted.
+	if report != noChanges {
+		t.Errorf("expected noChanges (correct totalLines), got: %s", report)
+	}
+}
+
+// TestFile_NoNewH3BelowExpandThreshold verifies that update does not add new h3 entries
+// for h2 sections below ExpandThreshold. generate's buildNavEntries omits those h3s
+// (rolling them into >hints or skipping entirely); update must match that behaviour to
+// avoid nav block growth that shifts all subsequent line numbers.
+func TestFile_NoNewH3BelowExpandThreshold(t *testing.T) {
+	dir := t.TempDir()
+
+	// The h2 "##Small Section" is 40 lines — well below ExpandThreshold (150).
+	// generate would skip its h3 children. The nav block only has the h2 entry.
+	// After generate the file looks like this (nav block = 7 lines, blank sep = 1):
+	// lines 1-7: nav block, line 8: blank, line 9: #Doc, ... line 13: ##Small Section
+	// Build a file where the nav has no h3s for the small h2, and verify update
+	// doesn't add them.
+	var sb strings.Builder
+	sb.WriteString("<!-- AGENT:NAV\npurpose:test\nnav[2]{s,n,name,about}:\n")
+	sb.WriteString("9,42,#Doc,doc\n")
+	sb.WriteString("13,38,##Small Section,small\n")
+	sb.WriteString("-->\n")
+	sb.WriteString("# Doc\n\nContent.\n\n")
+	sb.WriteString("## Small Section\n\n")
+	// Add h3 children inside the h2 (total h2 section = 38 lines < 150 ExpandThreshold)
+	for i := 0; i < 5; i++ {
+		sb.WriteString("### Child " + string(rune('A'+i)) + "\n\nChild content.\n\n")
+	}
+	// Pad to reach 50 lines for the h2 section end
+	sb.WriteString("End of small section.\n")
+	// Add a closing h1-level marker that ends the section
+	sb.WriteString("# AnotherDoc\n\nMore content.\n")
+	content := sb.String()
+	path := writeTempFile(t, dir, "doc.md", content)
+
+	cfg := config.Defaults()
+	cfg.MaxDepth = 3
+	cfg.ExpandThreshold = 150
+
+	report, err := File(path, cfg, false, false)
+	if err != nil {
+		t.Fatalf("File() error = %v", err)
+	}
+
+	// Should either be no-changes or report only shifted/content-changed —
+	// NOT "new: ###Child X" entries.
+	if strings.Contains(report, "new: ###Child") {
+		t.Errorf("update added new h3 entries for below-ExpandThreshold h2; report:\n%s", report)
 	}
 }
