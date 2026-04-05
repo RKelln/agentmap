@@ -143,7 +143,10 @@ func buildTaskEntry(root, relPath string, cfg config.Config) (TaskEntry, error) 
 		}
 	} else {
 		// No nav block yet; parse headings to build section list.
-		headings := parser.ParseHeadings(content, cfg.MaxDepth)
+		headings, parseWarnings := parser.ParseHeadings(content, cfg.MaxDepth)
+		for _, w := range parseWarnings {
+			fmt.Fprintf(os.Stderr, "warning: %s: %s\n", relPath, w)
+		}
 		parsedSections := parser.ComputeSections(headings, lineCount)
 		for _, s := range parsedSections {
 			prefix := strings.Repeat("#", s.Depth)
@@ -200,7 +203,7 @@ func renderTaskList(tasks []TaskEntry) string {
 
 // BuildIndex discovers files, generates skeletons for unindexed ones,
 // and writes .agentmap/index-tasks.md. Returns a summary.
-func BuildIndex(root string, cfg config.Config, dryRun bool, force bool) (Result, error) {
+func BuildIndex(root string, cfg config.Config, dryRun, force bool) (Result, error) {
 	files, err := discoverMD(root, cfg.Exclude)
 	if err != nil {
 		return Result{}, fmt.Errorf("index: discover files: %w", err)

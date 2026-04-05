@@ -101,7 +101,10 @@ func CheckFile(path string, cfg config.Config, warnUnreviewed bool) (bool, strin
 		return false, "", nil, nil
 	}
 
-	headings := parser.ParseHeadings(string(content), cfg.MaxDepth)
+	headings, parseWarnings := parser.ParseHeadings(string(content), cfg.MaxDepth)
+	for _, w := range parseWarnings {
+		fmt.Fprintf(os.Stderr, "warning: %s: %s\n", path, w)
+	}
 	sections := parser.ComputeSections(headings, totalLines)
 
 	// §W1: Apply the same large-file cap as generate: build lightweight NavEntry slice

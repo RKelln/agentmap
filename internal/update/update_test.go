@@ -850,7 +850,7 @@ func TestFile_TotalLinesOffByOne(t *testing.T) {
 
 // TestFile_NoNewH3BelowExpandThreshold verifies that update does not add new h3 entries
 // for h2 sections below ExpandThreshold. generate's buildNavEntries omits those h3s
-// (rolling them into >hints or skipping entirely); update must match that behaviour to
+// (rolling them into >hints or skipping entirely); update must match that behavior to
 // avoid nav block growth that shifts all subsequent line numbers.
 func TestFile_NoNewH3BelowExpandThreshold(t *testing.T) {
 	dir := t.TempDir()

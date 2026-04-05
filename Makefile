@@ -15,7 +15,7 @@ lint:
 	$(GOBIN)/golangci-lint run ./...
 
 fmt:
-	$(GOBIN)/gofumpt -w .
+	$(GOBIN)/golangci-lint fmt ./...
 
 install:
 	go install $(LDFLAGS) ./cmd/agentmap

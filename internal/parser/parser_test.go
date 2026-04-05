@@ -68,7 +68,7 @@ func TestParseHeadings_Basic(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := ParseHeadings(tt.input, tt.maxDepth)
+			got, _ := ParseHeadings(tt.input, tt.maxDepth)
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("ParseHeadings() = %v, want %v", got, tt.want)
 			}
@@ -114,7 +114,7 @@ func TestParseHeadings_CodeFences(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := ParseHeadings(tt.input, tt.maxDepth)
+			got, _ := ParseHeadings(tt.input, tt.maxDepth)
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("ParseHeadings() = %v, want %v", got, tt.want)
 			}
@@ -158,7 +158,7 @@ func TestParseHeadings_HTMLComments(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := ParseHeadings(tt.input, 3)
+			got, _ := ParseHeadings(tt.input, 3)
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("ParseHeadings() = %v, want %v", got, tt.want)
 			}
@@ -170,7 +170,7 @@ func TestParseHeadings_Frontmatter(t *testing.T) {
 	input := "---\ntitle: Test\n---\n# Heading\n"
 	want := []Heading{{Line: 4, Depth: 1, Text: "Heading"}}
 
-	got := ParseHeadings(input, 3)
+	got, _ := ParseHeadings(input, 3)
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("ParseHeadings() = %v, want %v", got, want)
 	}
@@ -191,9 +191,90 @@ func TestParseHeadings_RegressionInlineCommentMarker(t *testing.T) {
 		{Line: 5, Depth: 2, Text: "Section 5"},
 	}
 
-	got := ParseHeadings(input, 3)
+	got, _ := ParseHeadings(input, 3)
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("ParseHeadings() = %v, want %v", got, want)
+	}
+}
+
+func TestParseHeadings_UnclosedFenceWarning(t *testing.T) {
+	tests := []struct {
+		name         string
+		input        string
+		wantHeadings []Heading
+		wantWarning  bool
+	}{
+		{
+			name:         "properly closed fence has no warning",
+			input:        "```bash\n# in fence\n```\n## Real\n",
+			wantHeadings: []Heading{{Line: 4, Depth: 2, Text: "Real"}},
+			wantWarning:  false,
+		},
+		{
+			name:         "unclosed fence at EOF produces warning",
+			input:        "## Before\n```bash\n# not a heading\n",
+			wantHeadings: []Heading{{Line: 1, Depth: 2, Text: "Before"}},
+			wantWarning:  true,
+		},
+		{
+			name:         "empty file has no warning",
+			input:        "",
+			wantHeadings: nil,
+			wantWarning:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, warnings := ParseHeadings(tt.input, 3)
+			if !reflect.DeepEqual(got, tt.wantHeadings) {
+				t.Errorf("ParseHeadings() headings = %v, want %v", got, tt.wantHeadings)
+			}
+			hasWarning := len(warnings) > 0
+			if hasWarning != tt.wantWarning {
+				t.Errorf("ParseHeadings() warnings = %v, wantWarning = %v", warnings, tt.wantWarning)
+			}
+		})
+	}
+}
+
+func TestParseHeadings_FenceClosingRules(t *testing.T) {
+	// Per CommonMark: only a bare closing fence (no info string) can close a
+	// fenced code block. A line like ```bash cannot close an open fence.
+	tests := []struct {
+		name     string
+		input    string
+		maxDepth int
+		want     []Heading
+	}{
+		{
+			name: "lang-fence inside open fence is content not closer",
+			// ```bash opens, then ```bash inside cannot close it, bare ``` closes
+			input:    "```bash\n# not a heading\n```bash\n# still not a heading\n```\n## Real\n",
+			maxDepth: 3,
+			want:     []Heading{{Line: 6, Depth: 2, Text: "Real"}},
+		},
+		{
+			name: "stray bare fence then lang-fence does not expose shell comments",
+			// Normal block closes. Stray ``` opens phantom fence.
+			// ```bash inside phantom fence must NOT close it (would expose # comments).
+			// Second bare ``` closes phantom fence. ## Visible is then outside.
+			input:    "```bash\n# in fence\n```\n## After\n```\n## Phantom content\n```bash\n# not a heading\n```\n## Visible\n",
+			maxDepth: 3,
+			want: []Heading{
+				{Line: 4, Depth: 2, Text: "After"},
+				{Line: 10, Depth: 2, Text: "Visible"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, _ := ParseHeadings(tt.input, tt.maxDepth)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("ParseHeadings() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
 
@@ -204,7 +285,7 @@ func TestParseHeadings_DuplicateHeadings(t *testing.T) {
 		{Line: 5, Depth: 2, Text: "Examples"},
 	}
 
-	got := ParseHeadings(input, 3)
+	got, _ := ParseHeadings(input, 3)
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("ParseHeadings() = %v, want %v", got, want)
 	}

@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// UninitOptions controls Uninit behaviour.
+// UninitOptions controls Uninit behavior.
 type UninitOptions struct {
 	Root   string
 	DryRun bool

@@ -89,7 +89,7 @@ type Detection struct {
 	DisplayName string
 }
 
-// Options controls Apply behaviour.
+// Options controls Apply behavior.
 type Options struct {
 	Root       string
 	DryRun     bool

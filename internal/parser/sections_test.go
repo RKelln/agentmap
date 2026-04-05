@@ -162,7 +162,7 @@ Some content here.
 Content.
 `
 
-	headings := ParseHeadings(input, 3)
+	headings, _ := ParseHeadings(input, 3)
 
 	// Should find exactly these headings
 	wantTexts := []string{
@@ -290,7 +290,7 @@ Future project index feature.
 Future cross-file feature.
 `
 
-	headings := ParseHeadings(input, 3)
+	headings, _ := ParseHeadings(input, 3)
 	sections := ComputeSections(headings, 50)
 
 	// Verify heading count matches expected (1 h1 + 5 h2 + 8 h3 = 14)

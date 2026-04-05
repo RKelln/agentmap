@@ -69,7 +69,10 @@ func File(path string, cfg config.Config, dryRun bool, outputPath ...string) (st
 	// strings.Count avoids the spurious +1 from strings.Split on trailing newline.
 	contentLines := strings.Count(string(content), "\n") - oldBlockLines
 
-	headings := parser.ParseHeadings(string(content), cfg.MaxDepth)
+	headings, parseWarnings := parser.ParseHeadings(string(content), cfg.MaxDepth)
+	for _, w := range parseWarnings {
+		fmt.Fprintf(os.Stderr, "warning: %s: %s\n", path, w)
+	}
 	sections := parser.ComputeSections(headings, totalLines)
 
 	var blockText string
@@ -189,7 +192,7 @@ func findNavBlock(lines []string) (start, end int) {
 
 // insertNavBlock inserts or replaces a nav block in file content.
 // Skips nav blocks inside fenced code blocks.
-func insertNavBlock(content string, blockText string) string {
+func insertNavBlock(content, blockText string) string {
 	lines := strings.Split(content, "\n")
 
 	// Check for existing nav block using canonical detection.

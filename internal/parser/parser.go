@@ -15,11 +15,14 @@ type Heading struct {
 
 // ParseHeadings extracts h1-h3 headings from markdown content.
 // Headings inside fenced code blocks and HTML comments are skipped.
-func ParseHeadings(content string, maxDepth int) []Heading {
+// warnings contains a message for each structural anomaly detected (e.g. unclosed fence at EOF).
+func ParseHeadings(content string, maxDepth int) ([]Heading, []string) {
 	scanner := bufio.NewScanner(strings.NewReader(content))
 
 	var headings []Heading
 	inFence := false
+	fenceChar := byte(0) // '`' or '~' of the opening fence marker
+	fenceLen := 0        // number of fence chars in the opening marker
 	inComment := false
 	lineNum := 0
 
@@ -39,11 +42,39 @@ func ParseHeadings(content string, maxDepth int) []Heading {
 			continue
 		}
 
-		// Track fenced code blocks (``` or ~~~)
+		// Track fenced code blocks (``` or ~~~).
+		// Per CommonMark: only a bare closing fence (same char, >= opener length,
+		// no info string) can close an open fence. A line like ```bash can only
+		// ever open a fence, never close one.
 		trimmed := strings.TrimSpace(line)
-		if !inComment && (strings.HasPrefix(trimmed, "```") || strings.HasPrefix(trimmed, "~~~")) {
-			inFence = !inFence
-			continue
+		if !inComment {
+			if inFence {
+				// Check for a valid closing fence: same char, >= fenceLen, no trailing content.
+				if len(trimmed) >= fenceLen && trimmed[0] == fenceChar {
+					n := 0
+					for n < len(trimmed) && trimmed[n] == fenceChar {
+						n++
+					}
+					if n >= fenceLen && strings.TrimSpace(trimmed[n:]) == "" {
+						inFence = false
+						fenceChar = 0
+						fenceLen = 0
+					}
+				}
+				continue
+			}
+			// Not in a fence: detect an opening fence marker (3+ ` or ~).
+			if strings.HasPrefix(trimmed, "```") || strings.HasPrefix(trimmed, "~~~") {
+				ch := trimmed[0]
+				n := 0
+				for n < len(trimmed) && trimmed[n] == ch {
+					n++
+				}
+				inFence = true
+				fenceChar = ch
+				fenceLen = n
+				continue
+			}
 		}
 		if inFence {
 			continue
@@ -90,5 +121,10 @@ func ParseHeadings(content string, maxDepth int) []Heading {
 		}
 	}
 
-	return headings
+	var warnings []string
+	if inFence {
+		warnings = append(warnings, "unclosed code fence at end of file (malformed markdown)")
+	}
+
+	return headings, warnings
 }

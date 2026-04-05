@@ -76,7 +76,10 @@ var generateCmd = &cobra.Command{
 					return fmt.Errorf("read file: %w", err)
 				}
 				totalLines := strings.Count(string(content), "\n")
-				headings := parser.ParseHeadings(string(content), cfg.MaxDepth)
+				headings, parseWarnings := parser.ParseHeadings(string(content), cfg.MaxDepth)
+				for _, w := range parseWarnings {
+					fmt.Fprintf(os.Stderr, "warning: %s: %s\n", root, w)
+				}
 				sections := parser.ComputeSections(headings, totalLines)
 				pr := navblock.ParseNavBlock(string(content))
 				existingBlock, found := pr.Block, pr.Found

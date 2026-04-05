@@ -135,7 +135,10 @@ func File(path string, cfg config.Config, dryRun, quiet bool, changedLines ...[]
 		contentLines = 0
 	}
 
-	headings := parser.ParseHeadings(string(content), cfg.MaxDepth)
+	headings, parseWarnings := parser.ParseHeadings(string(content), cfg.MaxDepth)
+	for _, w := range parseWarnings {
+		fmt.Fprintf(os.Stderr, "warning: %s: %s\n", path, w)
+	}
 	sections := parser.ComputeSections(headings, totalLines)
 
 	// Handle purpose-only files: no headings, but lines:N may still need updating.
@@ -553,7 +556,7 @@ const (
 	navBlockEnd      = "-->"
 )
 
-func insertNavBlock(content string, blockText string) string {
+func insertNavBlock(content, blockText string) string {
 	lines := strings.Split(content, "\n")
 
 	blockStart := -1

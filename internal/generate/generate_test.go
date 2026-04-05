@@ -1283,7 +1283,8 @@ func TestBuildNavEntries_LargeH2NoH3Children(t *testing.T) {
 	}
 	content := sb.String()
 
-	sections := parser.ComputeSections(parser.ParseHeadings(content, 3), len(strings.Split(content, "\n")))
+	parsedHeadings, _ := parser.ParseHeadings(content, 3)
+	sections := parser.ComputeSections(parsedHeadings, len(strings.Split(content, "\n")))
 
 	// Must not panic.
 	entries := buildNavEntries(sections, content, cfg)
