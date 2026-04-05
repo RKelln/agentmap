@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/RKelln/agentmap/internal/config"
@@ -223,14 +224,104 @@ func getChangedLines(path string) []gitutil.LineRange {
 	return ranges
 }
 
+// navIndex builds an index from normalised heading name to all nav entries with
+// that name. Duplicate heading names are supported: callers pick the best match
+// by proximity using pickClosest.
+func navIndex(nav []navblock.NavEntry) map[string][]navblock.NavEntry {
+	idx := make(map[string][]navblock.NavEntry, len(nav))
+	for _, e := range nav {
+		key := navblock.NormalizeHeading(e.Name)
+		idx[key] = append(idx[key], e)
+	}
+	return idx
+}
+
+func abs(x int) int {
+	if x < 0 {
+		return -x
+	}
+	return x
+}
+
+// matchSectionsToNav maps each section to its best old nav entry using two passes:
+//  1. Exact: section.Start == entry.Start (no ambiguity)
+//  2. Minimum-distance: for unmatched sections, sort all (section, entry) candidate
+//     pairs by distance and assign greedily from closest outward, so each entry is
+//     consumed by the section that is truly nearest to it — not just the first
+//     section encountered in document order.
+//
+// This ensures that when a document has more occurrences of a heading name than
+// the nav block, the stored entry is paired with the section at the same line
+// (pass 1), and when the section has shifted, the nearest occurrence wins
+// rather than whatever happens to come first in the file.
+//
+// Returns a map from section index → matched NavEntry, and the set of matched
+// entry Start values.
+func matchSectionsToNav(sections []parser.Section, byName map[string][]navblock.NavEntry) (map[int]navblock.NavEntry, map[int]bool) {
+	matched := make(map[int]navblock.NavEntry, len(sections))
+	usedStart := make(map[int]bool)
+
+	// Pass 1: exact line-number matches.
+	for i, s := range sections {
+		key := navblock.NormalizeHeading(s.Text)
+		candidates := byName[key]
+		for j, e := range candidates {
+			if e.Start == s.Start {
+				matched[i] = e
+				usedStart[e.Start] = true
+				byName[key] = append(candidates[:j:j], candidates[j+1:]...)
+				break
+			}
+		}
+	}
+
+	// Pass 2: minimum-distance matching for remaining sections.
+	// Build all (section_idx, entry, distance) triples from unmatched sections
+	// and remaining entries, then sort by distance and assign greedily from
+	// closest outward so that the best pairing wins regardless of section order.
+	type candidate struct {
+		sectionIdx int
+		entry      navblock.NavEntry
+		dist       int
+	}
+	var candidates []candidate
+	for i, s := range sections {
+		if _, ok := matched[i]; ok {
+			continue
+		}
+		key := navblock.NormalizeHeading(s.Text)
+		for _, e := range byName[key] {
+			candidates = append(candidates, candidate{i, e, abs(e.Start - s.Start)})
+		}
+	}
+	sort.Slice(candidates, func(a, b int) bool {
+		return candidates[a].dist < candidates[b].dist
+	})
+
+	consumedSection := make(map[int]bool)
+	consumedEntry := make(map[int]bool) // keyed by entry.Start
+	for _, c := range candidates {
+		if consumedSection[c.sectionIdx] || consumedEntry[c.entry.Start] {
+			continue
+		}
+		matched[c.sectionIdx] = c.entry
+		usedStart[c.entry.Start] = true
+		consumedSection[c.sectionIdx] = true
+		consumedEntry[c.entry.Start] = true
+	}
+
+	return matched, usedStart
+}
+
 func buildEntryReports(oldNav []navblock.NavEntry, sections []parser.Section, changedLines []gitutil.LineRange, cfg config.Config) []ReportEntry {
 	var reports []ReportEntry
 
-	oldByName := make(map[string]navblock.NavEntry)
-	for _, e := range oldNav {
-		key := navblock.NormalizeHeading(e.Name)
-		oldByName[key] = e
-	}
+	// Build multi-map: name -> []NavEntry to handle duplicate heading names.
+	// matchSectionsToNav uses exact-match first, then proximity — ensuring each
+	// nav entry is paired with the section at the same absolute line before
+	// falling back to nearest duplicate.
+	byName := navIndex(oldNav)
+	sectionToEntry, usedStart := matchSectionsToNav(sections, byName)
 
 	// Build h2 size map for ExpandThreshold checks (mirrors buildUpdatedBlock logic).
 	h2SizeByKey := make(map[string]int)
@@ -257,13 +348,11 @@ func buildEntryReports(oldNav []navblock.NavEntry, sections []parser.Section, ch
 		return ""
 	}
 
-	used := make(map[int]bool)
-
 	for i, s := range sections {
-		key := navblock.NormalizeHeading(s.Text)
-		oldEntry, found := oldByName[key]
 		prefix := strings.Repeat("#", s.Depth)
 		name := prefix + navblock.NormalizeHeading(s.Text)
+
+		oldEntry, found := sectionToEntry[i]
 
 		if !found {
 			// New section not in existing nav block.
@@ -284,8 +373,6 @@ func buildEntryReports(oldNav []navblock.NavEntry, sections []parser.Section, ch
 			})
 			continue
 		}
-
-		used[oldEntry.Start] = true
 
 		reportType := ReportOK
 		oldEnd := oldEntry.Start + oldEntry.N - 1
@@ -320,9 +407,9 @@ func buildEntryReports(oldNav []navblock.NavEntry, sections []parser.Section, ch
 		})
 	}
 
+	// Any old entries not matched are deleted.
 	for _, e := range oldNav {
-		key := navblock.NormalizeHeading(e.Name)
-		if _, found := oldByName[key]; found && !used[oldByName[key].Start] {
+		if !usedStart[e.Start] {
 			reports = append(reports, ReportEntry{
 				Type: ReportDeleted,
 				Name: e.Name,
@@ -334,11 +421,12 @@ func buildEntryReports(oldNav []navblock.NavEntry, sections []parser.Section, ch
 }
 
 func buildUpdatedBlock(oldBlock navblock.NavBlock, sections []parser.Section, _ []ReportEntry, lines []string, cfg config.Config, contentLines int) navblock.NavBlock {
-	oldByName := make(map[string]navblock.NavEntry)
-	for _, e := range oldBlock.Nav {
-		key := navblock.NormalizeHeading(e.Name)
-		oldByName[key] = e
-	}
+	// Build multi-map: name -> []NavEntry to handle duplicate heading names.
+	// matchSectionsToNav uses exact-match first, then proximity — ensuring each
+	// nav entry is paired with the section at the same absolute line before
+	// falling back to nearest duplicate.
+	byName := navIndex(oldBlock.Nav)
+	sectionToEntry, _ := matchSectionsToNav(sections, byName)
 
 	// Build a map of h2 section size by heading text, so we can apply the same
 	// ExpandThreshold logic as generate's buildNavEntries when deciding whether
@@ -371,11 +459,10 @@ func buildUpdatedBlock(oldBlock navblock.NavBlock, sections []parser.Section, _ 
 	var newNav []navblock.NavEntry
 
 	for i, s := range sections {
-		key := navblock.NormalizeHeading(s.Text)
-		oldEntry, found := oldByName[key]
-
 		prefix := strings.Repeat("#", s.Depth)
 		wc := navblock.SectionWordCount(lines, s.Start, s.Len())
+
+		oldEntry, found := sectionToEntry[i]
 
 		if found {
 			newNav = append(newNav, navblock.NavEntry{

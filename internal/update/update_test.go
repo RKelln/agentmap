@@ -894,3 +894,240 @@ func TestFile_NoNewH3BelowExpandThreshold(t *testing.T) {
 		t.Errorf("update added new h3 entries for below-ExpandThreshold h2; report:\n%s", report)
 	}
 }
+
+// TestFile_DuplicateHeadingMatching verifies that when a document has two
+// sections with the same heading name, each nav entry is matched to the section
+// at the same absolute line (exact-match first), not greedily to the first
+// occurrence by proximity alone.
+//
+// Regression for Bug 8: navIndex used a single-value map, causing the second
+// entry to overwrite the first. matchSectionsToNav fixes this with a two-pass
+// approach (exact line match first, then proximity).
+func TestFile_DuplicateHeadingMatching(t *testing.T) {
+	dir := t.TempDir()
+
+	// Build a file with two sections named "## Step-by-Step Setup".
+	// Nav block records the second occurrence at line ~30 (after the nav block).
+	// The two-pass matcher must pair the nav entry at s=30 with the section at
+	// line 30, not displace it to the first occurrence at line 10.
+	//
+	// Layout (after prepended nav block of 6 lines + 1 blank = 7 offset):
+	//   line 1-6: nav block, line 7: blank
+	//   line  8: # Doc
+	//   line  9: (blank)
+	//   line 10: ## Step-by-Step Setup  (first occurrence, NOT in nav)
+	//   lines 11-28: filler (18 lines)
+	//   line 29: ## Other Section
+	//   lines 30-38: filler (9 lines)
+	//   line 39: ## Step-by-Step Setup  (second occurrence, IN nav at s=39)
+	//   lines 40-55: filler (16 lines)
+
+	// Build nav block with only the second occurrence recorded.
+	navText := "<!-- AGENT:NAV\npurpose:test\nnav[1]{s,n,name,about}:\n39,17,##Step-by-Step Setup,existing desc\n-->\n"
+
+	var sb strings.Builder
+	sb.WriteString(navText)
+	sb.WriteString("\n")                      // blank sep after nav block (line 7)
+	sb.WriteString("# Doc\n")                 // line 8
+	sb.WriteString("\n")                      // line 9
+	sb.WriteString("## Step-by-Step Setup\n") // line 10 — first occurrence
+	for i := 0; i < 18; i++ {
+		sb.WriteString("filler line\n") // lines 11-28
+	}
+	sb.WriteString("## Other Section\n") // line 29
+	for i := 0; i < 9; i++ {
+		sb.WriteString("filler line\n") // lines 30-38
+	}
+	sb.WriteString("## Step-by-Step Setup\n") // line 39 — second occurrence
+	for i := 0; i < 16; i++ {
+		sb.WriteString("filler line\n") // lines 40-55
+	}
+
+	path := writeTempFile(t, dir, "dup.md", sb.String())
+
+	cfg := config.Defaults()
+	cfg.MaxDepth = 2
+
+	report, err := File(path, cfg, true /* dry-run */, false)
+	if err != nil {
+		t.Fatalf("File() error = %v", err)
+	}
+
+	// The nav entry at s=39 must NOT be reported as deleted and re-added as new.
+	// It should either be OK or shifted (if lines moved slightly), but the
+	// existing description "existing desc" must survive.
+	if strings.Contains(report, "deleted: ##Step-by-Step Setup") {
+		t.Errorf("nav entry for second occurrence was incorrectly deleted; report:\n%s", report)
+	}
+
+	// Re-read file (dry-run doesn't write) and check descriptions are preserved.
+	// We test via buildUpdatedBlock directly for precision.
+	sections := []parser.Section{
+		{Heading: parser.Heading{Line: 10, Depth: 2, Text: "Step-by-Step Setup"}, Start: 10, End: 28},
+		{Heading: parser.Heading{Line: 29, Depth: 2, Text: "Other Section"}, Start: 29, End: 38},
+		{Heading: parser.Heading{Line: 39, Depth: 2, Text: "Step-by-Step Setup"}, Start: 39, End: 55},
+	}
+	oldBlock := navblock.NavBlock{
+		Purpose: "test",
+		Nav: []navblock.NavEntry{
+			{Start: 39, N: 17, Name: "##Step-by-Step Setup", About: "existing desc"},
+		},
+	}
+	updated := buildUpdatedBlock(oldBlock, sections, nil, nil, cfg, 50)
+
+	// Find the entry matched to line 39 (third section).
+	var matchedAbout string
+	for _, e := range updated.Nav {
+		if e.Start == 39 {
+			matchedAbout = e.About
+			break
+		}
+	}
+	if matchedAbout != "existing desc" {
+		t.Errorf("second occurrence (line 39) about = %q, want %q; full nav: %+v",
+			matchedAbout, "existing desc", updated.Nav)
+	}
+
+	// The first occurrence (line 10) must have an empty About (new, no description).
+	for _, e := range updated.Nav {
+		if e.Start == 10 && e.About != "" {
+			t.Errorf("first occurrence (line 10) incorrectly inherited about %q; should be empty", e.About)
+		}
+	}
+}
+
+// TestFile_BothDuplicatesInNav verifies that when both occurrences of a
+// duplicate heading are tracked in the nav block, each is matched to its own
+// section after content shifts. This is the normal post-generate state.
+func TestFile_BothDuplicatesInNav(t *testing.T) {
+	// Nav block records both occurrences with distinct descriptions.
+	// After the nav block is prepended, the sections will be at the same lines
+	// (exact match), so both should match and carry their descriptions forward.
+	sections := []parser.Section{
+		{Heading: parser.Heading{Line: 10, Depth: 2, Text: "Step-by-Step Setup"}, Start: 10, End: 28},
+		{Heading: parser.Heading{Line: 29, Depth: 2, Text: "Other Section"}, Start: 29, End: 38},
+		{Heading: parser.Heading{Line: 39, Depth: 2, Text: "Step-by-Step Setup"}, Start: 39, End: 55},
+	}
+	oldBlock := navblock.NavBlock{
+		Purpose: "test",
+		Nav: []navblock.NavEntry{
+			{Start: 10, N: 19, Name: "##Step-by-Step Setup", About: "first desc"},
+			{Start: 29, N: 10, Name: "##Other Section", About: "other desc"},
+			{Start: 39, N: 17, Name: "##Step-by-Step Setup", About: "second desc"},
+		},
+	}
+
+	cfg := config.Defaults()
+	cfg.MaxDepth = 2
+	updated := buildUpdatedBlock(oldBlock, sections, nil, nil, cfg, 50)
+
+	want := map[int]string{
+		10: "first desc",
+		29: "other desc",
+		39: "second desc",
+	}
+	got := map[int]string{}
+	for _, e := range updated.Nav {
+		got[e.Start] = e.About
+	}
+	for line, wantAbout := range want {
+		if got[line] != wantAbout {
+			t.Errorf("section at line %d: about = %q, want %q; full nav: %+v", line, got[line], wantAbout, updated.Nav)
+		}
+	}
+}
+
+// TestMatchSectionsToNav_ExactPass verifies pass 1: sections whose Start
+// exactly matches a nav entry's Start are consumed before proximity kicks in.
+func TestMatchSectionsToNav_ExactPass(t *testing.T) {
+	// Two sections with the same name. Nav has one entry at s=39 (the second).
+	// Pass 1 should bind the entry to section index 2 (line 39), leaving
+	// section index 0 (line 10) unmatched.
+	sections := []parser.Section{
+		{Heading: parser.Heading{Line: 10, Depth: 2, Text: "Dup"}, Start: 10, End: 28},
+		{Heading: parser.Heading{Line: 39, Depth: 2, Text: "Dup"}, Start: 39, End: 55},
+	}
+	byName := navIndex([]navblock.NavEntry{
+		{Start: 39, N: 17, Name: "##Dup", About: "desc"},
+	})
+
+	matched, usedStart := matchSectionsToNav(sections, byName)
+
+	// Section 0 (line 10) must be unmatched.
+	if _, ok := matched[0]; ok {
+		t.Errorf("section at line 10 should be unmatched, but was matched to %+v", matched[0])
+	}
+	// Section 1 (line 39) must be matched.
+	if e, ok := matched[1]; !ok {
+		t.Errorf("section at line 39 should be matched, but was not")
+	} else if e.About != "desc" {
+		t.Errorf("section at line 39 matched entry About = %q, want %q", e.About, "desc")
+	}
+	// usedStart must record the matched entry's Start.
+	if !usedStart[39] {
+		t.Errorf("usedStart[39] = false, want true")
+	}
+	if usedStart[10] {
+		t.Errorf("usedStart[10] = true, want false")
+	}
+}
+
+// TestMatchSectionsToNav_ProximityPass verifies pass 2: when a nav entry's
+// Start no longer matches any section exactly (section shifted), proximity
+// picks the closest remaining candidate rather than the first occurrence.
+func TestMatchSectionsToNav_ProximityPass(t *testing.T) {
+	// Nav entry was at s=39. Section shifted to s=42 (3 lines down).
+	// A separate first occurrence is at s=10 (distance 29 from 39).
+	// Proximity must choose s=42 (distance 3) over s=10 (distance 29).
+	sections := []parser.Section{
+		{Heading: parser.Heading{Line: 10, Depth: 2, Text: "Dup"}, Start: 10, End: 28},
+		{Heading: parser.Heading{Line: 42, Depth: 2, Text: "Dup"}, Start: 42, End: 58},
+	}
+	byName := navIndex([]navblock.NavEntry{
+		{Start: 39, N: 17, Name: "##Dup", About: "desc"},
+	})
+
+	matched, _ := matchSectionsToNav(sections, byName)
+
+	// Section 0 (line 10) must be unmatched (proximity chose line 42).
+	if _, ok := matched[0]; ok {
+		t.Errorf("section at line 10 should be unmatched; matched to %+v", matched[0])
+	}
+	// Section 1 (line 42) must be matched.
+	if e, ok := matched[1]; !ok {
+		t.Errorf("section at line 42 should be matched by proximity")
+	} else if e.About != "desc" {
+		t.Errorf("section at line 42 About = %q, want %q", e.About, "desc")
+	}
+}
+
+// TestMatchSectionsToNav_MoreOccurrencesThanEntries verifies that when the
+// document has more occurrences of a heading name than the nav block has
+// entries, the stored entry is matched exactly and the extra occurrences are
+// left unmatched.
+func TestMatchSectionsToNav_MoreOccurrencesThanEntries(t *testing.T) {
+	// Three occurrences in document; nav tracks only the middle one (s=30).
+	sections := []parser.Section{
+		{Heading: parser.Heading{Line: 10, Depth: 2, Text: "Dup"}, Start: 10, End: 20},
+		{Heading: parser.Heading{Line: 30, Depth: 2, Text: "Dup"}, Start: 30, End: 40},
+		{Heading: parser.Heading{Line: 50, Depth: 2, Text: "Dup"}, Start: 50, End: 60},
+	}
+	byName := navIndex([]navblock.NavEntry{
+		{Start: 30, N: 11, Name: "##Dup", About: "middle"},
+	})
+
+	matched, _ := matchSectionsToNav(sections, byName)
+
+	// Only section 1 (line 30) should be matched.
+	if _, ok := matched[0]; ok {
+		t.Errorf("section at line 10 should not be matched")
+	}
+	if e, ok := matched[1]; !ok {
+		t.Errorf("section at line 30 should be matched")
+	} else if e.About != "middle" {
+		t.Errorf("section at line 30 About = %q, want %q", e.About, "middle")
+	}
+	if _, ok := matched[2]; ok {
+		t.Errorf("section at line 50 should not be matched")
+	}
+}
