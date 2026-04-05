@@ -1882,6 +1882,22 @@ func TestFile_LineNumbersCorrectWithH3Children(t *testing.T) {
 		t.Fatal("nav block not found after generate")
 	}
 
+	// h3 entries must not appear: buildNavEntries skips them when the parent h2
+	// is below ExpandThreshold, and the nav block should only contain h1/h2.
+	for _, entry := range pr.Block.Nav {
+		depth := 0
+		for _, ch := range entry.Name {
+			if ch == '#' {
+				depth++
+			} else {
+				break
+			}
+		}
+		if depth >= 3 {
+			t.Errorf("h3+ entry %q found in nav block; expected only h1/h2 (ExpandThreshold not reached)", entry.Name)
+		}
+	}
+
 	fileLines := strings.Split(got, "\n")
 
 	// Every nav entry's s must point to the actual heading line in the file.
@@ -1905,5 +1921,54 @@ func TestFile_LineNumbersCorrectWithH3Children(t *testing.T) {
 			t.Errorf("entry %q: s=%d but heading is at line %d (off by %d)",
 				entry.Name, entry.Start, actualLine, actualLine-entry.Start)
 		}
+	}
+}
+
+// TestFile_MinLinesBoundary verifies the MinLines threshold is evaluated against
+// the correct line count. The bug: len(strings.Split(content, "\n")) overcounts by 1
+// for files ending with \n, so a file with exactly MinLines-1 content lines was
+// incorrectly treated as meeting the threshold and got a full nav block instead of
+// purpose-only. With strings.Count the boundary is exact.
+func TestFile_MinLinesBoundary(t *testing.T) {
+	cfg := config.Defaults()
+	// MinLines default is 50. Build a file with exactly MinLines-1 newlines (49 lines,
+	// trailing \n) that has a heading — it must get purpose-only treatment.
+	threshold := cfg.MinLines
+	targetNewlines := threshold - 1 // 49 newlines → 49 "lines" per wc -l
+
+	var b strings.Builder
+	b.WriteString("# Boundary Heading\n")
+	// Fill remaining lines so the file has exactly targetNewlines newlines total.
+	// We already wrote 1 newline above, so write targetNewlines-1 more lines.
+	for i := 1; i < targetNewlines; i++ {
+		b.WriteString("filler line content here\n")
+	}
+	content := b.String()
+
+	if got := strings.Count(content, "\n"); got != targetNewlines {
+		t.Fatalf("setup error: content has %d newlines, want %d", got, targetNewlines)
+	}
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "boundary.md")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := File(path, cfg, false)
+	if err != nil {
+		t.Fatalf("File() error = %v", err)
+	}
+
+	// File has fewer lines than MinLines → must be purpose-only, not a full nav block.
+	if !strings.Contains(report, "Skipped:") {
+		t.Errorf("report = %q; file with %d lines (threshold %d) should be purpose-only (Skipped:)",
+			report, targetNewlines, threshold)
+	}
+
+	data, _ := os.ReadFile(path)
+	if strings.Contains(string(data), "nav[") {
+		t.Errorf("file with %d lines should not have nav[] entries (threshold %d); off-by-1 in totalLines",
+			targetNewlines, threshold)
 	}
 }

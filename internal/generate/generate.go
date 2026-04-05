@@ -53,7 +53,10 @@ func File(path string, cfg config.Config, dryRun bool, outputPath ...string) (st
 	}
 
 	lines := strings.Split(string(content), "\n")
-	totalLines := len(lines)
+	// Use strings.Count for totalLines rather than len(lines): strings.Split
+	// produces a spurious trailing empty element for POSIX files ending with \n,
+	// overcounting by 1. strings.Count("\n") equals wc -l.
+	totalLines := strings.Count(string(content), "\n")
 
 	// Check for existing nav block to compute line offset
 	blockStart, blockEnd := findNavBlock(lines)
@@ -92,6 +95,9 @@ func File(path string, cfg config.Config, dryRun bool, outputPath ...string) (st
 		cappedForOffset := FilterNavEntries(originalEntries, cfg.MaxNavEntries, cfg.NavStubWords)
 		placeholder := navblock.NavBlock{Purpose: purpose, Lines: contentLines, Nav: cappedForOffset}
 		placeholderText := navblock.RenderNavBlock(placeholder)
+		// RenderNavBlock does NOT append a trailing newline, so strings.Split here
+		// correctly counts lines without the spurious +1 that a trailing \n would cause.
+		// If RenderNavBlock ever gains a trailing newline this count would be off by 1.
 		newBlockLines := len(strings.Split(placeholderText, "\n"))
 		// For fresh files (no existing nav block), insertNavBlock adds a blank separator
 		// line after the nav block (via cleanBlankLines). This blank is not part of
