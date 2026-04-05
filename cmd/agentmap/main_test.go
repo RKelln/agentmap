@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -254,5 +256,47 @@ func TestVersionCmd_WithCommit(t *testing.T) {
 func TestVersionCmd_DevDefault(t *testing.T) {
 	if version != "dev" {
 		t.Errorf("default version = %q, want %q", version, "dev")
+	}
+}
+
+// captureStdout runs f() and returns everything written to os.Stdout during the call.
+func captureStdout(f func()) string {
+	r, w, _ := os.Pipe()
+	old := os.Stdout
+	os.Stdout = w
+	f()
+	w.Close() //nolint:errcheck
+	os.Stdout = old
+	var buf bytes.Buffer
+	io.Copy(&buf, r) //nolint:errcheck
+	return buf.String()
+}
+
+// TestGenerateDebug_LineCount verifies that "generate -D" reports the correct
+// line count for a file. The bug: len(strings.Split(content, "\n")) is 1 too
+// high for any file ending with a newline (the trailing \n produces an extra
+// empty element). The correct count is strings.Count(content, "\n").
+func TestGenerateDebug_LineCount(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sample.md")
+
+	// File with exactly 7 lines, each ending with \n (standard POSIX text file).
+	content := "# Heading\n\nParagraph one.\n\n## Section\n\nParagraph two.\n"
+	wantLines := strings.Count(content, "\n") // 7 — the correct count
+
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// -D writes via fmt.Printf to os.Stdout, not cobra's output buffer, so
+	// we must capture os.Stdout directly.
+	captured := captureStdout(func() {
+		executeCommand("generate", "-D", path) //nolint:errcheck
+	})
+
+	// The first output line is: "File: <path> (<N> lines)"
+	want := fmt.Sprintf("(%d lines)", wantLines)
+	if !strings.Contains(captured, want) {
+		t.Errorf("generate -D output:\n%s\nwant line count %q (off-by-1: strings.Split adds spurious empty element for trailing newline)", captured, want)
 	}
 }

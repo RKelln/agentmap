@@ -93,14 +93,22 @@ func File(path string, cfg config.Config, dryRun bool, outputPath ...string) (st
 		placeholder := navblock.NavBlock{Purpose: purpose, Lines: contentLines, Nav: cappedForOffset}
 		placeholderText := navblock.RenderNavBlock(placeholder)
 		newBlockLines := len(strings.Split(placeholderText, "\n"))
-		offset := newBlockLines - oldBlockLines
+		// For fresh files (no existing nav block), insertNavBlock adds a blank separator
+		// line after the nav block (via cleanBlankLines). This blank is not part of
+		// newBlockLines, so add 1 to account for it. For existing nav blocks the blank
+		// was already present, so it cancels out and no adjustment is needed.
+		separatorLines := 0
+		if oldBlockLines == 0 {
+			separatorLines = 1
+		}
+		offset := newBlockLines + separatorLines - oldBlockLines
 
-		// Adjust section line numbers by the offset (applied to full/uncapped list so
-		// applyAdjustedLines can align by index with originalEntries).
-		adjusted := adjustSections(sections, offset)
-		// Apply adjusted line numbers to entries (preserves About/keyword descriptions).
-		// applyAdjustedLines requires len(entries) == len(adjusted); both are uncapped here.
-		adjustedEntries := applyAdjustedLines(originalEntries, adjusted)
+		// Shift every entry's Start by the offset. The offset is uniform across all
+		// lines in the file (the nav block is prepended), so we apply it directly to
+		// the entries rather than trying to align them with the full sections slice.
+		// This avoids the previous applyAdjustedLines length guard silently bailing
+		// when buildNavEntries skips h3 children (len(entries) < len(sections)).
+		adjustedEntries := shiftEntries(originalEntries, offset)
 		// Apply the large-file cap AFTER adjusting line numbers so kept entries are correct.
 		entries := FilterNavEntries(adjustedEntries, cfg.MaxNavEntries, cfg.NavStubWords)
 		block := navblock.NavBlock{
@@ -118,6 +126,24 @@ func File(path string, cfg config.Config, dryRun bool, outputPath ...string) (st
 
 	newContent := insertNavBlock(string(content), blockText)
 
+	// Recompute lines:N from the final content so generate/update/index always agree.
+	// insertNavBlock adds a blank separator that wasn't in the pre-insertion newline count,
+	// so the stored value would be off by 1 on the first generate for fresh files.
+	if contentLines > 0 {
+		if pr2 := navblock.ParseNavBlock(newContent); pr2.Found {
+			finalContentLines := strings.Count(newContent, "\n") - (pr2.End - pr2.Start + 1)
+			if finalContentLines < 0 {
+				finalContentLines = 0
+			}
+			if finalContentLines != contentLines {
+				old := fmt.Sprintf("lines:%d\n", contentLines)
+				repl := fmt.Sprintf("lines:%d\n", finalContentLines)
+				blockText = strings.Replace(blockText, old, repl, 1)
+				newContent = insertNavBlock(string(content), blockText)
+			}
+		}
+	}
+
 	// Write to output path if specified, otherwise modify source in place
 	dest := path
 	if len(outputPath) > 0 && outputPath[0] != "" {
@@ -131,39 +157,18 @@ func File(path string, cfg config.Config, dryRun bool, outputPath ...string) (st
 	return report, nil
 }
 
-// applyAdjustedLines copies Start/End line numbers from adjusted sections to entries.
-// Preserves the About field (keyword descriptions) and WordCount from the original entries.
-func applyAdjustedLines(entries []navblock.NavEntry, adjusted []parser.Section) []navblock.NavEntry {
-	if len(entries) != len(adjusted) {
+// shiftEntries returns a copy of entries with each Start shifted by offset.
+// N (section length) is unchanged because the whole file shifts uniformly.
+func shiftEntries(entries []navblock.NavEntry, offset int) []navblock.NavEntry {
+	if offset == 0 {
 		return entries
 	}
 	result := make([]navblock.NavEntry, len(entries))
-	for i := range entries {
-		result[i] = navblock.NavEntry{
-			Start:     adjusted[i].Start,
-			N:         adjusted[i].Len(),
-			Name:      entries[i].Name,
-			About:     entries[i].About,
-			WordCount: entries[i].WordCount,
-		}
+	for i, e := range entries {
+		result[i] = e
+		result[i].Start = e.Start + offset
 	}
 	return result
-}
-
-// adjustSections shifts all Start/End line numbers by the given offset.
-func adjustSections(sections []parser.Section, offset int) []parser.Section {
-	if offset == 0 {
-		return sections
-	}
-	adjusted := make([]parser.Section, len(sections))
-	for i, s := range sections {
-		adjusted[i] = parser.Section{
-			Heading: s.Heading,
-			Start:   s.Start + offset,
-			End:     s.End + offset,
-		}
-	}
-	return adjusted
 }
 
 // findNavBlock returns the 0-indexed start and end lines of an existing nav block.

@@ -1763,3 +1763,147 @@ func TestFile_IdempotentDesignClean(t *testing.T) {
 			count2, wantCount)
 	}
 }
+
+// TestFile_LineNumbersCorrectOnFirstGenerate verifies that on first generate (no
+// existing nav block) every nav entry's s value matches the actual line number of
+// that heading in the resulting file. This catches the off-by-1 bug caused by the
+// blank separator line that cleanBlankLines inserts after the nav block.
+func TestFile_LineNumbersCorrectOnFirstGenerate(t *testing.T) {
+	// Build a file where h1 is at line 1 with enough content for a full nav block.
+	var b strings.Builder
+	b.WriteString("# Database Guide\n\n")
+	b.WriteString(strings.Repeat("Database content line.\n", 10))
+	for i := 1; i <= 15; i++ {
+		fmt.Fprintf(&b, "\n## Section %d\n\n", i)
+		b.WriteString(strings.Repeat("Section content here.\n", 5))
+	}
+
+	content := b.String()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "database.md")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := config.Defaults()
+	cfg.MinLines = 10
+
+	_, err := File(path, cfg, false)
+	if err != nil {
+		t.Fatalf("File() error = %v", err)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(data)
+
+	pr := navblock.ParseNavBlock(got)
+	if !pr.Found {
+		t.Fatal("nav block not found after generate")
+	}
+
+	fileLines := strings.Split(got, "\n")
+
+	// Verify each nav entry's s value matches the actual line number of that heading.
+	for _, entry := range pr.Block.Nav {
+		headingText := strings.TrimLeft(entry.Name, "#")
+		depth := len(entry.Name) - len(headingText)
+		prefix := strings.Repeat("#", depth)
+		needle := prefix + " " + headingText
+
+		actualLine := -1
+		for i, line := range fileLines {
+			if line == needle {
+				actualLine = i + 1 // 1-indexed
+				break
+			}
+		}
+
+		if actualLine < 0 {
+			t.Errorf("entry %q: heading %q not found in file", entry.Name, needle)
+			continue
+		}
+
+		if entry.Start != actualLine {
+			t.Errorf("entry %q: s=%d but heading is at line %d (off by %d)",
+				entry.Name, entry.Start, actualLine, actualLine-entry.Start)
+		}
+	}
+}
+
+// TestFile_LineNumbersCorrectWithH3Children verifies that nav entry s values are
+// correct even when h2 sections have h3 children that buildNavEntries skips.
+// This is the common real-world case: skipped h3s make len(originalEntries) <
+// len(sections), which previously caused applyAdjustedLines to silently bail out
+// and return unadjusted (pre-nav-block) line numbers.
+func TestFile_LineNumbersCorrectWithH3Children(t *testing.T) {
+	// Build a file with h1 and several h2 sections, each with h3 subsections.
+	// Each h2 is small enough to stay below ExpandThreshold (default 200), so
+	// buildNavEntries skips the h3s and returns fewer entries than len(sections).
+	var b strings.Builder
+	b.WriteString("# Top Level\n\n")
+	b.WriteString(strings.Repeat("Intro content.\n", 5))
+	for i := 1; i <= 5; i++ {
+		fmt.Fprintf(&b, "\n## Chapter %d\n\n", i)
+		b.WriteString(strings.Repeat("Chapter body.\n", 4))
+		fmt.Fprintf(&b, "\n### Section %d.1\n\n", i)
+		b.WriteString(strings.Repeat("Sub content.\n", 3))
+		fmt.Fprintf(&b, "\n### Section %d.2\n\n", i)
+		b.WriteString(strings.Repeat("Sub content.\n", 3))
+	}
+
+	content := b.String()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "chapters.md")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := config.Defaults()
+	cfg.MinLines = 10
+	// Leave ExpandThreshold at default (200) so h2 sections don't expand.
+	// This ensures h3s are skipped: len(originalEntries) < len(sections).
+
+	_, err := File(path, cfg, false)
+	if err != nil {
+		t.Fatalf("File() error = %v", err)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(data)
+
+	pr := navblock.ParseNavBlock(got)
+	if !pr.Found {
+		t.Fatal("nav block not found after generate")
+	}
+
+	fileLines := strings.Split(got, "\n")
+
+	// Every nav entry's s must point to the actual heading line in the file.
+	for _, entry := range pr.Block.Nav {
+		headingText := strings.TrimLeft(entry.Name, "#")
+		depth := len(entry.Name) - len(headingText)
+		needle := strings.Repeat("#", depth) + " " + headingText
+
+		actualLine := -1
+		for i, line := range fileLines {
+			if line == needle {
+				actualLine = i + 1
+				break
+			}
+		}
+		if actualLine < 0 {
+			t.Errorf("entry %q: heading %q not found in file", entry.Name, needle)
+			continue
+		}
+		if entry.Start != actualLine {
+			t.Errorf("entry %q: s=%d but heading is at line %d (off by %d)",
+				entry.Name, entry.Start, actualLine, actualLine-entry.Start)
+		}
+	}
+}
