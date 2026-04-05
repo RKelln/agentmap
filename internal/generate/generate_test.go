@@ -124,7 +124,7 @@ OAuth2 flow.
 	}
 
 	cfg := config.Defaults()
-	cfg.MinLines = 10
+	cfg.MinLines = 5 // content is 7 lines; keep well below to test nav replacement, not threshold
 
 	_, err := File(path, cfg, false)
 	if err != nil {
