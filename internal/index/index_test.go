@@ -363,6 +363,44 @@ Silent rotation and expiry detection.
 	}
 }
 
+func TestBuildIndex_UnparsableNavMarker_DoesNotOverwriteWithoutForce(t *testing.T) {
+	dir := t.TempDir()
+
+	original := `<!-- AGENT:NAV
+purpose:human curated description
+nav[1]{s,n,name,about}:
+12,20,##Section,custom text
+
+# Guide
+
+## Section
+
+Details here.
+`
+	writeFile(t, filepath.Join(dir, "docs/guide.md"), original)
+
+	cfg := config.Defaults()
+	result, err := BuildIndex(dir, cfg, false, false)
+	if err != nil {
+		t.Fatalf("BuildIndex() error = %v", err)
+	}
+
+	if result.Generated != 0 {
+		t.Errorf("Generated = %d, want 0 (should not overwrite unparsable marker file)", result.Generated)
+	}
+	if result.TaskFiles != 1 {
+		t.Errorf("TaskFiles = %d, want 1", result.TaskFiles)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, "docs/guide.md"))
+	if err != nil {
+		t.Fatalf("read docs/guide.md: %v", err)
+	}
+	if string(data) != original {
+		t.Error("file content changed; expected unparsable marker file to be preserved")
+	}
+}
+
 func TestBuildIndex_TaskListContents(t *testing.T) {
 	dir := t.TempDir()
 
@@ -704,13 +742,9 @@ func TestWriteFilesBlock_DedicatedLarge(t *testing.T) {
 		t.Error("AGENTMAP.md should contain files block")
 	}
 
-	// AGENTS.md should have a pointer line.
-	agentsData, err := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
-	if err != nil {
-		t.Fatalf("read AGENTS.md: %v", err)
-	}
-	if !strings.Contains(string(agentsData), "See AGENTMAP.md for the full file index.") {
-		t.Error("AGENTS.md should contain pointer to AGENTMAP.md")
+	// AGENTS.md should not be touched in dedicated mode.
+	if _, err := os.Stat(filepath.Join(dir, "AGENTS.md")); !os.IsNotExist(err) {
+		t.Error("AGENTS.md should not be created or modified in dedicated mode")
 	}
 }
 

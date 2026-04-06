@@ -17,7 +17,7 @@ func TestDefaults(t *testing.T) {
 		MaxNavEntries:   20,
 		NavStubWords:    20,
 		IndexInlineMax:  20,
-		Exclude:         []string{".agentmap", ".agentmap/**", "AGENTMAP.md"},
+		Exclude:         []string{".agentmap", ".agentmap/**", "AGENTMAP.md", "AGENTS.md", "CLAUDE.md", "LICENSE.md"},
 	}
 	if !reflect.DeepEqual(cfg, expected) {
 		t.Errorf("Defaults() = %+v, want %+v", cfg, expected)
@@ -58,7 +58,7 @@ func TestLoad(t *testing.T) {
 				MaxNavEntries:   20,
 				NavStubWords:    20,
 				IndexInlineMax:  20,
-				Exclude:         []string{".agentmap", ".agentmap/**", "AGENTMAP.md"},
+				Exclude:         []string{".agentmap", ".agentmap/**", "AGENTMAP.md", "AGENTS.md", "CLAUDE.md", "LICENSE.md"},
 			},
 		},
 		{
@@ -80,7 +80,7 @@ exclude:
 				NavStubWords:    20,
 				IndexInlineMax:  20,
 				// User patterns prepended; default protected patterns always appended.
-				Exclude: []string{"dist/**", "CHANGELOG.md", ".agentmap", ".agentmap/**", "AGENTMAP.md"},
+				Exclude: []string{"dist/**", "CHANGELOG.md", ".agentmap", ".agentmap/**", "AGENTMAP.md", "AGENTS.md", "CLAUDE.md", "LICENSE.md"},
 			},
 		},
 		{
@@ -97,7 +97,7 @@ exclude:
 				NavStubWords:    20,
 				IndexInlineMax:  20,
 				// User patterns prepended; default protected patterns always appended.
-				Exclude: []string{"vendor/**", ".agentmap", ".agentmap/**", "AGENTMAP.md"},
+				Exclude: []string{"vendor/**", ".agentmap", ".agentmap/**", "AGENTMAP.md", "AGENTS.md", "CLAUDE.md", "LICENSE.md"},
 			},
 		},
 	}
@@ -136,6 +136,9 @@ func TestLoad_ExcludePreservesDefaults(t *testing.T) {
 	hasAgentmap := false
 	hasAgentmapGlob := false
 	hasAgentmapMD := false
+	hasAgentsMD := false
+	hasClaudeMD := false
+	hasLicenseMD := false
 	for _, p := range cfg.Exclude {
 		if p == ".agentmap" {
 			hasAgentmap = true
@@ -146,6 +149,15 @@ func TestLoad_ExcludePreservesDefaults(t *testing.T) {
 		if p == "AGENTMAP.md" {
 			hasAgentmapMD = true
 		}
+		if p == "AGENTS.md" {
+			hasAgentsMD = true
+		}
+		if p == "CLAUDE.md" {
+			hasClaudeMD = true
+		}
+		if p == "LICENSE.md" {
+			hasLicenseMD = true
+		}
 	}
 	if !hasAgentmap {
 		t.Errorf("Exclude should contain .agentmap; got %v", cfg.Exclude)
@@ -155,6 +167,15 @@ func TestLoad_ExcludePreservesDefaults(t *testing.T) {
 	}
 	if !hasAgentmapMD {
 		t.Errorf("Exclude should contain AGENTMAP.md; got %v", cfg.Exclude)
+	}
+	if !hasAgentsMD {
+		t.Errorf("Exclude should contain AGENTS.md; got %v", cfg.Exclude)
+	}
+	if !hasClaudeMD {
+		t.Errorf("Exclude should contain CLAUDE.md; got %v", cfg.Exclude)
+	}
+	if !hasLicenseMD {
+		t.Errorf("Exclude should contain LICENSE.md; got %v", cfg.Exclude)
 	}
 	// User pattern must also be present.
 	hasChangelog := false

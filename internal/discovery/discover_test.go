@@ -81,6 +81,31 @@ func TestDiscoverFilesWithExcludePatterns(t *testing.T) {
 	}
 }
 
+func TestDiscoverFilesExcludesHiddenDirectoriesByDefault(t *testing.T) {
+	dir := t.TempDir()
+
+	writeFile(t, dir, "README.md", "# Root")
+	writeFile(t, dir, ".opencode/commands/release.md", "# Hidden tool docs")
+	writeFile(t, dir, "docs/.draft/notes.md", "# Hidden draft")
+	writeFile(t, dir, "docs/guide.md", "# Guide")
+
+	files, err := DiscoverFiles(dir, nil)
+	if err != nil {
+		t.Fatalf("DiscoverFiles() error = %v", err)
+	}
+
+	sort.Strings(files)
+	expected := []string{"README.md", "docs/guide.md"}
+	if len(files) != len(expected) {
+		t.Fatalf("got %d files, want %d: %v", len(files), len(expected), files)
+	}
+	for i, f := range expected {
+		if files[i] != f {
+			t.Errorf("files[%d] = %q, want %q", i, files[i], f)
+		}
+	}
+}
+
 func TestDiscoverFilesEmptyDirectory(t *testing.T) {
 	dir := t.TempDir()
 
@@ -176,6 +201,8 @@ func TestMatchesExclude(t *testing.T) {
 		{"docs/public/guide.md", []string{"docs/internal/*"}, false},
 		{"README.md", []string{}, false},
 		{"dist/build.md", []string{"dist/**"}, true},
+		{"agents/commands/release.md", []string{"agents/**"}, true},
+		{"agents.md", []string{"agents/**"}, false},
 		{"src/test.md", []string{"*.md"}, true},
 	}
 
@@ -184,6 +211,28 @@ func TestMatchesExclude(t *testing.T) {
 			got := matchesExclude(tt.path, tt.patterns)
 			if got != tt.want {
 				t.Errorf("matchesExclude(%q, %v) = %v, want %v", tt.path, tt.patterns, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestHasHiddenDir(t *testing.T) {
+	tests := []struct {
+		path string
+		want bool
+	}{
+		{"README.md", false},
+		{"docs/guide.md", false},
+		{".opencode/commands/release.md", true},
+		{"docs/.draft/notes.md", true},
+		{"docs/.hidden.md", false}, // hidden filename only is allowed
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			got := hasHiddenDir(tt.path)
+			if got != tt.want {
+				t.Errorf("hasHiddenDir(%q) = %v, want %v", tt.path, got, tt.want)
 			}
 		})
 	}

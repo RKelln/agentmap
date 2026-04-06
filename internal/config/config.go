@@ -31,7 +31,7 @@ func Defaults() Config {
 		MaxNavEntries:   20,
 		NavStubWords:    20,
 		IndexInlineMax:  20,
-		Exclude:         []string{".agentmap", ".agentmap/**", "AGENTMAP.md"},
+		Exclude:         []string{".agentmap", ".agentmap/**", "AGENTMAP.md", "AGENTS.md", "CLAUDE.md", "LICENSE.md"},
 	}
 }
 

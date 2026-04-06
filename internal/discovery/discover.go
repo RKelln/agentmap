@@ -46,6 +46,9 @@ func DiscoverFiles(root string, excludePatterns []string) ([]string, error) {
 		if !strings.HasSuffix(f, ".md") {
 			continue
 		}
+		if hasHiddenDir(f) {
+			continue
+		}
 		if matchesExclude(f, excludePatterns) {
 			continue
 		}
@@ -54,6 +57,21 @@ func DiscoverFiles(root string, excludePatterns []string) ([]string, error) {
 
 	sort.Strings(result)
 	return result, nil
+}
+
+// hasHiddenDir reports whether path contains a hidden directory segment.
+// Only directory segments are checked; the filename may be hidden.
+func hasHiddenDir(path string) bool {
+	parts := strings.Split(path, "/")
+	if len(parts) <= 1 {
+		return false
+	}
+	for _, p := range parts[:len(parts)-1] {
+		if strings.HasPrefix(p, ".") && p != "." && p != ".." {
+			return true
+		}
+	}
+	return false
 }
 
 // isGitRepo checks if dir is inside a git repository by looking for .git.
@@ -133,6 +151,19 @@ func matchesExclude(path string, patterns []string) bool {
 		}
 		if matched {
 			return true
+		}
+		// Support recursive "dir/**" patterns to match any depth.
+		if strings.HasSuffix(pattern, "/**") {
+			prefix := strings.TrimSuffix(pattern, "/**")
+			if path == prefix || strings.HasPrefix(path, prefix+"/") {
+				return true
+			}
+		}
+		// Treat bare directory patterns as recursive excludes as well.
+		if strings.Contains(pattern, "/") && !strings.ContainsAny(pattern, "*?[") {
+			if path == pattern || strings.HasPrefix(path, pattern+"/") {
+				return true
+			}
 		}
 	}
 	return false

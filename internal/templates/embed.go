@@ -13,10 +13,25 @@ import (
 //go:embed *.tmpl
 var FS embed.FS
 
+const bodyPlaceholder = "{{AGENTMAP_BODY}}"
+
 // Get returns the contents of the named template file.
 // Name must be one of the .tmpl filenames (e.g. "agents.md.tmpl").
 func Get(name string) ([]byte, error) {
-	return FS.ReadFile(name)
+	b, err := FS.ReadFile(name)
+	if err != nil {
+		return nil, err
+	}
+	s := string(b)
+	if strings.Contains(s, bodyPlaceholder) {
+		body, err := Body()
+		if err != nil {
+			return nil, err
+		}
+		s = strings.ReplaceAll(s, bodyPlaceholder, body)
+		return []byte(s), nil
+	}
+	return b, nil
 }
 
 // Body returns the shared agent instruction body that every tool template

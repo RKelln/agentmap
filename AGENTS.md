@@ -98,7 +98,7 @@ Read the first 50 lines of a file before reading the rest of the file.
 
 - If purpose doesn't match your task; stop reading.
 - Use s,n line ranges: Read(offset=s; limit=n) for the section you need.
-- For cross-file discovery; read AGENTMAP.md first (or the agentmap:index block in AGENTS.md) before using grep.
+- For cross-file discovery use this flow: Read AGENTMAP.md -> identify file -> read AGENT:NAV -> jump to section.
 - If indexing was run on a subdirectory; read <indexed-path>/AGENTMAP.md for that scope.
 - Check see before searching; the file you need may be listed.
 
