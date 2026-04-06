@@ -4,6 +4,30 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.1.0-rc.2] - Index and installer hardening - 2026-04-05
+
+This release candidate focuses on reliability for real repos: safer index behavior, cleaner discovery defaults, and installer fixes that work before the first stable release.
+
+### Added
+- `index` discovery now uses the shared discovery pipeline and is AGENTMAP-first in generated guidance, with a clear `AGENTMAP -> AGENT:NAV -> section` flow.
+- Default markdown-control excludes now cover generated or agent-instruction files (`AGENTMAP.md`, `AGENTS.md`, `CLAUDE.md`, `LICENSE.md`) in addition to `.agentmap/**`.
+- Hidden-directory exclusion is now applied by default during markdown discovery.
+
+### Fixed
+- Fixed installer prerelease behavior when no stable tag exists: install now falls back from `/releases/latest` to newest prerelease.
+- Fixed installer checksum matching to validate by archive filename (not temp-path), resolving `checksums.txt` lookup failures.
+- Fixed installer version-resolution output so status text does not corrupt download URLs during command substitution.
+- Fixed `index` safety: files containing an `AGENT:NAV` marker but unparsable blocks are no longer overwritten unless `--force` is used.
+- Fixed exclude pattern handling for recursive patterns like `agents/**` in config-driven discovery.
+
+### Changed
+- `index` no longer injects the `See AGENTMAP.md for the full file index.` pointer line into `AGENTS.md` in dedicated index mode.
+- Agent setup templates are now DRY via a shared body placeholder expansion path, reducing drift across tool-specific templates.
+- Shared guidance was tightened to minimize token use and discourage grep-first behavior.
+
+### Infrastructure
+- CI and release workflows now use `actions/checkout@v5` and `actions/setup-go@v6` for Node 24-compatible action runtime support.
+
 ## [v0.1.0-rc.1] - Introducing agentmap - 2026-04-05
 
 `agentmap` is a local CLI that makes markdown files navigable for coding agents.
