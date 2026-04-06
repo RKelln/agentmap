@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	selfupdate "github.com/creativeprojects/go-selfupdate"
@@ -46,7 +47,8 @@ func runUpgrade(cmd *cobra.Command, _ []string) error {
 	defer cancel()
 
 	updater, err := selfupdate.NewUpdater(selfupdate.Config{
-		Validator: &selfupdate.ChecksumValidator{UniqueFilename: "checksums.txt"},
+		Validator:  &selfupdate.ChecksumValidator{UniqueFilename: "checksums.txt"},
+		Prerelease: shouldAllowPrerelease(version),
 	})
 	if err != nil {
 		return fmt.Errorf("creating updater: %w", err)
@@ -84,6 +86,12 @@ func runUpgrade(cmd *cobra.Command, _ []string) error {
 
 	fmt.Printf("Updated agentmap %s -> %s\n", version, latest.Version())
 	return nil
+}
+
+// shouldAllowPrerelease returns true when currentVersion is a prerelease tag,
+// so upgrade checks can see newer prerelease builds as candidates.
+func shouldAllowPrerelease(currentVersion string) bool {
+	return strings.Contains(currentVersion, "-")
 }
 
 // detectManagedInstall returns an error with upgrade instructions if the binary

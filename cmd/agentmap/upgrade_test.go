@@ -94,3 +94,24 @@ func TestDetectManagedInstall_Direct(t *testing.T) {
 		})
 	}
 }
+
+func TestShouldAllowPrerelease(t *testing.T) {
+	tests := []struct {
+		version string
+		want    bool
+	}{
+		{version: "v0.1.0-rc.1", want: true},
+		{version: "0.1.0-beta.2", want: true},
+		{version: "v0.1.0", want: false},
+		{version: "0.1.0", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.version, func(t *testing.T) {
+			got := shouldAllowPrerelease(tt.version)
+			if got != tt.want {
+				t.Errorf("shouldAllowPrerelease(%q) = %v, want %v", tt.version, got, tt.want)
+			}
+		})
+	}
+}
