@@ -36,3 +36,6 @@ Thumbs.db
 
 # project
 .agent-output/
+.env
+.env.*
+tmp/

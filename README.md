@@ -1,6 +1,6 @@
 # agentmap
 
-Navigation maps for AI agents.
+Navigation maps for markdown files for AI agents.
 
 ## What It Does
 
@@ -24,9 +24,12 @@ This gives AI coding agents:
 2. Section index with line ranges (which section do I need, and exactly which lines?)
 3. Cross-references to related files (is the answer actually somewhere else?)
 
+`agentmap` does not call external LLMs for `generate`, `update`, `check`, or
+`index`. Nav block creation is local, deterministic, and fast.
+
 ## Why
 
-Code files have LSPs, treesitter, go-to-definition, and symbol search. Markdown has none of these. When an agent needs information from a 500-line markdown file, it typically reads the entire file (~2000 tokens) even if it only needs a 20-line section (~80 tokens).
+Code files have LSPs, treesitter, go-to-definition, and symbol search. Markdown has none of these. When an agent needs information from a 500-line markdown file, it has to grep or read the entire file (~2000 tokens) even if it only needs a 20-line section (~80 tokens).
 
 `agentmap` closes that gap with a compact nav block that collapses multi-step navigation into a single precise `Read(offset=s, limit=n)` call.
 
@@ -40,9 +43,20 @@ To set up agentmap in your project:
 agentmap init
 ```
 
-This detects your agent tool (Claude Code; Cursor; Windsurf; Continue; Roo Code; OpenCode; GitHub Copilot; etc.) and installs the right configuration files automatically.
+This detects your agent tool files and installs the right configuration automatically.
+
+- Native tool rule files are written for Cursor, Windsurf, Continue, Roo Code, Amazon Q, and OpenCode.
+- `AGENTS.md` / `CLAUDE.md` are updated for AGENTS-compatible tools (including Claude Code; GitHub Copilot coding agent workflows; and other tools that read `AGENTS.md`).
+- Hooks are added when supported hook infrastructure is detected (`.pre-commit-config.yaml`; `.husky/`; or plain `.git/hooks`).
 
 See [AGENTS.md](AGENTS.md) for the full workflow: how to read nav blocks and how to update them after editing markdown files.
+
+## Basic Workflow
+
+1. Run `agentmap index .` (or `agentmap generate <path>`) to create local deterministic `AGENT:NAV` blocks.
+2. Agent (or human) reviews and refines the generated `purpose`, `about`, and `see` descriptions.
+3. After markdown edits, run `agentmap update <changed files>` to refresh line numbers only.
+4. Run `agentmap check <path>` in CI/pre-commit to keep nav blocks in sync.
 
 ## Install
 
@@ -73,13 +87,15 @@ make install
 
 ## Quick Start
 
-Generate nav blocks for all markdown files in your docs directory:
+First-time setup for a repo (recommended):
 
 ```bash
-agentmap generate ./docs
+agentmap index .
 ```
 
-Refresh line numbers after editing:
+This creates nav blocks where needed and writes `.agentmap/index-tasks.md` for description review.
+
+Refresh line numbers after editing markdown:
 
 ```bash
 agentmap update ./docs/authentication.md
@@ -91,11 +107,43 @@ Validate before committing:
 agentmap check ./docs
 ```
 
+Optional: generate full nav blocks directly (without index task list):
+
+```bash
+agentmap generate ./docs
+```
+
 Set up agent tool configuration:
 
 ```bash
 agentmap init
 ```
+
+## Agent + Hook Support
+
+`agentmap init` currently configures these targets:
+
+| Environment | What `init` updates |
+|---|---|
+| AGENTS-compatible tools | `AGENTS.md` (append or create fallback when nothing else is detected) |
+| Claude Code | `CLAUDE.md` (if present) |
+| Cursor | `.cursor/rules/agentmap.md` |
+| Cursor legacy | `.cursorrules` |
+| Windsurf | `.windsurf/rules/agentmap.md` |
+| Continue | `.continue/rules/agentmap.md` |
+| Roo Code | `.roo/rules/agentmap.md` |
+| Amazon Q | `.amazonq/rules/agentmap.md` |
+| OpenCode | `.opencode/skills/agentmap/SKILL.md` |
+| Aider | Warning only (`.aider.conf.yml` must be updated manually with `read: [AGENTS.md]`) |
+
+Hook handling in `init`:
+
+| Hook system detected | `init` behavior |
+|---|---|
+| `.pre-commit-config.yaml` | Appends an `agentmap check .` hook |
+| `.husky/` | Appends guard block to `.husky/pre-commit` |
+| `.git/hooks/` (no pre-commit/husky) | Creates or appends `.git/hooks/pre-commit` |
+| `.lefthook.yml` | Warns only (manual setup required) |
 
 ## Commands
 

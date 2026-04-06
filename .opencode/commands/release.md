@@ -84,6 +84,9 @@ gh repo view RKelln/homebrew-agentmap --json name 2>&1
 
 # Scoop bucket (may not exist yet — this is the common blocker)
 gh repo view RKelln/scoop-agentmap --json name 2>&1
+
+# GH_PAT secret must exist (release workflow uses it as GITHUB_TOKEN)
+gh secret list --repo RKelln/agentmap --json name --jq '.[].name' | grep '^GH_PAT$'
 ```
 
 If `scoop-agentmap` does not exist, stop and show the user this exact fix:
@@ -100,6 +103,22 @@ Then re-run /release.
 ```
 
 Do not proceed past Step 2 if any pre-flight check fails.
+
+If `GH_PAT` is missing, stop and show this exact fix:
+
+```
+BLOCKER: GH_PAT repository secret is missing in RKelln/agentmap.
+
+release.yml uses GH_PAT as GITHUB_TOKEN. Without it, GoReleaser cannot push
+Homebrew/Scoop updates to external repos.
+
+Add a PAT with write access to:
+  - RKelln/agentmap
+  - RKelln/homebrew-agentmap
+  - RKelln/scoop-agentmap
+
+Save it as repository secret GH_PAT, then re-run /release.
+```
 
 ---
 

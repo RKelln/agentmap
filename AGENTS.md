@@ -19,7 +19,7 @@ When you need to reference the design:
 ## Fast Path
 
 ```bash
-make build      # build binary to ./agentmap
+scripts/agent-run.sh make build      # build binary to ./agentmap
 
 # CI before pushing (required)
 scripts/agent-run.sh make ci
@@ -31,10 +31,10 @@ scripts/agent-run.sh make test
 scripts/agent-run.sh make lint
 
 # Format
-make fmt
+scripts/agent-run.sh make fmt
 
 # Rebuild after code changes
-make build
+scripts/agent-run.sh make build
 ```
 
 **Always wrap build/test/lint/long output commands with `scripts/agent-run.sh`** — captures verbose output to `.agent-output/`, shows only summary.
@@ -75,7 +75,8 @@ testdata/           -- sample markdown files for tests
 - **Assertions:** stdlib only. `reflect.DeepEqual` and manual checks. No testify, no go-cmp.
 - **Error wrapping:** `fmt.Errorf("context: %w", err)` -- always wrap, never swallow.
 - **CLI framework:** cobra. No viper -- simple YAML config via `gopkg.in/yaml.v3`.
-- **No LLM calls** in `update` or `check` commands -- ever.
+- **No external LLM calls** in `generate`; `index`; `update`; or `check` -- ever.
+- These commands are local, deterministic, and designed to run quickly.
 - **Target performance:** `update` and `check` under 100ms for 50 files.
 - **File I/O:** read each file once, write only if changed.
 - **Never alter test data files** -- always use `--output /tmp/` or `--dry-run` when testing on real files
@@ -92,7 +93,7 @@ testdata/           -- sample markdown files for tests
 
 ## Reading Markdown Files
 
-Read the AGENT:NAV block at the top after any other the frontmatter. 
+Read the AGENT:NAV block at the top after any frontmatter.
 Read the first 40 lines of a file before reading the rest of the file.
 
 - If purpose doesn't match your task; stop reading.
@@ -101,10 +102,10 @@ Read the first 40 lines of a file before reading the rest of the file.
 
 ## Before Committing Markdown Changes
 
-1. Run: `agentmap update <changed markdown files>` (once the tool is built)
-2. Review output for sections marked content-changed or new.
-3. Read flagged sections and update their descriptions in the nav block.
-4. Commit.
+1. For first-pass indexing, run: `agentmap index <path>` (or `agentmap generate <path>` for targeted generation).
+2. Review and refine nav descriptions (`purpose`; `about`; `see`) with agent/human judgment.
+3. Run: `agentmap update <changed markdown files>` to refresh line numbers only.
+4. Run: `agentmap check <path>` before committing.
 
 ## Commit Messages
 
@@ -134,7 +135,7 @@ bd close <id>         # Complete work
 
 ### Rules
 
-- Use `bd` for ALL task tracking — do NOT use TodoWrite, TaskCreate, or markdown TODO lists
+- Use `bd` for task tracking between issues and sessions
 - Run `bd prime` for detailed command reference and session close protocol
 - Use `bd remember` for persistent knowledge — do NOT use MEMORY.md files
 
@@ -144,7 +145,7 @@ bd close <id>         # Complete work
 
 **MANDATORY WORKFLOW:**
 
-1. **File issues for remaining work** - Create issues for anything that needs follow-up
+1. **Create/update beads for remaining work** - Create issues for anything that needs follow-up
 2. **Run quality gates** (if code changed) - Tests, linters, builds
 3. **Update issue status** - Close finished work, update in-progress items
 4. **PUSH TO REMOTE** - This is MANDATORY:

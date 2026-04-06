@@ -36,10 +36,21 @@ automatically. See `.opencode/commands/release.md` for the full workflow.
      --description "Scoop bucket for agentmap"
    ```
 
-3. **`GITHUB_TOKEN` permissions** — The default `GITHUB_TOKEN` in GitHub
-   Actions has `contents: write` (set in `release.yml`). This is sufficient for
-   creating releases and pushing to repos in the same account. No additional
-   secrets needed.
+3. **Create `GH_PAT` repo secret** — GoReleaser needs cross-repo push access for
+   `RKelln/homebrew-agentmap` and `RKelln/scoop-agentmap`.
+
+   The default workflow `GITHUB_TOKEN` is repository-scoped and is not
+   sufficient for pushing to those separate repos.
+
+   Create a classic PAT (or fine-grained token with equivalent permissions)
+   that has write access to:
+   - `RKelln/agentmap`
+   - `RKelln/homebrew-agentmap`
+   - `RKelln/scoop-agentmap`
+
+   Save it as repository secret `GH_PAT` in `RKelln/agentmap`.
+
+   `release.yml` is configured to use `secrets.GH_PAT` as `GITHUB_TOKEN`.
 
 ## Manual release (fallback)
 
@@ -47,7 +58,7 @@ automatically. See `.opencode/commands/release.md` for the full workflow.
 # 1. Ensure main is clean and CI passes
 git checkout main && git pull
 scripts/agent-run.sh make ci
-goreleaser check
+scripts/agent-run.sh goreleaser check
 
 # 2. Update CHANGELOG.md with the new version entry, then commit
 git add CHANGELOG.md
@@ -88,10 +99,10 @@ Requires [GoReleaser](https://goreleaser.com/install/) installed locally.
 
 ```bash
 # Validate config
-goreleaser check
+scripts/agent-run.sh goreleaser check
 
 # Build snapshot (all platforms; no publish; output to dist/)
-goreleaser build --snapshot --clean
+scripts/agent-run.sh goreleaser build --snapshot --clean
 ```
 
 ## Testing a release
@@ -125,7 +136,7 @@ Runs the full GoReleaser pipeline locally without publishing — builds all 6
 platform binaries, creates archives, generates checksums:
 
 ```bash
-goreleaser release --snapshot --clean
+scripts/agent-run.sh goreleaser release --snapshot --clean
 # Then smoke test the Linux build:
 make smoke BINARY=dist/agentmap_Linux_x86_64_v1/agentmap
 ```
@@ -213,4 +224,3 @@ before tagging — the `/release` command does this automatically.
 The GoReleaser GitHub Release notes are auto-generated from git log and exclude
 commits prefixed with `docs:`, `test:`, or `chore:`. Use conventional commit
 types (`feat:`, `fix:`, `refactor:`) for changes that should appear there.
-

@@ -1,7 +1,12 @@
 ## Reading Markdown Files
 
-Every markdown file over 50 lines has an AGENT:NAV block in the first
-20 lines. Read it before reading the rest of the file.
+AGENT:NAV placement and shape:
+
+- AGENT:NAV appears immediately after any frontmatter.
+- Files over 50 lines get a nav block with section entries.
+- Files under 50 lines get a purpose-only block (and may include `see`).
+
+Read the first 50 lines first then use the nav block to jump to the section you need.
 
 - If purpose doesn't match your task; stop reading.
 - Use s;n line ranges: Read(offset=s; limit=n) for the section you need.
