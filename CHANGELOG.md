@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.1.0-rc.3] - Prerelease upgrade detection fix - 2026-04-06
+
+This release candidate fixes `agentmap upgrade` behavior for prerelease installs. RC users can now detect newer RC releases instead of seeing "no releases found for your platform".
+
+### Fixed
+- `agentmap upgrade` now enables prerelease discovery when the running binary version is itself a prerelease tag (for example `v0.1.0-rc.2`).
+- `agentmap upgrade --check` now correctly reports availability for newer RC releases instead of returning a false "no releases" result.
+
+### Infrastructure
+- Added unit coverage for prerelease detection logic in `cmd/agentmap/upgrade_test.go`.
+
 ## [v0.1.0-rc.2] - Index and installer hardening - 2026-04-05
 
 This release candidate focuses on reliability for real repos: safer index behavior, cleaner discovery defaults, and installer fixes that work before the first stable release.
