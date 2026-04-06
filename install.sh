@@ -124,7 +124,7 @@ verify_checksum() {
 # --- resolve latest version ---
 resolve_version() {
   if [ "$VERSION" = "latest" ]; then
-    info "Fetching latest release..."
+    printf '%s\n' "Fetching latest release..." >&2
     if release_json=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" 2>/dev/null); then
       VERSION=$(printf '%s' "$release_json" | grep '"tag_name"' | head -1 | cut -d'"' -f4 || true)
     else
