@@ -28,10 +28,18 @@ if ($Version -eq 'latest') {
         $Release = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest"
         $Version = $Release.tag_name
     } catch {
-        Write-Err "Failed to fetch latest version: $_"
+        Write-Warn 'No stable release found; checking latest prerelease...'
+        try {
+            $Releases = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases?per_page=1"
+            if ($Releases -and $Releases.Count -gt 0) {
+                $Version = $Releases[0].tag_name
+            }
+        } catch {
+            Write-Err "Failed to fetch latest version: $_"
+        }
     }
     if (-not $Version) {
-        Write-Err 'Failed to resolve latest version from GitHub API'
+        Write-Err 'Failed to resolve latest version from GitHub API. Try -Version vX.Y.Z'
     }
 }
 

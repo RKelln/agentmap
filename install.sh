@@ -92,15 +92,22 @@ need_cmd() {
 
 need_cmd curl
 need_cmd tar
-need_cmd sha256sum || need_cmd shasum
+if command -v sha256sum >/dev/null 2>&1; then
+  :
+elif command -v shasum >/dev/null 2>&1; then
+  :
+else
+  error "Required command not found: sha256sum or shasum"
+fi
 
 # --- checksum verification ---
 verify_checksum() {
   archive="$1"
+  archive_name="$(basename "$archive")"
   checksum_file="$2"
-  expected=$(grep " ${archive}$" "$checksum_file" | cut -d' ' -f1)
+  expected=$(grep "[[:space:]]${archive_name}$" "$checksum_file" | head -1 | cut -d' ' -f1 || true)
   if [ -z "$expected" ]; then
-    error "Checksum for $archive not found in checksums.txt"
+    error "Checksum for $archive_name not found in checksums.txt"
   fi
 
   if command -v sha256sum >/dev/null 2>&1; then
@@ -118,10 +125,15 @@ verify_checksum() {
 resolve_version() {
   if [ "$VERSION" = "latest" ]; then
     info "Fetching latest release..."
-    VERSION=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" \
-      | grep '"tag_name"' | cut -d'"' -f4)
+    if release_json=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" 2>/dev/null); then
+      VERSION=$(printf '%s' "$release_json" | grep '"tag_name"' | head -1 | cut -d'"' -f4 || true)
+    else
+      warn "No stable release found; checking latest prerelease..."
+      release_json=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases?per_page=1" 2>/dev/null || true)
+      VERSION=$(printf '%s' "$release_json" | grep '"tag_name"' | head -1 | cut -d'"' -f4 || true)
+    fi
     if [ -z "$VERSION" ]; then
-      error "Failed to fetch latest version from GitHub API"
+      error "Failed to fetch latest version from GitHub API. Try --version vX.Y.Z"
     fi
   fi
   printf '%s' "$VERSION"
