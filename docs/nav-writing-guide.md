@@ -1,15 +1,15 @@
 <!-- AGENT:NAV
 purpose:practical guide for writing AGENT:NAV block descriptions; quality criteria; examples
 nav[9]{s,n,name,about}:
-15,169,#Nav Writing Guide,canonical how-to reference for nav block descriptions
-24,14,##Quick Reference,nav block format at a glance
-38,17,##1. Before You Write,read nav block first; use line ranges to skim sections
-55,13,##2. Starting from Scratch,generate-then-edit workflow for new files; avoid overwriting hand-written nav
-68,20,##3. Writing `purpose` Lines,one-line file summary; word limit; no commas; good vs bad examples
-88,36,##4. Writing `about` Fields,one-line section summaries; > hints handling; good vs bad examples
-124,23,##5. Adding `see` Entries,when and how to add cross-file links; format
-147,20,##6. The `~` Prefix,auto-generated marker; when to remove it; index behavior
-167,17,##7. Quality Checklist,four criteria for decision-quality descriptions
+15,179,#Nav Writing Guide,canonical how-to reference for nav block descriptions
+25,17,##Quick Reference,nav block format at a glance
+42,20,##1. Before You Write,read nav block first; use line ranges to skim sections
+62,13,##2. Starting from Scratch,generate-then-edit workflow for new files; avoid overwriting hand-written nav
+75,20,##3. Writing `purpose` Lines,one-line file summary; word limit; no commas; good vs bad examples
+95,36,##4. Writing `about` Fields,one-line section summaries; > hints handling; good vs bad examples
+131,27,##5. Adding `see` Entries,when and how to add cross-file links; format
+158,20,##6. The `~` Prefix,auto-generated marker; when to remove it; index behavior
+178,16,##7. Quality Checklist,four criteria for decision-quality descriptions
 -->
 
 # Nav Writing Guide
@@ -17,7 +17,8 @@ nav[9]{s,n,name,about}:
 This is the canonical reference for writing AGENT:NAV block descriptions. It covers the practical
 "how to write" workflow. For the format specification and parser rules, see `agentmap-design.md`.
 
-**Scope:** `purpose`, `about`, and `see` fields. Not line numbers — those are managed by `agentmap update`.
+**Scope:** `purpose`, `about`, and `see` fields.
+Do not hand-edit line metadata (`s`, `n`, `nav[N]`, `see[N]`) — `agentmap update` manages that.
 
 ---
 
@@ -29,16 +30,22 @@ purpose:one-line file summary; no commas
 nav[N]{s,n,name,about}:
 s,n,#Heading,one-line section summary; no commas
 see[N]{path,why}:
-relative/path.md,why an agent here would need that file
+relative/path.md,linked file purpose relative to this file
 -->
 ```
+
+**Order is strict:** `purpose` first, then `nav[...]` and its entries, then optional `see[...]` and its entries, then closing `-->`.
+Never remove the opening `<!-- AGENT:NAV` or the `purpose:` line.
 
 ---
 
 ## 1. Before You Write
 
-Read the AGENT:NAV block first (first 40 lines of any file). This gives you purpose, section names,
+Read the AGENT:NAV block first (first 50 lines of any file). This gives you purpose, section names,
 and line ranges before you commit to reading further.
+
+Never hand-edit nav line metadata while doing description work. Keep your edits to `purpose`, `about`,
+and `see`; then run `agentmap update` to refresh line numbers.
 
 Use line ranges from the nav block to read only what you need:
 
@@ -132,7 +139,10 @@ you only rewrite the description before the `>`.
 
 **When not to add:** don't list every adjacent file. Only add entries that save a real search.
 
-**Format:** `relative/path/from/repo/root.md,reason without commas`
+**Placement rule:** add `see` entries after the nav entries inside the same AGENT:NAV block.
+Do not insert `see` above `purpose` or above `nav[...]`.
+
+**Format:** `relative/path/from/repo/root.md,linked file purpose relative to this file`
 
 ```
 see[2]{path,why}:
@@ -140,7 +150,8 @@ src/config.py,default timeout and token TTL values
 docs/error-policy.md,error handling for auth failures
 ```
 
-`why` must not contain commas. Use semicolons if listing multiple reasons.
+`why` should describe the linked file's purpose in this context. Keep it short, specific,
+and free of filler words. `why` must not contain commas; use semicolons if needed.
 
 ---
 

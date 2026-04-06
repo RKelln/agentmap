@@ -401,8 +401,11 @@ Silent rotation and expiry detection.
 	if !strings.Contains(contents, "# agentmap index tasks") {
 		t.Error("task list should have title '# agentmap index tasks'")
 	}
-	if !strings.Contains(contents, "docs/nav-writing-guide.md") {
-		t.Error("task list should reference the nav writing guide")
+	if !strings.Contains(contents, "# Nav Writing Guide") {
+		t.Error("task list should embed a nav writing guide")
+	}
+	if strings.Contains(contents, "docs/nav-writing-guide.md") {
+		t.Error("task list should not reference repo-local nav writing guide path")
 	}
 	if !strings.Contains(contents, "Progress:") {
 		t.Error("task list should have Progress counter")

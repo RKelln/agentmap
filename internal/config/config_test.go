@@ -17,7 +17,7 @@ func TestDefaults(t *testing.T) {
 		MaxNavEntries:   20,
 		NavStubWords:    20,
 		IndexInlineMax:  20,
-		Exclude:         []string{".agentmap", ".agentmap/**"},
+		Exclude:         []string{".agentmap", ".agentmap/**", "AGENTMAP.md"},
 	}
 	if !reflect.DeepEqual(cfg, expected) {
 		t.Errorf("Defaults() = %+v, want %+v", cfg, expected)
@@ -58,7 +58,7 @@ func TestLoad(t *testing.T) {
 				MaxNavEntries:   20,
 				NavStubWords:    20,
 				IndexInlineMax:  20,
-				Exclude:         []string{".agentmap", ".agentmap/**"},
+				Exclude:         []string{".agentmap", ".agentmap/**", "AGENTMAP.md"},
 			},
 		},
 		{
@@ -79,8 +79,8 @@ exclude:
 				MaxNavEntries:   20,
 				NavStubWords:    20,
 				IndexInlineMax:  20,
-				// User patterns prepended; default .agentmap patterns always appended.
-				Exclude: []string{"dist/**", "CHANGELOG.md", ".agentmap", ".agentmap/**"},
+				// User patterns prepended; default protected patterns always appended.
+				Exclude: []string{"dist/**", "CHANGELOG.md", ".agentmap", ".agentmap/**", "AGENTMAP.md"},
 			},
 		},
 		{
@@ -96,8 +96,8 @@ exclude:
 				MaxNavEntries:   20,
 				NavStubWords:    20,
 				IndexInlineMax:  20,
-				// User patterns prepended; default .agentmap patterns always appended.
-				Exclude: []string{"vendor/**", ".agentmap", ".agentmap/**"},
+				// User patterns prepended; default protected patterns always appended.
+				Exclude: []string{"vendor/**", ".agentmap", ".agentmap/**", "AGENTMAP.md"},
 			},
 		},
 	}
@@ -121,7 +121,7 @@ exclude:
 }
 
 func TestLoad_ExcludePreservesDefaults(t *testing.T) {
-	// When user specifies exclude: in agentmap.yml, default .agentmap patterns
+	// When user specifies exclude: in agentmap.yml, default protected patterns
 	// must still be present in the merged result.
 	dir := t.TempDir()
 	path := filepath.Join(dir, "agentmap.yml")
@@ -135,6 +135,7 @@ func TestLoad_ExcludePreservesDefaults(t *testing.T) {
 	}
 	hasAgentmap := false
 	hasAgentmapGlob := false
+	hasAgentmapMD := false
 	for _, p := range cfg.Exclude {
 		if p == ".agentmap" {
 			hasAgentmap = true
@@ -142,12 +143,18 @@ func TestLoad_ExcludePreservesDefaults(t *testing.T) {
 		if p == ".agentmap/**" {
 			hasAgentmapGlob = true
 		}
+		if p == "AGENTMAP.md" {
+			hasAgentmapMD = true
+		}
 	}
 	if !hasAgentmap {
 		t.Errorf("Exclude should contain .agentmap; got %v", cfg.Exclude)
 	}
 	if !hasAgentmapGlob {
 		t.Errorf("Exclude should contain .agentmap/**; got %v", cfg.Exclude)
+	}
+	if !hasAgentmapMD {
+		t.Errorf("Exclude should contain AGENTMAP.md; got %v", cfg.Exclude)
 	}
 	// User pattern must also be present.
 	hasChangelog := false

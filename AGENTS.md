@@ -94,15 +94,17 @@ testdata/           -- sample markdown files for tests
 ## Reading Markdown Files
 
 Read the AGENT:NAV block at the top after any frontmatter.
-Read the first 40 lines of a file before reading the rest of the file.
+Read the first 50 lines of a file before reading the rest of the file.
 
 - If purpose doesn't match your task; stop reading.
 - Use s,n line ranges: Read(offset=s; limit=n) for the section you need.
+- For cross-file discovery; read AGENTMAP.md first (or the agentmap:index block in AGENTS.md) before using grep.
+- If indexing was run on a subdirectory; read <indexed-path>/AGENTMAP.md for that scope.
 - Check see before searching; the file you need may be listed.
 
 ## Before Committing Markdown Changes
 
-1. For first-pass indexing, run: `agentmap index <path>` (or `agentmap generate <path>` for targeted generation).
+1. For first-pass indexing, run: `agentmap index .` from repo root (or `agentmap generate <path>` for targeted generation).
 2. Review and refine nav descriptions (`purpose`; `about`; `see`) with agent/human judgment.
 3. Run: `agentmap update <changed markdown files>` to refresh line numbers only.
 4. Run: `agentmap check <path>` before committing.

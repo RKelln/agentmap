@@ -53,10 +53,12 @@ See [AGENTS.md](AGENTS.md) for the full workflow: how to read nav blocks and how
 
 ## Basic Workflow
 
-1. Run `agentmap index .` (or `agentmap generate <path>`) to create local deterministic `AGENT:NAV` blocks.
+1. Run `agentmap index .` from repo root (recommended) to create local deterministic `AGENT:NAV` blocks.
 2. Agent (or human) reviews and refines the generated `purpose`, `about`, and `see` descriptions.
 3. After markdown edits, run `agentmap update <changed files>` to refresh line numbers only.
 4. Run `agentmap check <path>` in CI/pre-commit to keep nav blocks in sync.
+
+`index` writes outputs relative to the path you pass. Example: `agentmap index docs/` writes `docs/.agentmap/index-tasks.md` and `docs/AGENTMAP.md`.
 
 ## Install
 

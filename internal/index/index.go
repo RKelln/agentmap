@@ -14,6 +14,61 @@ import (
 	"github.com/RKelln/agentmap/internal/parser"
 )
 
+const embeddedNavWritingGuide = `# Nav Writing Guide
+
+Use this guide to review and rewrite AGENT:NAV descriptions in this repo.
+
+CRITICAL: do not edit nav line numbers or nav counts by hand.
+Do not edit ` + "`s`" + `; ` + "`n`" + `; ` + "`nav[N]`" + `; or ` + "`see[N]`" + ` manually.
+Line-number maintenance is done only by ` + "`agentmap update`" + `.
+Your job is description quality in ` + "`purpose`" + `; ` + "`about`" + `; and ` + "`see`" + `.
+
+## Quick Reference
+
+	<!-- AGENT:NAV
+	purpose:one-line file summary; no commas
+	nav[N]{s,n,name,about}:
+	s,n,#Heading,one-line section summary; no commas
+	see[N]{path,why}:
+	relative/path.md,linked file purpose relative to this file
+	-->
+
+## Workflow
+
+1. Read file purpose and section list first.
+2. Read the listed section content using Read(offset=s; limit=n).
+3. Rewrite ` + "`~`" + ` descriptions into specific human-quality text.
+4. Add or improve ` + "`see`" + ` entries whenever related files are needed; create a ` + "`see`" + ` block if missing.
+5. Do not touch line numbers or counts; run ` + "`agentmap update <changed files>`" + ` after content edits.
+6. Run ` + "`agentmap check <path>`" + ` before committing.
+
+## Format Invariants
+
+- Never remove or rewrite the opening ` + "`<!-- AGENT:NAV`" + ` line.
+- Never remove or rewrite ` + "`purpose:`" + `.
+- Keep field order: ` + "`purpose`" + `, then ` + "`nav[...]`" + ` entries, then optional ` + "`see[...]`" + ` entries, then ` + "`-->`" + `.
+- When adding ` + "`see`" + `, append it after nav entries; do not insert it above ` + "`purpose`" + ` or ` + "`nav`" + `.
+
+## Writing Rules
+
+- ` + "`purpose`" + `: one-line summary of the whole file; under 10 words; no commas.
+- ` + "`about`" + `: one-line summary of one section; under 10 words; no commas.
+- ` + "`see`" + `: add high-value cross-file links when they save search time.
+- ` + "`why`" + `: state the linked file purpose relative to this file; no filler words.
+- Remove ` + "`~`" + ` only after you actually improve the description.
+- Keep ` + "`>`" + ` subsection hints when present; rewrite only the description before ` + "`>`" + `.
+
+## Quality Checklist
+
+- Decision support: would this line tell an agent whether to read further?
+- Disambiguation: does it distinguish this section from siblings?
+- Precision: avoid filler words like overview/introduction/details.
+- Format: under 10 words; no commas; no leftover ` + "`~`" + ` after review.
+
+---
+
+`
+
 // FileEntry is a file that has an AGENT:NAV block with a purpose field.
 type FileEntry struct {
 	RelPath string // relative to root, e.g. "docs/auth.md"
@@ -166,8 +221,8 @@ func buildTaskEntry(root, relPath string, cfg config.Config) (TaskEntry, error) 
 // renderTaskList renders the markdown task list for index-tasks.md.
 func renderTaskList(tasks []TaskEntry) string {
 	var b strings.Builder
+	b.WriteString(embeddedNavWritingGuide)
 	b.WriteString("# agentmap index tasks\n\n")
-	b.WriteString("See docs/nav-writing-guide.md for instructions on writing descriptions.\n\n")
 
 	// Count checked items for progress (only purpose lines marked [x]).
 	total := len(tasks)
