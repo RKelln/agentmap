@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.1.0-rc.4] - Upgrade release-note visibility - 2026-04-07
+
+This release candidate improves update transparency by showing where to read release notes before applying an upgrade.
+
+### Added
+- `agentmap upgrade --check` now prints the target release URL so users can review notes before updating.
+- `agentmap upgrade` now also prints the target release URL before download begins.
+
+### Changed
+- Upgrade output now includes release-note context in both check-only and full-update paths.
+
 ## [v0.1.0-rc.3] - Prerelease upgrade detection fix - 2026-04-06
 
 This release candidate fixes `agentmap upgrade` behavior for prerelease installs. RC users can now detect newer RC releases instead of seeing "no releases found for your platform".
