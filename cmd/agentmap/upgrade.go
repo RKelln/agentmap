@@ -69,6 +69,9 @@ func runUpgrade(cmd *cobra.Command, _ []string) error {
 
 	if checkOnly {
 		fmt.Printf("Update available: %s -> %s\n", version, latest.Version())
+		if latest.URL != "" {
+			fmt.Printf("Release notes: %s\n", latest.URL)
+		}
 		return nil
 	}
 
@@ -76,6 +79,9 @@ func runUpgrade(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("locating executable: %w", exeErr)
 	}
 
+	if latest.URL != "" {
+		fmt.Printf("Release notes: %s\n", latest.URL)
+	}
 	fmt.Printf("Downloading agentmap %s...\n", latest.Version())
 	if err := updater.UpdateTo(ctx, latest, exe); err != nil {
 		if os.IsPermission(err) {
