@@ -4,6 +4,61 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.1.0-rc.5] — Budget-first nav pruning and embedded guide — 2026-04-08
+
+This release replaces the old per-section threshold branching in nav generation
+with a cleaner include-all-then-prune algorithm, adds the `agentmap guide`
+command for in-shell reference, and fixes a critical bug in `update` that was
+silently dropping new h3 sections.
+
+### Added
+
+- **`agentmap guide` command** — prints the nav-writing guide to stdout for quick
+  in-shell reference. The guide is now embedded in the binary via `internal/guide`
+  (Go `embed`), so it is always in sync with the installed version.
+- **`agentmap index` embeds guide in task list** — `index-tasks.md` now includes
+  the full nav-writing guide as a preamble so agents have all instructions in a
+  single file without a separate lookup.
+
+### Fixed
+
+- **Critical: `update` was silently dropping new h3 sections** — the
+  `expandThreshold` guard in `update.go` was gating inclusion of h3 entries on
+  parent section size. Since `update` never knows the final budget, this caused
+  newly added h3 headings to disappear from nav blocks after the first `update`
+  run. Guard removed; `update` now preserves all entries unconditionally and lets
+  `generate` (with `PruneNavEntries`) enforce the budget.
+- **Hint trimming** — subsection hint text is now `TrimSpace`d before being
+  appended to parent `about` fields, eliminating stray leading/trailing whitespace
+  in generated hints.
+
+### Changed
+
+- **Budget-first nav generation** — `buildNavEntries` is now a flat loop that
+  includes all h1–h3 sections unconditionally. The new `PruneNavEntries` function
+  then enforces `max_nav_entries` by iteratively removing entries depth-first,
+  classifying by parent section size: small parents (< `sub_threshold`) are
+  silently dropped; medium parents (`sub_threshold`–`expand_threshold`) are
+  collapsed to `>` hints; large parents (≥ `expand_threshold`) are unkillable.
+  This replaces the previous `FilterNavEntries` approach.
+- **`max_depth` default raised from 3 to 6** — the old value was used as a budget
+  proxy; with budget-first pruning it is now a true sanity ceiling matching the
+  Markdown heading maximum.
+- **`FilterNavEntries` and `NavStubWords` removed** — retired concepts no longer
+  needed under the budget-first model.
+- **Nav-writing guide moved to `internal/guide/nav-writing-guide.md`** —
+  `docs/nav-writing-guide.md` is now a symlink for discoverability; the canonical
+  source is embedded in the binary.
+
+### Infrastructure
+
+- `testdata/README.md` added — documents each fixture's purpose, which tests use
+  it, and the rule against modifying fixtures in place.
+- `testdata/pruning-over-budget.md` added — static fixture that exercises all
+  three `PruneNavEntries` branches (unkillable/hintable/droppable) under default
+  config; 35 entries pruned to budget of 20.
+- Stale `testdata/agentmap-design-expected.md` removed (unreferenced artifact).
+
 ## [v0.1.0-rc.4] - Upgrade release-note visibility - 2026-04-07
 
 This release candidate improves update transparency by showing where to read release notes before applying an upgrade.
