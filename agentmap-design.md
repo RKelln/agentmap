@@ -118,7 +118,7 @@ This provides **absolute depth** — an agent landing on any entry knows its exa
 **Rules:**
 - Every entry has at least one `#`. There are no unmarked entries.
 - Depth is absolute, not relative. `##` always means h2 regardless of surrounding entries.
-- Maximum tracked depth: `###` (h3). Deeper headings (h4+) are not included in the nav block — the agent reads the parent h3 section to find them.
+- Maximum tracked depth: configurable via `max_depth` (default h3). This is a heuristic to keep nav entries within budget — in a shallow document all tracked headings get full entries regardless of depth. Headings deeper than `max_depth` are not included; the agent reads the parent section to find them.
 
 ### 3.4 Complete Example
 
@@ -151,9 +151,9 @@ Token lifecycle management for the platform...
 ```
 
 This example shows all three tiers from section 3.8:
-- `##Overview` (36 lines) and `##Migration Guide` (19 lines) — under `sub_threshold`; no subsection info even if they had h3 children.
-- `##Token Exchange` (79 lines) — between `sub_threshold` and `expand_threshold`; `>` hints list its three h3 children without giving them their own entries.
-- `##Token Lifecycle` (199 lines) — over `expand_threshold`; its h3 children (`###Refresh`, `###Revocation`, `###Introspection`) appear as full nav entries with their own `s,n` ranges.
+- `##Overview` (36 lines) and `##Migration Guide` (19 lines) — under `sub_threshold`; no subsection info even if they had children.
+- `##Token Exchange` (79 lines) — between `sub_threshold` and `expand_threshold`; `>` hints list its three children without giving them their own entries.
+- `##Token Lifecycle` (199 lines) — over `expand_threshold`; its children (`###Refresh`, `###Revocation`, `###Introspection`) appear as full nav entries with their own `s,n` ranges.
 
 ### 3.5 Placement Rules
 
@@ -182,7 +182,9 @@ No `nav` or `see` sections. The `purpose` line is always useful regardless of fi
 
 ### 3.8 Subsection Hints
 
-The `about` field may include a `>` suffix listing abbreviated subsection names. This trades horizontal space (longer lines) for vertical space (fewer nav entries) and gives agents routing signals without expanding every subsection into its own entry.
+The `about` field may include a `>` suffix listing abbreviated names of subsections that have no
+nav entry of their own. This trades horizontal space (longer lines) for vertical space (fewer nav
+entries) and gives agents routing signals without expanding every subsection into its own entry.
 
 **Format:** `description>sub1;sub2;sub3`
 
@@ -192,27 +194,40 @@ The `about` field may include a `>` suffix listing abbreviated subsection names.
 528,555,##9. Keyword Extraction,offline TF-IDF; stopwords
 ```
 
-Subsection names are 1-2 word abbreviations of the h3 heading text. They don't need to match the heading exactly — they need to be recognizable enough for the agent to decide "this section contains what I need."
+**When to use `>` hints vs. full entries:**
 
-**When to use `>` hints vs. full h3 entries:**
+The generator starts by including all tracked headings as full nav entries, then prunes back to
+`max_nav_entries` (default 20) if needed. Pruning works depth-first: the deepest entries are
+removed first. When a deep entry is removed, it either becomes a `>` hint on its parent or
+disappears entirely, depending on parent section size:
 
-The generator uses a three-tier threshold based on parent section line count:
+| Pruned entry's parent section size | Outcome |
+|---|---|
+| Under `sub_threshold` (default 50 lines) | Entry dropped; no hint — parent is cheap to read in full |
+| `sub_threshold` to `expand_threshold` (default 150 lines) | Entry collapsed to `>` hint on parent |
+| Over `expand_threshold` | Entry kept as full entry — section too large to scan without offsets |
 
-| Parent section size | Strategy | Rationale |
-|---|---|---|
-| Under `sub_threshold` (default 50 lines) | No subsection info | Section is cheap to read in full |
-| `sub_threshold` to `expand_threshold` (default 150 lines) | `>` hints only | Agent reads parent section; hints help scan |
-| Over `expand_threshold` | Full h3 entries with own `s,n` ranges | Section too large to scan; agent needs precise offsets |
+A document with 1 h1, 2 h2s, and 15 h3s has 18 total entries — under the default cap of 20 — so
+all get full entries regardless of section size. Thresholds only apply when the budget is exceeded.
 
-This keeps the nav block compact for most files. A file with ten 40-line sections produces 10 nav entries with no hints. A file with three 80-line sections produces 3 entries with `>` hints. A file with one 200-line section produces 1 parent entry plus its h3 children as full entries.
+**Authoring:**
+
+`agentmap generate` initially populates hints with verbatim heading text as a scaffold (marked `~`
+on the full `about` value). Agents reviewing `~` entries should rewrite the whole value — both the
+description and the hints — choosing 1-2 words per hint that best encapsulate that subsection.
+Hints may overlap with heading words but should reflect agent judgment about the most useful label.
+
+The `~` prefix covers the entire `about` value including hints. Removing `~` signals that both
+the description and the hints have been reviewed.
 
 **Rules:**
 - `>` hints are appended directly to the `about` text with no space before `>`.
 - Subsection names are separated by semicolons.
 - No commas in subsection names (same constraint as `about`).
-- Subsection names should be 1-2 words — abbreviate freely.
-- `>` hints are generated by the tool and preserved by `update` (same as `about` descriptions).
-- If a section has no subsections (no h3+ headings), no `>` suffix appears.
+- Subsection names should be 1-2 words — abbreviate to the most useful label.
+- One hint per subsection that has no nav entry of its own — count matches the unrepresented subsections.
+- `agentmap update` preserves the full `about` value (description and hints) unchanged.
+- If a section has no unrepresented subsections, no `>` suffix appears.
 
 ## 4. CLI Commands
 
@@ -236,7 +251,7 @@ This keeps the nav block compact for most files. A file with ten 40-line section
 - `--llm` — Use an LLM to generate descriptions instead of keyword extraction. Requires LLM configuration (see section 7).
 - `--min-lines N` — Override minimum file size threshold (default: 50).
 - `--sub-threshold N` — Override subheading inclusion threshold (default: 50 lines). Sections under this size get no subsection info.
-- `--expand-threshold N` — Override full-expansion threshold (default: 150 lines). Sections over this size get full h3 entries with own `s,n` ranges. Sections between `sub-threshold` and `expand-threshold` get `>` hints instead (see section 3.8).
+- `--expand-threshold N` — Override full-expansion threshold (default: 150 lines). Sections over this size get full entries with own `s,n` ranges for each unrepresented subsection. Sections between `sub-threshold` and `expand-threshold` get `>` hints instead (see section 3.8).
 - `--dry-run` — Print what would be generated without writing files.
 
 **Output:**
@@ -638,12 +653,14 @@ min_lines: 50
 # Sections under this get no subsection hints or entries
 sub_threshold: 50
 
-# Section size at which full h3 entries replace inline > hints (lines)
+# Section size at which full subsection entries replace inline > hints (lines)
 # Between sub_threshold and expand_threshold: > hints only
-# Above expand_threshold: full h3 entries with own line ranges
+# Above expand_threshold: full subsection entries with own line ranges
+# Note: sub_threshold and expand_threshold are heuristics — the real constraint
+# is max_nav_entries. If all tracked headings fit in the budget, all get entries.
 expand_threshold: 150
 
-# Maximum heading depth to track
+# Maximum heading depth to track (heuristic to stay near max_nav_entries budget)
 max_depth: 3
 
 # Files/directories to exclude (in addition to .gitignore)
@@ -678,9 +695,10 @@ All configuration is optional. Sensible defaults:
 | Setting | Default | Notes |
 |---|---|---|
 | `min_lines` | 50 | Purpose-only below this |
-| `sub_threshold` | 50 | No subsection info below this |
-| `expand_threshold` | 150 | Full h3 entries above this; `>` hints between |
-| `max_depth` | 3 | h1-h3 tracked |
+| `max_nav_entries` | 20 | Soft cap on nav entries; the primary budget constraint |
+| `sub_threshold` | 50 | No subsection hints/entries below this (heuristic) |
+| `expand_threshold` | 150 | Full subsection entries above this; `>` hints between (heuristic) |
+| `max_depth` | 3 | Heading depth limit (heuristic to stay near budget) |
 | `exclude` | `[]` | Additional excludes beyond .gitignore |
 
 ## 11. Edge Cases
@@ -701,12 +719,19 @@ A heading immediately followed by another heading (no content between them) prod
 
 ### 11.4 Very Large Files
 
-Files with many headings would produce a nav block that itself costs significant tokens. A soft cap (`max_nav_entries`, default 20) limits nav entries using a two-pass algorithm:
+Files with many headings would produce a nav block that itself costs significant tokens. A soft cap (`max_nav_entries`, default 20) limits nav entries. `max_depth`, `sub_threshold`, and `expand_threshold` are all heuristics in service of this budget.
 
-1. **Stub pass** — drop h3+ sections with fewer than `nav_stub_words` words of content (default 20). Trivially empty sections (just a heading) are removed first.
-2. **Budget pass** — if still over the cap, keep the longest h3+ entries that fit the remaining budget (`max_nav_entries - h1h2_count`), dropping the shortest. Word count (`NavEntry.WordCount`) drives both passes.
+**Algorithm:**
 
-h1/h2 entries are always kept. If h1/h2 alone exceeds the cap, the overrun is accepted — h2 sections are structural and dropping them would lose more than it saves.
+1. **Include all** — start with all headings up to `max_depth` as full nav entries.
+2. **Check budget** — if total entries ≤ `max_nav_entries`, done.
+3. **Prune depth-first** — remove the deepest entries first. For each removed entry:
+   - If its parent section is under `sub_threshold`: drop entirely (cheap to read in full).
+   - If its parent section is between `sub_threshold` and `expand_threshold`: collapse to a `>` hint on the parent entry.
+   - If its parent section is over `expand_threshold`: keep as a full entry (too large to scan without offsets).
+4. **Repeat** until within budget or no more prunable entries remain.
+
+Shallow entries (those with no parent in the nav block) are never pruned. If shallow entries alone exceed the cap, the overrun is accepted.
 
 ### 11.5 Files Without Headings
 
@@ -887,18 +912,20 @@ Git already tracks every change. Storing content hashes in the nav block adds:
 
 `git diff HEAD -- file.md` gives exact changed line ranges, which map directly to sections. It's simpler, more reliable, and leverages infrastructure that's already present.
 
-### Why `>` subsection hints instead of always expanding h3s?
+### Why `>` subsection hints instead of always expanding?
 
-Full h3 entries are precise but expensive: each adds a line to the nav block (~8-12 tokens). For a file with many sections, expanding every h3 could double the nav block size — burning the token budget the tool exists to save.
+Full subsection entries are precise but expensive: each adds a line to the nav block (~8-12 tokens). For a file with many sections, expanding every subsection could double the nav block size — burning the token budget the tool exists to save.
 
 The three-tier threshold balances precision against cost:
 - Small sections (under 50 lines) need no subsection info — reading the whole section is cheap.
 - Medium sections (50-150 lines) get `>` hints — a few extra tokens per line that tell the agent *which* subsection exists without adding full entries. The agent reads the parent section and scans for the hinted heading.
-- Large sections (over 150 lines) get full h3 entries — the section is too large to scan comfortably, so precise offsets pay for themselves.
+- Large sections (over 150 lines) get full entries with own `s,n` ranges — the section is too large to scan comfortably, so precise offsets pay for themselves.
+
+Hints apply to any subsection depth (h3 under h2, h4 under h3, etc.) as long as that subsection has no nav entry of its own. The tool initially populates hints with verbatim heading text as a scaffold; agents reviewing `~` entries rewrite both the description and hints to produce 1-2 word labels chosen for navigational usefulness, not just heading verbatim.
 
 This was validated by A/B testing with two subagents. The version with `>` hints reduced every test task to a single targeted read. The biggest win: finding a specific rule buried in a long section went from 4 reads (wrong section first, backtracked) to 1 read. The hints cost ~30 extra tokens across the whole nav block and saved ~200-400 tokens per avoided misroute.
 
 Alternatives considered:
-- **Always expand h3s:** Too many nav lines for large files. A 20-section file with 3 h3s each produces 80 entries.
+- **Always expand subsections:** Too many nav lines for large files. A 20-section file with 3 subsections each produces 80 entries.
 - **Never show subsections:** Agents misroute into wrong sections when descriptions are ambiguous. The hints disambiguate.
 - **Line numbers in hints** (`>sub1:42-48`): Both test agents requested this, but it adds too many tokens per hint line and once you're inside the right section, scanning for a heading is cheap.

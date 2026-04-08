@@ -9,6 +9,7 @@ import (
 	"github.com/RKelln/agentmap/internal/check"
 	"github.com/RKelln/agentmap/internal/config"
 	"github.com/RKelln/agentmap/internal/generate"
+	"github.com/RKelln/agentmap/internal/guide"
 	"github.com/RKelln/agentmap/internal/index"
 	"github.com/RKelln/agentmap/internal/initcmd"
 	"github.com/RKelln/agentmap/internal/navblock"
@@ -25,6 +26,16 @@ var rootCmd = &cobra.Command{
 	Use:   "agentmap",
 	Short: "Navigation maps for AI agents",
 	Long:  "agentmap generates and maintains compact navigation blocks at the top of markdown files.",
+}
+
+var guideCmd = &cobra.Command{
+	Use:   "guide",
+	Short: "Print the nav writing guide",
+	Long:  "Print the nav writing guide: how to write purpose, about, and see fields.",
+	Args:  cobra.NoArgs,
+	Run: func(cmd *cobra.Command, _ []string) {
+		fmt.Print(guide.Content)
+	},
 }
 
 var generateCmd = &cobra.Command{
@@ -482,7 +493,7 @@ func init() {
 	// upgrade flags
 	upgradeCmd.Flags().Bool("check", false, "Only check if an update is available; do not update")
 
-	rootCmd.AddCommand(generateCmd, updateCmd, checkCmd, versionCmd, hookCmd, indexCmd, initCmd, uninitCmd, uninstallCmd, upgradeCmd)
+	rootCmd.AddCommand(generateCmd, updateCmd, checkCmd, versionCmd, hookCmd, guideCmd, indexCmd, initCmd, uninitCmd, uninstallCmd, upgradeCmd)
 }
 
 func main() {

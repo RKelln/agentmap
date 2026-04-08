@@ -15,6 +15,7 @@ Go 1.25+. Cobra CLI. Single binary; no runtime dependencies.
 When you need to reference the design:
 
 - `agentmap-design.md` -- full specification; nav block format; CLI commands; parser rules; keyword extraction; config
+- Run `agentmap guide` for practical how-to on writing `purpose`; `about`; and `see` fields
 
 ## Fast Path
 
@@ -88,7 +89,7 @@ testdata/           -- sample markdown files for tests
 - `update` never writes descriptions -- only refreshes line numbers
 - `check` never modifies files -- only validates
 - `generate` overwrites existing nav blocks entirely
-- Maximum tracked heading depth: h3 (configurable via `max_depth`)
+- Nav entries capped at ~20 (`max_nav_entries`); `max_depth` and `sub/expand_threshold` are heuristics toward that budget
 - Files under `min_lines` (default 50) get purpose-only blocks
 
 ## Reading Markdown Files
@@ -101,6 +102,10 @@ Read the first 50 lines of a file before reading the rest of the file.
 - For cross-file discovery use this flow: Read AGENTMAP.md -> identify file -> read AGENT:NAV -> jump to section.
 - If indexing was run on a subdirectory; read <indexed-path>/AGENTMAP.md for that scope.
 - Check see before searching; the file you need may be listed.
+
+## Writing Nav Descriptions
+
+Run `agentmap guide` for full instructions on writing `purpose`, `about`, and `see` fields.
 
 ## Before Committing Markdown Changes
 
