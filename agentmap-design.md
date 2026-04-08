@@ -251,7 +251,7 @@ the description and the hints have been reviewed.
 - `--llm` — Use an LLM to generate descriptions instead of keyword extraction. Requires LLM configuration (see section 7).
 - `--min-lines N` — Override minimum file size threshold (default: 50).
 - `--sub-threshold N` — Override subheading inclusion threshold (default: 50 lines). Sections under this size get no subsection info.
-- `--expand-threshold N` — Override full-expansion threshold (default: 150 lines). Sections over this size get full entries with own `s,n` ranges for each unrepresented subsection. Sections between `sub-threshold` and `expand-threshold` get `>` hints instead (see section 3.8).
+- `--expand-threshold N` — Override full-expansion threshold (default: 150 lines). These thresholds are pruning heuristics that only apply when the `max_nav_entries` budget is exceeded: sections with parent N >= expand-threshold are kept as full entries (unkillable); sections with parent N in [sub-threshold, expand-threshold) become `>` hints on the parent entry; sections with parent N < sub-threshold are dropped silently (see section 3.8 and §11.4).
 - `--dry-run` — Print what would be generated without writing files.
 
 **Output:**

@@ -310,8 +310,9 @@ func buildNavEntries(sections []parser.Section, content string) []navblock.NavEn
 
 // PruneNavEntries applies the §11.4 budget-first algorithm to cap nav entries.
 //
-// If len(entries) <= maxEntries, the input is returned unchanged (no copy).
-// Otherwise entries are pruned depth-first, guided by parent section size:
+// Fast path: if len(entries) <= maxEntries, returns the input slice unchanged (no copy).
+// Pruning path: when over budget, entries are pruned depth-first, guided by parent
+// section size:
 //   - parent N < subThreshold   → droppable (no hint)
 //   - parent N in [sub, expand) → hintable (collapsed to > hint on parent About)
 //   - parent N >= expandThreshold → unkillable (kept; overrun accepted)
@@ -321,7 +322,8 @@ func buildNavEntries(sections []parser.Section, content string) []navblock.NavEn
 // Pruning stops when within budget, when no droppable/hintable entries remain,
 // or when only shallow entries (depth ≤ 2) are left.
 //
-// The function returns a new slice sorted by Start; it does NOT mutate the input.
+// The fast path returns the original input slice. The pruning path returns a new
+// slice sorted by Start; it does NOT mutate the input.
 // It is safe to call twice (e.g. once for offset measurement, once after shift).
 func PruneNavEntries(entries []navblock.NavEntry, subThreshold, expandThreshold, maxEntries int) []navblock.NavEntry {
 	if len(entries) <= maxEntries {
@@ -401,8 +403,10 @@ func PruneNavEntries(entries []navblock.NavEntry, subThreshold, expandThreshold,
 			remove[idx] = true
 
 			if c.hintable {
-				// Derive hint text: heading name without leading # chars, commas → semicolons.
-				headingText := strings.TrimLeft(e.Name, "#")
+				// Derive hint text: heading name without leading # chars and surrounding
+				// whitespace, commas → semicolons. TrimSpace is applied after TrimLeft
+				// to be robust against any future whitespace in stored names.
+				headingText := strings.TrimSpace(strings.TrimLeft(e.Name, "#"))
 				hint := strings.ReplaceAll(headingText, ",", ";")
 
 				// Find parent index and mutate its About.
@@ -428,6 +432,8 @@ func PruneNavEntries(entries []navblock.NavEntry, subThreshold, expandThreshold,
 		}
 
 		// Rebuild working set without removed entries.
+		// Elements are compacted leftward, so source indices always exceed
+		// destination indices; no aliasing corruption occurs when reusing work[:0].
 		next := work[:0]
 		for i, e := range work {
 			if !remove[i] {

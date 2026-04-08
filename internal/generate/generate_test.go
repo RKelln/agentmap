@@ -15,6 +15,7 @@ import (
 const (
 	testAutoAbout = "~keywords"
 	testSection2  = "##Section2"
+	testParent    = "##Parent"
 )
 
 func TestFile_WithHeadings(t *testing.T) {
@@ -447,7 +448,7 @@ func TestPruneNavEntries_HintsForMediumParent(t *testing.T) {
 func TestPruneNavEntries_MultipleHintsAccumulate(t *testing.T) {
 	entries := []navblock.NavEntry{
 		{Start: 1, N: 200, Name: "#Top"},
-		{Start: 10, N: 80, Name: "##Parent", About: testAutoAbout},
+		{Start: 10, N: 80, Name: testParent, About: testAutoAbout},
 		{Start: 20, N: 5, Name: "###h3a"},
 		{Start: 30, N: 5, Name: "###h3b"},
 		{Start: 40, N: 5, Name: "###h3c"},
@@ -459,12 +460,12 @@ func TestPruneNavEntries_MultipleHintsAccumulate(t *testing.T) {
 	}
 	var parent *navblock.NavEntry
 	for i := range got {
-		if got[i].Name == "##Parent" {
+		if got[i].Name == testParent {
 			parent = &got[i]
 		}
 	}
 	if parent == nil {
-		t.Fatal("##Parent entry not found after pruning")
+		t.Fatal(testParent + " entry not found after pruning")
 	}
 	// All 3 h3 hints should be present
 	if !strings.Contains(parent.About, "h3a") {
@@ -1890,5 +1891,82 @@ func TestFile_MinLinesBoundary(t *testing.T) {
 	if strings.Contains(string(data), "nav[") {
 		t.Errorf("file with %d lines should not have nav[] entries (threshold %d); off-by-1 in totalLines",
 			targetNewlines, threshold)
+	}
+}
+
+// TestPruneNavEntries_Idempotent verifies that calling PruneNavEntries twice on the
+// same base entries (with Start values shifted on the second call to simulate an
+// offset adjustment) produces structurally identical pruning decisions: the same
+// entries survive, the same become hints, and the hint text on parent entries is
+// identical. This also confirms PruneNavEntries does not mutate the original slice.
+func TestPruneNavEntries_Idempotent(t *testing.T) {
+	// Base entries: 1 h1 + 1 h2 (medium parent, N=80) + 5 h3.
+	// With cap=2, all 5 h3s must be pruned to reach the budget; medium parent gets hints.
+	base := []navblock.NavEntry{
+		{Start: 1, N: 200, Name: "#Top", About: "~top"},
+		{Start: 10, N: 80, Name: testParent, About: "~parent desc"},
+		{Start: 20, N: 5, Name: "###Child1", About: "~c1"},
+		{Start: 30, N: 5, Name: "###Child2", About: "~c2"},
+		{Start: 40, N: 5, Name: "###Child3", About: "~c3"},
+		{Start: 50, N: 5, Name: "###Child4", About: "~c4"},
+		{Start: 55, N: 5, Name: "###Child5", About: "~c5"},
+	}
+
+	// First call — baseline result.
+	got1 := PruneNavEntries(base, 50, 150, 2)
+
+	// Verify the original slice was not mutated.
+	if base[1].About != "~parent desc" {
+		t.Errorf("original base[1].About = %q after first PruneNavEntries call; should be unchanged (no mutation)", base[1].About)
+	}
+
+	// Build shifted copy: same entries with Start += 5 to simulate offset adjustment.
+	shifted := make([]navblock.NavEntry, len(base))
+	copy(shifted, base)
+	for i := range shifted {
+		shifted[i].Start += 5
+	}
+
+	// Second call on shifted entries.
+	got2 := PruneNavEntries(shifted, 50, 150, 2)
+
+	// Structural check: both results must have the same length.
+	if len(got1) != len(got2) {
+		t.Fatalf("first call len=%d, second call len=%d; pruning decisions should be structurally identical", len(got1), len(got2))
+	}
+
+	// Both must have exactly 2 entries (h1 + h2; all 5 h3s pruned to reach cap=2).
+	if len(got1) != 2 {
+		t.Errorf("len(got1) = %d, want 2 (h1 + h2 after all h3s pruned to cap=2)", len(got1))
+	}
+
+	// Locate the parent entry in each result and compare hint text.
+	var parent1, parent2 *navblock.NavEntry
+	for i := range got1 {
+		if got1[i].Name == testParent {
+			parent1 = &got1[i]
+		}
+	}
+	for i := range got2 {
+		if got2[i].Name == testParent {
+			parent2 = &got2[i]
+		}
+	}
+
+	if parent1 == nil {
+		t.Fatal(testParent + " not found in first result")
+	}
+	if parent2 == nil {
+		t.Fatal(testParent + " not found in second result")
+	}
+
+	// The hint text (everything after the > separator) should be identical across both calls.
+	if parent1.About != parent2.About {
+		t.Errorf("hint text diverged between calls:\n  call1 About = %q\n  call2 About = %q", parent1.About, parent2.About)
+	}
+
+	// Both should contain > hints.
+	if !strings.Contains(parent1.About, ">") {
+		t.Errorf("parent1.About = %q, should contain > hints", parent1.About)
 	}
 }

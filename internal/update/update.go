@@ -195,7 +195,7 @@ func File(path string, cfg config.Config, dryRun, quiet bool, changedLines ...[]
 	} else if len(changedLines) == 0 {
 		fileChanges = getChangedLines(path)
 	}
-	entryReports := buildEntryReports(oldBlock.Nav, sections, fileChanges, cfg)
+	entryReports := buildEntryReports(oldBlock.Nav, sections, fileChanges)
 
 	hasChanges := (oldBlock.Lines != 0 && oldBlock.Lines != contentLines)
 	for _, er := range entryReports {
@@ -340,7 +340,7 @@ func matchSectionsToNav(sections []parser.Section, byName map[string][]navblock.
 	return matched, usedStart
 }
 
-func buildEntryReports(oldNav []navblock.NavEntry, sections []parser.Section, changedLines []gitutil.LineRange, cfg config.Config) []ReportEntry {
+func buildEntryReports(oldNav []navblock.NavEntry, sections []parser.Section, changedLines []gitutil.LineRange) []ReportEntry {
 	var reports []ReportEntry
 
 	// Build multi-map: name -> []NavEntry to handle duplicate heading names.
@@ -350,31 +350,6 @@ func buildEntryReports(oldNav []navblock.NavEntry, sections []parser.Section, ch
 	byName := navIndex(oldNav)
 	sectionToEntry, usedStart := matchSectionsToNav(sections, byName)
 
-	// Build h2 size map for ExpandThreshold checks (mirrors buildUpdatedBlock logic).
-	h2SizeByKey := make(map[string]int)
-	for _, s := range sections {
-		if s.Depth == 2 {
-			key := navblock.NormalizeHeading(s.Text)
-			h2SizeByKey[key] = s.Len()
-		}
-	}
-
-	// findParentH2Key returns the normalised key of the h2 containing sections[idx], or "".
-	findParentH2Key := func(idx int) string {
-		if sections[idx].Depth != 3 {
-			return ""
-		}
-		for j := idx - 1; j >= 0; j-- {
-			if sections[j].Depth == 2 {
-				return navblock.NormalizeHeading(sections[j].Text)
-			}
-			if sections[j].Depth < 2 {
-				break
-			}
-		}
-		return ""
-	}
-
 	for i, s := range sections {
 		prefix := strings.Repeat("#", s.Depth)
 		name := prefix + navblock.NormalizeHeading(s.Text)
@@ -383,15 +358,9 @@ func buildEntryReports(oldNav []navblock.NavEntry, sections []parser.Section, ch
 
 		if !found {
 			// New section not in existing nav block.
-			// Suppress new-h3 reports for h3s whose parent h2 is below ExpandThreshold:
-			// generate would not have included them, so reporting them as new would
-			// mislead the user into thinking they need descriptions.
-			if s.Depth == 3 {
-				parentKey := findParentH2Key(i)
-				if parentKey != "" && h2SizeByKey[parentKey] < cfg.ExpandThreshold {
-					continue
-				}
-			}
+			// All new sections are reported — including h3s — consistent with
+			// buildUpdatedBlock which now includes all sections unconditionally
+			// and delegates budget enforcement to PruneNavEntries.
 			reports = append(reports, ReportEntry{
 				Type:     ReportNew,
 				Name:     name,
@@ -455,34 +424,6 @@ func buildUpdatedBlock(oldBlock navblock.NavBlock, sections []parser.Section, _ 
 	byName := navIndex(oldBlock.Nav)
 	sectionToEntry, _ := matchSectionsToNav(sections, byName)
 
-	// Build a map of h2 section size by heading text, so we can apply the same
-	// ExpandThreshold logic as generate's buildNavEntries when deciding whether
-	// to add new h3 entries that were not in the original nav block.
-	h2SizeByKey := make(map[string]int)
-	for _, s := range sections {
-		if s.Depth == 2 {
-			key := navblock.NormalizeHeading(s.Text)
-			h2SizeByKey[key] = s.Len()
-		}
-	}
-
-	// findParentH2Key returns the normalised heading key of the h2 that contains s,
-	// or "" if s is not an h3 or has no h2 parent.
-	findParentH2Key := func(idx int) string {
-		if sections[idx].Depth != 3 {
-			return ""
-		}
-		for j := idx - 1; j >= 0; j-- {
-			if sections[j].Depth == 2 {
-				return navblock.NormalizeHeading(sections[j].Text)
-			}
-			if sections[j].Depth < 2 {
-				break
-			}
-		}
-		return ""
-	}
-
 	var newNav []navblock.NavEntry
 
 	for i, s := range sections {
@@ -501,18 +442,9 @@ func buildUpdatedBlock(oldBlock navblock.NavBlock, sections []parser.Section, _ 
 			})
 		} else {
 			// New section not in the existing nav block.
-			// If this is an h3 and its parent h2 is below ExpandThreshold, generate
-			// would have excluded it (or rolled it into >hints). Don't add it here
-			// either — consistency with generate avoids nav block growth and line shifts.
-			if s.Depth == 3 {
-				parentKey := findParentH2Key(i)
-				if parentKey != "" {
-					parentSize := h2SizeByKey[parentKey]
-					if parentSize < cfg.ExpandThreshold {
-						continue
-					}
-				}
-			}
+			// Include all new sections unconditionally — generate now includes ALL
+			// sections and lets PruneNavEntries handle the budget. update must do
+			// the same: no expandThreshold guard here.
 			newNav = append(newNav, navblock.NavEntry{
 				Start:     s.Start,
 				N:         s.Len(),
