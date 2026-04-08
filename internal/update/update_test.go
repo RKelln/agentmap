@@ -848,19 +848,18 @@ func TestFile_TotalLinesOffByOne(t *testing.T) {
 	}
 }
 
-// TestFile_NoNewH3BelowExpandThreshold verifies that update does not add new h3 entries
-// for h2 sections below ExpandThreshold. generate's buildNavEntries omits those h3s
-// (rolling them into >hints or skipping entirely); update must match that behavior to
-// avoid nav block growth that shifts all subsequent line numbers.
-func TestFile_NoNewH3BelowExpandThreshold(t *testing.T) {
+// TestFile_NewH3IncludedAndPruned verifies that update now includes new h3 entries
+// for all h2 sections (including those below ExpandThreshold), then delegates to
+// PruneNavEntries to enforce the max_nav_entries budget. This matches generate's
+// budget-first behavior: buildNavEntries includes everything; PruneNavEntries prunes.
+func TestFile_NewH3IncludedAndPruned(t *testing.T) {
 	dir := t.TempDir()
 
-	// The h2 "##Small Section" is 40 lines — well below ExpandThreshold (150).
-	// generate would skip its h3 children. The nav block only has the h2 entry.
-	// After generate the file looks like this (nav block = 7 lines, blank sep = 1):
-	// lines 1-7: nav block, line 8: blank, line 9: #Doc, ... line 13: ##Small Section
-	// Build a file where the nav has no h3s for the small h2, and verify update
-	// doesn't add them.
+	// The h2 "##Small Section" is ~38 lines — below ExpandThreshold (150).
+	// The old nav block only has the h2 entry (no h3 children).
+	// Under the new model, update should include the new h3 entries and call
+	// PruneNavEntries; since total entries is well under MaxNavEntries(20),
+	// all entries survive and the report lists them as "new".
 	var sb strings.Builder
 	sb.WriteString("<!-- AGENT:NAV\npurpose:test\nnav[2]{s,n,name,about}:\n")
 	sb.WriteString("9,42,#Doc,doc\n")
@@ -882,16 +881,36 @@ func TestFile_NoNewH3BelowExpandThreshold(t *testing.T) {
 	cfg := config.Defaults()
 	cfg.MaxDepth = 3
 	cfg.ExpandThreshold = 150
+	cfg.MaxNavEntries = 20 // well above 7 total sections → no pruning expected
 
 	report, err := File(path, cfg, false, false)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
 
-	// Should either be no-changes or report only shifted/content-changed —
-	// NOT "new: ###Child X" entries.
-	if strings.Contains(report, "new: ###Child") {
-		t.Errorf("update added new h3 entries for below-ExpandThreshold h2; report:\n%s", report)
+	// New h3 entries should now be included and reported (under budget, all survive).
+	// The report should contain "new: ###Child" entries — that is the correct behavior.
+	if !strings.Contains(report, "new: ###Child") {
+		t.Errorf("update should now include new h3 entries (budget-first model); report:\n%s", report)
+	}
+
+	// Verify the written nav block actually contains the h3 entries.
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read file: %v", err)
+	}
+	pr := navblock.ParseNavBlock(string(data))
+	if !pr.Found {
+		t.Fatal("nav block not found after update")
+	}
+	h3Count := 0
+	for _, e := range pr.Block.Nav {
+		if strings.HasPrefix(e.Name, "###") {
+			h3Count++
+		}
+	}
+	if h3Count == 0 {
+		t.Errorf("nav block should contain h3 entries after update (budget-first model); entries: %v", pr.Block.Nav)
 	}
 }
 

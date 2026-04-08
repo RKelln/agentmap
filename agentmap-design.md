@@ -118,7 +118,7 @@ This provides **absolute depth** — an agent landing on any entry knows its exa
 **Rules:**
 - Every entry has at least one `#`. There are no unmarked entries.
 - Depth is absolute, not relative. `##` always means h2 regardless of surrounding entries.
-- Maximum tracked depth: configurable via `max_depth` (default h3). This is a heuristic to keep nav entries within budget — in a shallow document all tracked headings get full entries regardless of depth. Headings deeper than `max_depth` are not included; the agent reads the parent section to find them.
+- Maximum tracked depth: configurable via `max_depth` (default h6). This is a heuristic to keep nav entries within budget — in a shallow document all tracked headings get full entries regardless of depth. Headings deeper than `max_depth` are not included; the agent reads the parent section to find them.
 
 ### 3.4 Complete Example
 
@@ -251,7 +251,7 @@ the description and the hints have been reviewed.
 - `--llm` — Use an LLM to generate descriptions instead of keyword extraction. Requires LLM configuration (see section 7).
 - `--min-lines N` — Override minimum file size threshold (default: 50).
 - `--sub-threshold N` — Override subheading inclusion threshold (default: 50 lines). Sections under this size get no subsection info.
-- `--expand-threshold N` — Override full-expansion threshold (default: 150 lines). Sections over this size get full entries with own `s,n` ranges for each unrepresented subsection. Sections between `sub-threshold` and `expand-threshold` get `>` hints instead (see section 3.8).
+- `--expand-threshold N` — Override full-expansion threshold (default: 150 lines). These thresholds are pruning heuristics that only apply when the `max_nav_entries` budget is exceeded: sections with parent N >= expand-threshold are kept as full entries (unkillable); sections with parent N in [sub-threshold, expand-threshold) become `>` hints on the parent entry; sections with parent N < sub-threshold are dropped silently (see section 3.8 and §11.4).
 - `--dry-run` — Print what would be generated without writing files.
 
 **Output:**
@@ -661,7 +661,7 @@ sub_threshold: 50
 expand_threshold: 150
 
 # Maximum heading depth to track (heuristic to stay near max_nav_entries budget)
-max_depth: 3
+max_depth: 6
 
 # Files/directories to exclude (in addition to .gitignore)
 exclude:
@@ -698,7 +698,7 @@ All configuration is optional. Sensible defaults:
 | `max_nav_entries` | 20 | Soft cap on nav entries; the primary budget constraint |
 | `sub_threshold` | 50 | No subsection hints/entries below this (heuristic) |
 | `expand_threshold` | 150 | Full subsection entries above this; `>` hints between (heuristic) |
-| `max_depth` | 3 | Heading depth limit (heuristic to stay near budget) |
+| `max_depth` | 6 | Heading depth limit (heuristic to stay near budget) |
 | `exclude` | `[]` | Additional excludes beyond .gitignore |
 
 ## 11. Edge Cases

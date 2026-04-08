@@ -1,6 +1,7 @@
 package generate
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -454,8 +455,8 @@ func TestGenerate_LargeFile(t *testing.T) {
 		t.Fatal("nav block not found")
 	}
 
-	// Should have all 20 h2 sections plus the h1 = 21 entries
-	// h3 children are under sub_threshold so they appear as hints, not full entries
+	// Should have all 20 h2 sections plus the h1 = 21 entries.
+	// The 2 h3 children are over budget and their parent h2 has small N → droppable (no hint).
 	if len(block.Nav) != 21 {
 		t.Errorf("expected 21 nav entries, got %d", len(block.Nav))
 	}
@@ -474,10 +475,11 @@ func TestGenerate_LargeFile(t *testing.T) {
 		}
 	}
 
-	// h3 children appear as > hints in the last h2 section's about field
-	foundHints := strings.Contains(got, "Subsection A") && strings.Contains(got, "Subsection B")
-	if !foundHints {
-		t.Error("nav should have hints for Subsection A and B")
+	// h3 children are dropped (not hinted) because their parent h2 N < sub_threshold
+	for _, entry := range block.Nav {
+		if entry.Name == "###Subsection A" || entry.Name == "###Subsection B" {
+			t.Errorf("h3 %q should have been pruned (over budget)", entry.Name)
+		}
 	}
 
 	// Verify line ranges are in order (each entry starts after the previous)
@@ -545,40 +547,34 @@ Silent rotation and sliding-window expiry detection.
 func TestGenerate_SubsectionHints(t *testing.T) {
 	dir := t.TempDir()
 
-	// Medium section (between sub_threshold=50 and expand_threshold=150) with h3 children
-	// should get > hints instead of full h3 entries
-	// Token Exchange section needs to be between sub_threshold(50) and expand_threshold(150)
-	// to trigger > hints instead of full h3 entries
-	content := `# Guide
-
-Overview of the guide.
-
-## Token Exchange
-
-Main section about token exchange.
-
-` + strings.Repeat("Token exchange details and implementation notes about OAuth2 flows.\n", 20) + `
-### PKCE
-
-Proof key for code exchange details.
-
-### Implicit
-
-Legacy implicit grant flow.
-
-` + strings.Repeat("More exchange content here covering various scenarios.\n", 20) + `
-## Migration
-
-Migration guide content.
-
-` + strings.Repeat("More migration details.\n", 40)
-
-	writeTempFile(t, dir, "hints.md", content)
-
+	// Build a file that goes over budget so PruneNavEntries must collapse h3 entries.
+	// We need: many h2 sections (to push total over MaxNavEntries=20) plus one "medium"
+	// h2 (between sub and expand thresholds) that has h3 children.
+	// The medium h2 parent will be hintable, its h3s converted to > hints.
 	cfg := config.Defaults()
 	cfg.MinLines = 50
 	cfg.SubThreshold = 50
 	cfg.ExpandThreshold = 150
+	cfg.MaxNavEntries = 10 // small budget to force pruning
+
+	var b strings.Builder
+	b.WriteString("# Guide\n\nOverview of the guide.\n\n")
+
+	// Add a medium-sized Token Exchange section (N between sub=50 and expand=150)
+	// with h3 children that should become hints when pruning occurs.
+	b.WriteString("## Token Exchange\n\nMain section about token exchange.\n\n")
+	b.WriteString(strings.Repeat("Token exchange details and implementation notes about OAuth2 flows.\n", 20))
+	b.WriteString("### PKCE\n\nProof key for code exchange details.\n\n")
+	b.WriteString("### Implicit\n\nLegacy implicit grant flow.\n\n")
+	b.WriteString(strings.Repeat("More exchange content here covering various scenarios.\n", 20))
+
+	// Add many more h2 sections to push the total entry count over budget (10)
+	for i := 1; i <= 10; i++ {
+		fmt.Fprintf(&b, "## Section%d\n\nContent for section %d.\n\n", i, i)
+		b.WriteString(strings.Repeat("Section details.\n", 3))
+	}
+
+	writeTempFile(t, dir, "hints.md", b.String())
 
 	_, err := File(filepath.Join(dir, "hints.md"), cfg, false)
 	if err != nil {
@@ -597,6 +593,16 @@ Migration guide content.
 		t.Fatal("nav block not found")
 	}
 
+	// Result: h3s were hinted away. The remaining h2 entries may exceed budget
+	// since PruneNavEntries accepts overrun when only depth ≤ 2 entries remain.
+	// Verify we're at most total-minus-h3s (2 h3s collapsed into hints).
+	totalBeforePrune := 14 // 1 h1 + 1 Token Exchange h2 + 2 h3 + 10 small h2
+	if len(block.Nav) > totalBeforePrune-2 {
+		t.Errorf("nav has %d entries, expected at most %d (2 h3s should be collapsed to hints)",
+			len(block.Nav), totalBeforePrune-2)
+	}
+
+	// Token Exchange must still be present (it's the hintable parent)
 	var exchangeEntry navblock.NavEntry
 	for _, entry := range block.Nav {
 		if entry.Name == "##Token Exchange" {
@@ -609,6 +615,7 @@ Migration guide content.
 		t.Fatal("##Token Exchange entry not found")
 	}
 
+	// Token Exchange N is between sub and expand → hints should be added
 	if !strings.Contains(exchangeEntry.About, ">") {
 		t.Errorf("##Token Exchange should have > hints, got: %q", exchangeEntry.About)
 	}
@@ -619,9 +626,10 @@ Migration guide content.
 		t.Errorf("hints should mention Implicit, got: %q", exchangeEntry.About)
 	}
 
+	// PKCE and Implicit must not appear as full entries (they were hinted)
 	for _, entry := range block.Nav {
 		if entry.Name == "###PKCE" || entry.Name == "###Implicit" {
-			t.Errorf("h3 %q should not appear as full entry in medium section", entry.Name)
+			t.Errorf("h3 %q should not appear as full entry (should be hinted)", entry.Name)
 		}
 	}
 }
@@ -685,6 +693,8 @@ Brief other section.
 		t.Fatal("nav block not found")
 	}
 
+	// 1 h1 + 2 h2 + 3 h3 = 6 entries, well under MaxNavEntries=20 → no pruning.
+	// All h3s appear as full entries regardless of parent size.
 	h3Names := []string{"###Refresh", "###Revocation", "###Introspection"}
 	for _, h3 := range h3Names {
 		found := false
@@ -706,9 +716,17 @@ Brief other section.
 func TestGenerate_NoSubsectionInfoForSmallSections(t *testing.T) {
 	dir := t.TempDir()
 
-	// File must exceed min_lines (50) to get full nav block
-	// But the "Small Section" must be under sub_threshold (50) to get no subsection info
-	// We make "Another Section" large to push the file over min_lines
+	// When a small parent section (N < sub_threshold) has h3 children and we're
+	// over budget, the h3s are dropped with NO hint (not hintable, only droppable).
+	// We force over-budget by using a tiny MaxNavEntries.
+	cfg := config.Defaults()
+	cfg.MinLines = 50
+	cfg.SubThreshold = 50
+	cfg.ExpandThreshold = 150
+	cfg.MaxNavEntries = 3 // force pruning of both h3s (5 entries → need to drop 2)
+
+	// File must exceed min_lines (50) to get full nav block.
+	// Small Section N < subThreshold(50) → droppable (no hints for its h3s).
 	content := `# Guide
 
 Overview of the guide document.
@@ -731,11 +749,6 @@ Detail B.
 
 	writeTempFile(t, dir, "small.md", content)
 
-	cfg := config.Defaults()
-	cfg.MinLines = 50
-	cfg.SubThreshold = 50
-	cfg.ExpandThreshold = 150
-
 	_, err := File(filepath.Join(dir, "small.md"), cfg, false)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
@@ -753,6 +766,11 @@ Detail B.
 		t.Fatal("nav block not found")
 	}
 
+	// Result must be within budget
+	if len(block.Nav) > cfg.MaxNavEntries {
+		t.Errorf("nav has %d entries, want ≤ %d", len(block.Nav), cfg.MaxNavEntries)
+	}
+
 	var entry navblock.NavEntry
 	for _, e := range block.Nav {
 		if e.Name == "##Small Section" {
@@ -765,13 +783,15 @@ Detail B.
 		t.Fatal("##Small Section entry not found")
 	}
 
+	// Small section N < sub_threshold → droppable, not hintable → no > hints
 	if strings.Contains(entry.About, ">") {
 		t.Errorf("small section should not have > hints, got: %q", entry.About)
 	}
 
+	// h3 children should be dropped (not hinted) for a droppable parent
 	for _, e := range block.Nav {
 		if e.Name == "###SubA" || e.Name == "###SubB" {
-			t.Errorf("h3 %q should not appear for small parent section", e.Name)
+			t.Errorf("h3 %q should not appear: small parent is droppable (N < sub_threshold)", e.Name)
 		}
 	}
 }

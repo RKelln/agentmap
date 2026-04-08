@@ -12,6 +12,12 @@ import (
 	"github.com/RKelln/agentmap/internal/parser"
 )
 
+const (
+	testAutoAbout = "~keywords"
+	testSection2  = "##Section2"
+	testParent    = "##Parent"
+)
+
 func TestFile_WithHeadings(t *testing.T) {
 	content := `# Authentication
 
@@ -298,7 +304,7 @@ Content here.
 
 func TestBuildNavEntries_LargeFileCap(t *testing.T) {
 	// §11.4: if more than 20 nav entries would be generated,
-	// filter to only h1 and h2 entries.
+	// PruneNavEntries prunes the deepest entries by parent size.
 	var sections []parser.Section
 	// Build 5 h1 + 5 h2 + 15 h3 = 25 total headings
 	line := 1
@@ -337,223 +343,308 @@ func TestBuildNavEntries_LargeFileCap(t *testing.T) {
 
 	cfg := config.Defaults()
 	cfg.SubThreshold = 1
-	cfg.ExpandThreshold = 1
+	cfg.ExpandThreshold = 1000 // force droppable (parentN < subThreshold=1 → false; all are droppable at N=2)
 
 	// Build dummy content (just newlines)
 	content := strings.Repeat("\n", line+1)
 
-	// §C3: buildNavEntries no longer caps internally; FilterNavEntries applies the cap.
-	got := FilterNavEntries(buildNavEntries(sections, content, cfg), 20, 3)
+	// buildNavEntries returns all 25 entries; PruneNavEntries applies the cap.
+	got := PruneNavEntries(buildNavEntries(sections, content), cfg.SubThreshold, cfg.ExpandThreshold, 20)
 
 	// With 25 headings (5 h1 + 5 h2 + 15 h3) > MaxNavEntries (20),
-	// should filter to h1 and h2 only = 10 entries
+	// h3s should be pruned until within budget (10 h1+h2 remain or 20 if some h3s survive).
+	// With sub=1 and expand=1000, parentN=2 is >= sub(1) but < expand(1000) → hintable.
+	// Pruning should occur until len(got) <= 20.
+	if len(got) > 20 {
+		t.Errorf("len(entries) = %d, want ≤ 20 after pruning", len(got))
+	}
+}
+
+// TestPruneNavEntries_UnderBudget: 18 entries under cap → all returned unchanged.
+func TestPruneNavEntries_UnderBudget(t *testing.T) {
+	// 1 h1 + 2 h2 (N=100 each) + 15 h3, cap=20
+	var specs []entrySpec
+	specs = append(specs, entrySpec{depth: 1, n: 200})
+	specs = append(specs, entrySpec{depth: 2, n: 100})
+	specs = append(specs, entrySpec{depth: 2, n: 100})
+	for i := 0; i < 15; i++ {
+		specs = append(specs, entrySpec{depth: 3, n: 5})
+	}
+	entries := makeNavEntries(specs)
+	// Add about fields to h2 entries to ensure they're not modified.
+	entries[1].About = testAutoAbout
+	entries[2].About = testAutoAbout
+
+	got := PruneNavEntries(entries, 50, 150, 20)
+	if len(got) != 18 {
+		t.Errorf("len(got) = %d, want 18 (under budget, no pruning)", len(got))
+	}
+	// h2 About fields should be unchanged (no hints appended)
 	for _, e := range got {
-		depth := 0
-		for _, ch := range e.Name {
-			if ch == '#' {
-				depth++
-			} else {
-				break
+		if e.Name == testSection2 || e.Name == "##Section3" {
+			if strings.Contains(e.About, ">") {
+				t.Errorf("entry %q About = %q, should not have > hints (under budget)", e.Name, e.About)
 			}
 		}
-		if depth > 2 {
-			t.Errorf("entry %q: depth %d > 2 (should be filtered out when >20 entries)", e.Name, depth)
-		}
-	}
-
-	// Count h1+h2 in input
-	wantCount := 0
-	for _, s := range sections {
-		if s.Depth <= 2 {
-			wantCount++
-		}
-	}
-	if len(got) != wantCount {
-		t.Errorf("len(entries) = %d, want %d (h1+h2 only)", len(got), wantCount)
 	}
 }
 
-// TestFilterNavEntries_NoCapNeeded: 15 entries (mix of h1/h2/h3), all n≥3 → all returned
-func TestFilterNavEntries_NoCapNeeded(t *testing.T) {
-	entries := makeNavEntries([]entrySpec{
-		// 5 h1, 5 h2, 5 h3 — all with n=5
-		{depth: 1, n: 5},
-		{depth: 1, n: 5},
-		{depth: 1, n: 5},
-		{depth: 1, n: 5},
-		{depth: 1, n: 5},
-		{depth: 2, n: 5},
-		{depth: 2, n: 5},
-		{depth: 2, n: 5},
-		{depth: 2, n: 5},
-		{depth: 2, n: 5},
-		{depth: 3, n: 5},
-		{depth: 3, n: 5},
-		{depth: 3, n: 5},
-		{depth: 3, n: 5},
-		{depth: 3, n: 5},
-	})
-	got := FilterNavEntries(entries, 20, 3)
-	if len(got) != 15 {
-		t.Errorf("len(got) = %d, want 15 (no cap needed)", len(got))
+// TestPruneNavEntries_DropsSmallParent: h3 with parent N < sub_threshold → dropped, no hint.
+func TestPruneNavEntries_DropsSmallParent(t *testing.T) {
+	// 1 h1 + 1 h2 (N=30 < sub=50) + 10 h3, cap=5
+	specs := []entrySpec{
+		{depth: 1, n: 200},
+		{depth: 2, n: 30}, // small parent
 	}
-	// Verify document order preserved
-	for i := 1; i < len(got); i++ {
-		if got[i].Start <= got[i-1].Start {
-			t.Errorf("entries not in document order: got[%d].Start=%d <= got[%d].Start=%d",
-				i, got[i].Start, i-1, got[i-1].Start)
-		}
-	}
-}
-
-// TestFilterNavEntries_StubPassOnly: 22 entries (8 h1/h2 + 14 h3), 4 h3 are stubs (WordCount=1)
-// stub pass removes 4 stubs → 8+10=18 ≤ 20 → no budget pass needed, 18 returned
-func TestFilterNavEntries_StubPassOnly(t *testing.T) {
-	var specs []entrySpec
-	// 4 h1 + 4 h2
-	for i := 0; i < 4; i++ {
-		specs = append(specs, entrySpec{depth: 1, n: 10})
-	}
-	for i := 0; i < 4; i++ {
-		specs = append(specs, entrySpec{depth: 2, n: 10})
-	}
-	// 4 h3 stubs (wordCount=1 < stubWords=3)
-	for i := 0; i < 4; i++ {
-		specs = append(specs, entrySpec{depth: 3, n: 1, wordCount: 1})
-	}
-	// 10 h3 non-stubs (wordCount=25 ≥ stubWords=3)
 	for i := 0; i < 10; i++ {
-		specs = append(specs, entrySpec{depth: 3, n: 5, wordCount: 25})
+		specs = append(specs, entrySpec{depth: 3, n: 5})
 	}
 	entries := makeNavEntries(specs)
-	got := FilterNavEntries(entries, 20, 3)
-	if len(got) != 18 {
-		t.Errorf("len(got) = %d, want 18 (stub pass removes 4 stubs; 18 ≤ 20)", len(got))
+	// h2 About to confirm no hint is added.
+	entries[1].About = "~original"
+
+	got := PruneNavEntries(entries, 50, 150, 5)
+	if len(got) > 5 {
+		t.Errorf("len(got) = %d, want ≤ 5 after pruning", len(got))
 	}
-	// All returned h3 entries should have WordCount >= 3
+	// h2 About should remain unchanged (droppable, no hint)
 	for _, e := range got {
-		d := entryDepth(e)
-		if d > 2 && e.WordCount < 3 {
-			t.Errorf("stub entry %q (WordCount=%d) should have been removed", e.Name, e.WordCount)
-		}
-	}
-	// Verify document order
-	for i := 1; i < len(got); i++ {
-		if got[i].Start <= got[i-1].Start {
-			t.Errorf("entries not in document order at index %d", i)
+		if e.Name == testSection2 {
+			if e.About != "~original" {
+				t.Errorf("h2 About = %q, want %q (no hint for droppable h3)", e.About, "~original")
+			}
 		}
 	}
 }
 
-// TestFilterNavEntries_BudgetPassOnly: 25 entries (8 h1/h2 + 17 h3), all WordCount≥stubWords
-// stub pass removes nothing; budget=12 → keep 12 longest h3, drop 5 shortest; 20 returned
-func TestFilterNavEntries_BudgetPassOnly(t *testing.T) {
-	var specs []entrySpec
-	// 4 h1 + 4 h2 (fixed, n=10)
-	for i := 0; i < 4; i++ {
-		specs = append(specs, entrySpec{depth: 1, n: 10})
+// TestPruneNavEntries_HintsForMediumParent: h3 with medium parent → hint appended to parent About.
+func TestPruneNavEntries_HintsForMediumParent(t *testing.T) {
+	// 1 h1 + 1 h2 (N=80, medium) + 10 h3, cap=5
+	specs := []entrySpec{
+		{depth: 1, n: 200},
+		{depth: 2, n: 80}, // medium: sub(50) ≤ 80 < expand(150)
 	}
-	for i := 0; i < 4; i++ {
-		specs = append(specs, entrySpec{depth: 2, n: 10})
-	}
-	// 17 h3: sizes 3..19 (unique, all ≥ 3, wordCount defaults to n*5 ≥ 15 ≥ stubWords=3)
-	for i := 0; i < 17; i++ {
-		specs = append(specs, entrySpec{depth: 3, n: 3 + i})
+	for i := 0; i < 10; i++ {
+		specs = append(specs, entrySpec{depth: 3, n: 5})
 	}
 	entries := makeNavEntries(specs)
-	got := FilterNavEntries(entries, 20, 3)
-	if len(got) != 20 {
-		t.Errorf("len(got) = %d, want 20", len(got))
+	entries[1].About = testAutoAbout
+
+	got := PruneNavEntries(entries, 50, 150, 5)
+	if len(got) > 5 {
+		t.Errorf("len(got) = %d, want ≤ 5 after pruning", len(got))
 	}
-	// Shortest 5 h3 (n=3,4,5,6,7) should be gone (budget pass uses N for sorting)
+	// h2 About should contain > hints
 	for _, e := range got {
-		if entryDepth(e) == 3 && e.N < 8 {
-			t.Errorf("short h3 entry %q (n=%d) should have been removed by budget pass", e.Name, e.N)
-		}
-	}
-	// Verify document order
-	for i := 1; i < len(got); i++ {
-		if got[i].Start <= got[i-1].Start {
-			t.Errorf("entries not in document order at index %d", i)
+		if e.Name == testSection2 {
+			if !strings.Contains(e.About, ">") {
+				t.Errorf("medium parent About = %q, should contain > hints", e.About)
+			}
 		}
 	}
 }
 
-// TestFilterNavEntries_BothPasses: 25 entries (8 h1/h2 + 17 h3), 3 h3 are stubs (WordCount=1)
-// stub pass drops 3 → 8+14=22 > 20; budget=12 → keep 12 longest of 14; 20 returned
-func TestFilterNavEntries_BothPasses(t *testing.T) {
-	var specs []entrySpec
-	// 4 h1 + 4 h2
-	for i := 0; i < 4; i++ {
-		specs = append(specs, entrySpec{depth: 1, n: 10})
+// TestPruneNavEntries_MultipleHintsAccumulate: 3 h3s under same medium h2, all pruned → hints accumulate.
+func TestPruneNavEntries_MultipleHintsAccumulate(t *testing.T) {
+	entries := []navblock.NavEntry{
+		{Start: 1, N: 200, Name: "#Top"},
+		{Start: 10, N: 80, Name: testParent, About: testAutoAbout},
+		{Start: 20, N: 5, Name: "###h3a"},
+		{Start: 30, N: 5, Name: "###h3b"},
+		{Start: 40, N: 5, Name: "###h3c"},
 	}
-	for i := 0; i < 4; i++ {
-		specs = append(specs, entrySpec{depth: 2, n: 10})
+	// cap=2 forces all 3 h3s to be pruned
+	got := PruneNavEntries(entries, 50, 150, 2)
+	if len(got) != 2 {
+		t.Errorf("len(got) = %d, want 2", len(got))
 	}
-	// 3 h3 stubs (wordCount=1 < stubWords=3)
-	for i := 0; i < 3; i++ {
-		specs = append(specs, entrySpec{depth: 3, n: 2, wordCount: 1})
-	}
-	// 14 h3 non-stubs (n=5..18, wordCount defaults to n*5 ≥ 25 ≥ 3)
-	for i := 0; i < 14; i++ {
-		specs = append(specs, entrySpec{depth: 3, n: 5 + i})
-	}
-	entries := makeNavEntries(specs)
-	got := FilterNavEntries(entries, 20, 3)
-	if len(got) != 20 {
-		t.Errorf("len(got) = %d, want 20 (stub+budget passes)", len(got))
-	}
-	// No stubs (WordCount<3) should remain among h3s
-	for _, e := range got {
-		if entryDepth(e) > 2 && e.WordCount < 3 {
-			t.Errorf("stub h3 entry %q (WordCount=%d) should be removed", e.Name, e.WordCount)
+	var parent *navblock.NavEntry
+	for i := range got {
+		if got[i].Name == testParent {
+			parent = &got[i]
 		}
 	}
-	// Verify document order
-	for i := 1; i < len(got); i++ {
-		if got[i].Start <= got[i-1].Start {
-			t.Errorf("entries not in document order at index %d", i)
-		}
+	if parent == nil {
+		t.Fatal(testParent + " entry not found after pruning")
+	}
+	// All 3 h3 hints should be present
+	if !strings.Contains(parent.About, "h3a") {
+		t.Errorf("parent About = %q, want h3a hint", parent.About)
+	}
+	if !strings.Contains(parent.About, "h3b") {
+		t.Errorf("parent About = %q, want h3b hint", parent.About)
+	}
+	if !strings.Contains(parent.About, "h3c") {
+		t.Errorf("parent About = %q, want h3c hint", parent.About)
+	}
+	// Multiple hints separated by ;
+	if !strings.Contains(parent.About, ";") {
+		t.Errorf("parent About = %q, want ; between accumulated hints", parent.About)
 	}
 }
 
-// TestFilterNavEntries_H1H2Overrun: 25 entries all h1/h2, no candidates → accept overrun
-func TestFilterNavEntries_H1H2Overrun(t *testing.T) {
-	var specs []entrySpec
-	for i := 0; i < 13; i++ {
-		specs = append(specs, entrySpec{depth: 1, n: 10})
+// TestPruneNavEntries_KeepsLargeParent: h3 with parent N >= expand_threshold → kept; overrun accepted.
+func TestPruneNavEntries_KeepsLargeParent(t *testing.T) {
+	entries := []navblock.NavEntry{
+		{Start: 1, N: 200, Name: "#Top"},
+		{Start: 10, N: 200, Name: "##BigParent", About: "~big"}, // N=200 >= expand=150
+		{Start: 20, N: 5, Name: "###Child1"},
+		{Start: 30, N: 5, Name: "###Child2"},
+		{Start: 40, N: 5, Name: "###Child3"},
 	}
-	for i := 0; i < 12; i++ {
+	// cap=2 would normally force pruning, but h3s are unkillable
+	got := PruneNavEntries(entries, 50, 150, 2)
+	// Overrun accepted: all 5 entries remain
+	if len(got) != 5 {
+		t.Errorf("len(got) = %d, want 5 (unkillable h3s cause overrun acceptance)", len(got))
+	}
+}
+
+// TestPruneNavEntries_NoParentDrops: orphan h3 (no preceding h2) → dropped, no panic.
+func TestPruneNavEntries_NoParentDrops(t *testing.T) {
+	entries := []navblock.NavEntry{
+		{Start: 1, N: 5, Name: "###OrphanH3"}, // no parent (depth 2) above it
+		{Start: 10, N: 5, Name: "###OrphanH3b"},
+		{Start: 20, N: 5, Name: "###OrphanH3c"},
+		{Start: 30, N: 5, Name: "###OrphanH3d"},
+		{Start: 40, N: 5, Name: "###OrphanH3e"},
+	}
+	// Should not panic; orphans have parentN=0 (droppable)
+	got := PruneNavEntries(entries, 50, 150, 2)
+	if len(got) > 2 {
+		t.Errorf("len(got) = %d, want ≤ 2 (orphans dropped)", len(got))
+	}
+}
+
+// TestPruneNavEntries_ShallowOverrunAccepted: 25 h2 entries (no h3), cap=20 → all 25 returned.
+func TestPruneNavEntries_ShallowOverrunAccepted(t *testing.T) {
+	var specs []entrySpec
+	for i := 0; i < 25; i++ {
 		specs = append(specs, entrySpec{depth: 2, n: 10})
 	}
 	entries := makeNavEntries(specs)
-	got := FilterNavEntries(entries, 20, 3)
+	got := PruneNavEntries(entries, 50, 150, 20)
 	if len(got) != 25 {
-		t.Errorf("len(got) = %d, want 25 (h1/h2 overrun accepted)", len(got))
+		t.Errorf("len(got) = %d, want 25 (shallow overrun accepted)", len(got))
 	}
 }
 
-// TestFilterNavEntries_BudgetExhausted: 8 h1/h2 + 15 h3 stubs (all WordCount=1)
-// stub pass drops all 15 → 8 remain; 8 ≤ 20 → return 8
-func TestFilterNavEntries_BudgetExhausted(t *testing.T) {
-	var specs []entrySpec
-	for i := 0; i < 4; i++ {
-		specs = append(specs, entrySpec{depth: 1, n: 10})
+// TestPruneNavEntries_MixedOutcomes: mix of large/medium/small h2 parents with h3s, over budget.
+func TestPruneNavEntries_MixedOutcomes(t *testing.T) {
+	// 1 h1 + large h2 (N=200) + 5 h3 + medium h2 (N=80) + 5 h3 + small h2 (N=30) + 5 h3 = 18 total
+	// cap=10: 5 h3s under large parent are unkillable; medium → hints; small → dropped
+	entries := []navblock.NavEntry{
+		{Start: 1, N: 250, Name: "#Top"},
+		// Large parent section: h3s unkillable
+		{Start: 10, N: 200, Name: "##LargeParent"},
+		{Start: 20, N: 5, Name: "###LargeChild1"},
+		{Start: 30, N: 5, Name: "###LargeChild2"},
+		{Start: 40, N: 5, Name: "###LargeChild3"},
+		{Start: 50, N: 5, Name: "###LargeChild4"},
+		{Start: 60, N: 5, Name: "###LargeChild5"},
+		// Medium parent: h3s become hints
+		{Start: 220, N: 80, Name: "##MediumParent", About: "~medium"},
+		{Start: 230, N: 5, Name: "###MediumChild1"},
+		{Start: 240, N: 5, Name: "###MediumChild2"},
+		{Start: 250, N: 5, Name: "###MediumChild3"},
+		{Start: 260, N: 5, Name: "###MediumChild4"},
+		{Start: 270, N: 5, Name: "###MediumChild5"},
+		// Small parent: h3s dropped
+		{Start: 310, N: 30, Name: "##SmallParent", About: "~small"},
+		{Start: 320, N: 5, Name: "###SmallChild1"},
+		{Start: 330, N: 5, Name: "###SmallChild2"},
+		{Start: 340, N: 5, Name: "###SmallChild3"},
+		{Start: 350, N: 5, Name: "###SmallChild4"},
 	}
-	for i := 0; i < 4; i++ {
-		specs = append(specs, entrySpec{depth: 2, n: 10})
+	// cap=10: forces pruning of h3s.
+	// Large h3s: unkillable (parent N=200 >= expand=150).
+	// Medium h3s: hintable (50 <= parent N=80 < 150).
+	// Small h3s: droppable (parent N=30 < sub=50).
+	// Start: 18 entries, need to reduce to 10 → remove 8.
+	// First round: maxD=3. Small h3s (parentN=30) droppable, medium h3s (parentN=80) hintable, large h3s unkillable.
+	// Sort by N asc (all N=5): droppable first, then hintable.
+	// Need to remove 8: 4 small (droppable) + 4 medium (hintable from 5 available), leaving 10 = 1+2+5+1+1 = 10
+	got := PruneNavEntries(entries, 50, 150, 10)
+	if len(got) > 10 {
+		t.Errorf("len(got) = %d, want ≤ 10 after pruning", len(got))
 	}
-	for i := 0; i < 15; i++ {
-		specs = append(specs, entrySpec{depth: 3, n: 1, wordCount: 1})
-	}
-	entries := makeNavEntries(specs)
-	got := FilterNavEntries(entries, 20, 3)
-	if len(got) != 8 {
-		t.Errorf("len(got) = %d, want 8 (all stubs removed)", len(got))
-	}
+	// Large parent h3s should all be kept (unkillable)
+	largeKept := 0
 	for _, e := range got {
-		if entryDepth(e) > 2 {
-			t.Errorf("h3 entry %q should have been removed as stub", e.Name)
+		if strings.HasPrefix(e.Name, "###LargeChild") {
+			largeKept++
+		}
+	}
+	if largeKept != 5 {
+		t.Errorf("LargeChild h3s kept = %d, want 5 (unkillable)", largeKept)
+	}
+	// Small parent h3s should all be dropped
+	for _, e := range got {
+		if strings.HasPrefix(e.Name, "###SmallChild") {
+			t.Errorf("SmallChild h3 %q should have been dropped", e.Name)
+		}
+	}
+	// Medium parent should have > hints
+	for _, e := range got {
+		if e.Name == "##MediumParent" {
+			if !strings.Contains(e.About, ">") {
+				t.Errorf("MediumParent About = %q, should have > hints", e.About)
+			}
+		}
+	}
+}
+
+// TestBuildNavEntries_AllSectionsIncluded: all sections appear as entries, no threshold filtering.
+func TestBuildNavEntries_AllSectionsIncluded(t *testing.T) {
+	content := `# Doc
+intro
+
+## SmallSection
+
+brief
+
+### SmallChild
+
+child content
+
+## MediumSection
+
+` + strings.Repeat("medium content line\n", 10) + `
+### MediumChild
+
+child content here
+
+## LargeSection
+
+` + strings.Repeat("large content line\n", 50) + `
+### LargeChild
+
+child content here
+`
+	sections := []parser.Section{
+		{Heading: parser.Heading{Line: 1, Depth: 1, Text: "Doc"}, Start: 1, End: 100},
+		{Heading: parser.Heading{Line: 3, Depth: 2, Text: "SmallSection"}, Start: 3, End: 10},
+		{Heading: parser.Heading{Line: 7, Depth: 3, Text: "SmallChild"}, Start: 7, End: 9},
+		{Heading: parser.Heading{Line: 12, Depth: 2, Text: "MediumSection"}, Start: 12, End: 30},
+		{Heading: parser.Heading{Line: 25, Depth: 3, Text: "MediumChild"}, Start: 25, End: 28},
+		{Heading: parser.Heading{Line: 32, Depth: 2, Text: "LargeSection"}, Start: 32, End: 90},
+		{Heading: parser.Heading{Line: 85, Depth: 3, Text: "LargeChild"}, Start: 85, End: 88},
+	}
+
+	got := buildNavEntries(sections, content)
+
+	// ALL 7 sections should appear as full nav entries with no threshold branching.
+	if len(got) != 7 {
+		t.Errorf("len(got) = %d, want 7 (all sections included)", len(got))
+		for i, e := range got {
+			t.Logf("  got[%d]: %s", i, e.Name)
+		}
+	}
+
+	// No hints should appear in About fields (hints only from PruneNavEntries, not buildNavEntries)
+	for _, e := range got {
+		if strings.Contains(e.About, ">") {
+			t.Errorf("entry %q About = %q: should not have > hints from buildNavEntries", e.Name, e.About)
 		}
 	}
 }
@@ -588,19 +679,6 @@ func makeNavEntries(specs []entrySpec) []navblock.NavEntry {
 	return entries
 }
 
-// entryDepth returns the heading depth of a NavEntry by counting leading '#' chars.
-func entryDepth(e navblock.NavEntry) int {
-	d := 0
-	for _, ch := range e.Name {
-		if ch == '#' {
-			d++
-		} else {
-			break
-		}
-	}
-	return d
-}
-
 // TestFile_LargeFileCapLineNumbers verifies that when the large-file cap fires
 // (>20 entries), the kept h1/h2 entries have correct adjusted line numbers — i.e.
 // applyAdjustedLines runs on the full list BEFORE the cap, so the offset is applied.
@@ -629,9 +707,10 @@ func TestFile_LargeFileCapLineNumbers(t *testing.T) {
 
 	cfg := config.Defaults()
 	cfg.MinLines = 10
-	// Set expand threshold low so h3s get included before the cap, testing the cap
-	cfg.SubThreshold = 1
-	cfg.ExpandThreshold = 1
+	// Each h2 parent has N≈7 lines; set SubThreshold=20 so all h2 parents are droppable
+	// (parentN < subThreshold → droppable → h3 children dropped with no hints).
+	cfg.SubThreshold = 20
+	cfg.ExpandThreshold = 200
 
 	_, err := File(path, cfg, false)
 	if err != nil {
@@ -698,9 +777,8 @@ Some content here.
 		{Heading: parser.Heading{Line: 1, Depth: 2, Text: "First"}, Start: 1, End: 1},
 		{Heading: parser.Heading{Line: 3, Depth: 2, Text: "Second"}, Start: 3, End: 6},
 	}
-	cfg := config.Defaults()
 
-	got := buildNavEntries(sections, content, cfg)
+	got := buildNavEntries(sections, content)
 
 	if len(got) != 2 {
 		t.Fatalf("len(entries) = %d, want 2", len(got))
@@ -730,8 +808,7 @@ Some setup content.
 		},
 	}
 
-	cfg := config.Defaults()
-	got := buildNavEntries(sections, content, cfg)
+	got := buildNavEntries(sections, content)
 
 	if len(got) != 1 {
 		t.Fatalf("len(entries) = %d, want 1", len(got))
@@ -779,7 +856,7 @@ Silent rotation and expiry detection.
 	cfg := config.Defaults()
 	cfg.MinLines = 10
 
-	got := buildNavEntries(sections, content, cfg)
+	got := buildNavEntries(sections, content)
 
 	if len(got) != 3 {
 		t.Fatalf("len(entries) = %d, want 3", len(got))
@@ -892,13 +969,13 @@ Content B.
 	if !strings.Contains(got, "##Section A") {
 		t.Error("nav should contain ##Section A")
 	}
-	// Section A is medium-sized (between sub_threshold and expand_threshold),
-	// so h3 children appear as > hints, not full entries
-	if !strings.Contains(got, ">Subsection A1") {
-		t.Error("Section A should have > hint for Subsection A1")
+	// With 5 entries total (well under MaxNavEntries=20), no pruning occurs —
+	// all h3 sections appear as full nav entries.
+	if !strings.Contains(got, "###Subsection A1") {
+		t.Error("nav should contain ###Subsection A1 as full entry (under budget)")
 	}
-	if !strings.Contains(got, "Subsection A2") {
-		t.Error("Section A should have > hint for Subsection A2")
+	if !strings.Contains(got, "###Subsection A2") {
+		t.Error("nav should contain ###Subsection A2 as full entry (under budget)")
 	}
 	if !strings.Contains(got, "##Section B") {
 		t.Error("nav should contain ##Section B")
@@ -1010,115 +1087,18 @@ Content goes here.
 	}
 }
 
-func TestGetH3Children_ImmediateOnly(t *testing.T) {
-	tests := []struct {
-		name      string
-		sections  []parser.Section
-		parentIdx int
-		wantText  []string
-	}{
-		{
-			name: "h2 with immediate h3 children only",
-			sections: []parser.Section{
-				{Heading: parser.Heading{Line: 1, Depth: 1, Text: "Main"}, Start: 1, End: 100},
-				{Heading: parser.Heading{Line: 10, Depth: 2, Text: "Section A"}, Start: 10, End: 50},
-				{Heading: parser.Heading{Line: 15, Depth: 3, Text: "Subsection A1"}, Start: 15, End: 20},
-				{Heading: parser.Heading{Line: 25, Depth: 3, Text: "Subsection A2"}, Start: 25, End: 30},
-				{Heading: parser.Heading{Line: 60, Depth: 2, Text: "Section B"}, Start: 60, End: 100},
-			},
-			parentIdx: 1,
-			wantText:  []string{"Subsection A1", "Subsection A2"},
-		},
-		{
-			name: "h2 with grandchild h3s separated by another h2",
-			sections: []parser.Section{
-				{Heading: parser.Heading{Line: 1, Depth: 1, Text: "Main"}, Start: 1, End: 120},
-				{Heading: parser.Heading{Line: 10, Depth: 2, Text: "Section A"}, Start: 10, End: 60},
-				{Heading: parser.Heading{Line: 15, Depth: 3, Text: "Child A1"}, Start: 15, End: 20},
-				{Heading: parser.Heading{Line: 30, Depth: 2, Text: "Section B"}, Start: 30, End: 70},
-				{Heading: parser.Heading{Line: 35, Depth: 3, Text: "Child B1"}, Start: 35, End: 40},
-				{Heading: parser.Heading{Line: 50, Depth: 3, Text: "Child B2"}, Start: 50, End: 55},
-				{Heading: parser.Heading{Line: 80, Depth: 2, Text: "Section C"}, Start: 80, End: 120},
-			},
-			parentIdx: 1,
-			wantText:  []string{"Child A1"},
-		},
-		{
-			name: "h1 parent should not get h3s from later h2 sections",
-			sections: []parser.Section{
-				{Heading: parser.Heading{Line: 1, Depth: 1, Text: "Main"}, Start: 1, End: 100},
-				{Heading: parser.Heading{Line: 10, Depth: 2, Text: "Section A"}, Start: 10, End: 30},
-				{Heading: parser.Heading{Line: 15, Depth: 3, Text: "A1"}, Start: 15, End: 20},
-				{Heading: parser.Heading{Line: 40, Depth: 2, Text: "Section B"}, Start: 40, End: 100},
-				{Heading: parser.Heading{Line: 50, Depth: 3, Text: "B1"}, Start: 50, End: 60},
-				{Heading: parser.Heading{Line: 70, Depth: 3, Text: "B2"}, Start: 70, End: 80},
-			},
-			parentIdx: 0,
-			wantText:  nil,
-		},
-		{
-			name: "empty children case - no h3",
-			sections: []parser.Section{
-				{Heading: parser.Heading{Line: 1, Depth: 1, Text: "Main"}, Start: 1, End: 50},
-				{Heading: parser.Heading{Line: 10, Depth: 2, Text: "Section A"}, Start: 10, End: 30},
-				{Heading: parser.Heading{Line: 40, Depth: 2, Text: "Section B"}, Start: 40, End: 50},
-			},
-			parentIdx: 1,
-			wantText:  nil,
-		},
-		{
-			name: "multiple h2 siblings - each gets own h3s",
-			sections: []parser.Section{
-				{Heading: parser.Heading{Line: 1, Depth: 1, Text: "Main"}, Start: 1, End: 200},
-				{Heading: parser.Heading{Line: 10, Depth: 2, Text: "CLI Commands"}, Start: 10, End: 80},
-				{Heading: parser.Heading{Line: 15, Depth: 3, Text: "generate"}, Start: 15, End: 25},
-				{Heading: parser.Heading{Line: 30, Depth: 3, Text: "update"}, Start: 30, End: 40},
-				{Heading: parser.Heading{Line: 50, Depth: 2, Text: "Description Authoring"}, Start: 50, End: 120},
-				{Heading: parser.Heading{Line: 60, Depth: 3, Text: "Tier 1 Keywords"}, Start: 60, End: 70},
-				{Heading: parser.Heading{Line: 80, Depth: 3, Text: "LLM Generated"}, Start: 80, End: 90},
-				{Heading: parser.Heading{Line: 130, Depth: 2, Text: "Parser Spec"}, Start: 130, End: 200},
-				{Heading: parser.Heading{Line: 140, Depth: 3, Text: "Nav Block Parser"}, Start: 140, End: 160},
-				{Heading: parser.Heading{Line: 170, Depth: 3, Text: "Nav Block Writer"}, Start: 170, End: 190},
-			},
-			parentIdx: 1,
-			wantText:  []string{"generate", "update"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := getH3Children(tt.sections, tt.parentIdx)
-			if tt.wantText == nil {
-				if len(got) != 0 {
-					t.Errorf("getH3Children() = %v, want nil or empty", got)
-				}
-				return
-			}
-			if len(got) != len(tt.wantText) {
-				t.Errorf("len(getH3Children()) = %d, want %d. Got: %v, Want: %v",
-					len(got), len(tt.wantText), got, tt.wantText)
-				return
-			}
-			for i := range tt.wantText {
-				if got[i].Text != tt.wantText[i] {
-					t.Errorf("getH3Children()[%d].Text = %q, want %q", i, got[i].Text, tt.wantText[i])
-				}
-			}
-		})
-	}
-}
-
 func TestBuildNavEntries_HierarchyEdgeCases(t *testing.T) {
+	// New behavior: buildNavEntries always includes every section; no threshold branching.
+	// All sections become full entries; no hints are added at build time.
 	tests := []struct {
-		name           string
-		sections       []parser.Section
-		content        string
-		cfg            config.Config
-		wantEntryText  []string
-		wantEntryAbout []string
+		name          string
+		sections      []parser.Section
+		content       string
+		cfg           config.Config
+		wantEntryText []string
 	}{
 		{
-			name: "h2 with immediate h3 children only - Section 4 should not include Section 8 h3s",
+			name: "all sections included regardless of size",
 			sections: []parser.Section{
 				{Heading: parser.Heading{Line: 1, Depth: 1, Text: "Design Doc"}, Start: 1, End: 35},
 				{Heading: parser.Heading{Line: 3, Depth: 2, Text: "CLI Commands"}, Start: 3, End: 15},
@@ -1166,17 +1146,12 @@ more
 
 heading parser content
 `,
-			cfg: config.Config{
-				SubThreshold:    5,
-				ExpandThreshold: 12,
-			},
-			// CLI Commands (lines 3-15, 13 lines >= expand threshold 12) gets h3 children expanded
-			// Description Authoring (lines 16-22, 7 lines >= sub threshold 5 but < expand) gets > hints
-			// Parser Spec (lines 24-35, 12 lines >= expand threshold 12) gets h3 children expanded
-			wantEntryText: []string{"#Design Doc", "##CLI Commands", "###generate", "###update", "##Description Authoring", "##Parser Spec", "###Heading Parser"},
+			cfg: config.Config{SubThreshold: 5, ExpandThreshold: 12},
+			// ALL 8 sections — including h3s — are full entries; no threshold filtering in buildNavEntries.
+			wantEntryText: []string{"#Design Doc", "##CLI Commands", "###generate", "###update", "##Description Authoring", "###Keywords", "##Parser Spec", "###Heading Parser"},
 		},
 		{
-			name: "small h2 sections - should not expand h3 children, use > hints instead",
+			name: "small h2 sections still include h3 children",
 			sections: []parser.Section{
 				{Heading: parser.Heading{Line: 1, Depth: 1, Text: "Main"}, Start: 1, End: 22},
 				{Heading: parser.Heading{Line: 3, Depth: 2, Text: "Section A"}, Start: 3, End: 15},
@@ -1208,14 +1183,12 @@ a2 content
 
 section b content
 `,
-			cfg: config.Config{
-				SubThreshold:    8,
-				ExpandThreshold: 20,
-			},
-			wantEntryText: []string{"#Main", "##Section A", "##Section B"},
+			cfg: config.Config{SubThreshold: 8, ExpandThreshold: 20},
+			// All 5 sections are full entries now; pruning only via PruneNavEntries.
+			wantEntryText: []string{"#Main", "##Section A", "###A1", "###A2", "##Section B"},
 		},
 		{
-			name: "h2 below subThreshold - no h3 hints",
+			name: "h2 below subThreshold still includes h3",
 			sections: []parser.Section{
 				{Heading: parser.Heading{Line: 1, Depth: 1, Text: "Main"}, Start: 1, End: 20},
 				{Heading: parser.Heading{Line: 3, Depth: 2, Text: "Section A"}, Start: 3, End: 12},
@@ -1233,17 +1206,15 @@ more
 
 a1 content
 `,
-			cfg: config.Config{
-				SubThreshold:    50,
-				ExpandThreshold: 100,
-			},
-			wantEntryText: []string{"#Main", "##Section A"},
+			cfg: config.Config{SubThreshold: 50, ExpandThreshold: 100},
+			// All 3 sections are full entries; no threshold-based skipping.
+			wantEntryText: []string{"#Main", "##Section A", "###A1"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := buildNavEntries(tt.sections, tt.content, tt.cfg)
+			got := buildNavEntries(tt.sections, tt.content)
 			if len(got) != len(tt.wantEntryText) {
 				t.Errorf("len(buildNavEntries()) = %d, want %d", len(got), len(tt.wantEntryText))
 				for i, e := range got {
@@ -1256,12 +1227,10 @@ a1 content
 					t.Errorf("entry[%d].Name = %q, want %q", i, got[i].Name, want)
 				}
 			}
-			// Check About field if provided
-			if len(tt.wantEntryAbout) > 0 {
-				for i, want := range tt.wantEntryAbout {
-					if got[i].About != want {
-						t.Errorf("entry[%d].About = %q, want %q", i, got[i].About, want)
-					}
+			// No About field should contain > hints (hints come from PruneNavEntries, not buildNavEntries)
+			for _, e := range got {
+				if strings.Contains(e.About, ">") {
+					t.Errorf("entry %q About = %q: buildNavEntries must not add > hints", e.Name, e.About)
 				}
 			}
 		})
@@ -1271,8 +1240,6 @@ a1 content
 // TestBuildNavEntries_LargeH2NoH3Children verifies that a large h2 section with no
 // h3 children does not panic (regression for index-out-of-range [-1] bug).
 func TestBuildNavEntries_LargeH2NoH3Children(t *testing.T) {
-	cfg := config.Defaults()
-
 	// Build a content string where the h2 section is larger than ExpandThreshold
 	// but contains zero h3 children.
 	var sb strings.Builder
@@ -1287,7 +1254,7 @@ func TestBuildNavEntries_LargeH2NoH3Children(t *testing.T) {
 	sections := parser.ComputeSections(parsedHeadings, len(strings.Split(content, "\n")))
 
 	// Must not panic.
-	entries := buildNavEntries(sections, content, cfg)
+	entries := buildNavEntries(sections, content)
 
 	// Sanity: we should get at least 2 entries (#Title and ##Big-Section).
 	if len(entries) < 2 {
@@ -1295,31 +1262,26 @@ func TestBuildNavEntries_LargeH2NoH3Children(t *testing.T) {
 	}
 }
 
-// TestFilterNavEntries_StubUsesWordCount verifies that the stub pass uses WordCount,
-// not N, to decide which h3 entries to drop.
-func TestFilterNavEntries_StubUsesWordCount(t *testing.T) {
-	// 4 h1/h2 fixed; 2 h3 with high N but low WordCount (stubs); 2 h3 with low N but high WordCount
+// TestPruneNavEntries_DropsShortestFirst verifies that PruneNavEntries prunes
+// by N ascending (shortest sections first) when over budget.
+func TestPruneNavEntries_DropsShortestFirst(t *testing.T) {
+	// h2 parent N=40 < subThreshold=50 → droppable. 3 h3 children with varying N.
+	// With 5 entries and maxEntries=3, need to drop 2 → shortest h3s first.
 	entries := []navblock.NavEntry{
-		{Start: 1, N: 10, Name: "#Chapter", About: "", WordCount: 100},
-		{Start: 11, N: 10, Name: "##Section", About: "", WordCount: 80},
-		// h3 stubs: large N but few words
-		{Start: 21, N: 50, Name: "###StubA", About: "", WordCount: 5},
-		{Start: 71, N: 50, Name: "###StubB", About: "", WordCount: 3},
-		// h3 substantive: small N but many words (dense content)
-		{Start: 121, N: 3, Name: "###DenseA", About: "", WordCount: 30},
-		{Start: 124, N: 3, Name: "###DenseB", About: "", WordCount: 25},
+		{Start: 1, N: 200, Name: "#Chapter", About: "", WordCount: 100},
+		{Start: 11, N: 40, Name: "##Section", About: "", WordCount: 50}, // N=40 < sub=50 → droppable parent
+		{Start: 51, N: 10, Name: "###Short1", About: "", WordCount: 80},
+		{Start: 61, N: 20, Name: "###Medium1", About: "", WordCount: 80},
+		{Start: 81, N: 50, Name: "###Large1", About: "", WordCount: 80},
 	}
-	// 6 entries total ≤ 20, but force stub pass via budget (set maxEntries to 4)
-	// With maxEntries=4: fixed=2, candidates=4, budget=2
-	// stub pass (stubWords=20): drops StubA(5) and StubB(3), keeps DenseA(30) and DenseB(25)
-	// After stub pass: 2 fixed + 2 dense = 4 ≤ 4
-	got := FilterNavEntries(entries, 4, 20)
-	if len(got) != 4 {
-		t.Fatalf("len(got) = %d, want 4", len(got))
+	// 5 entries; cap to 3 → drop 2 h3s (Short1 N=10, Medium1 N=20 are cheapest)
+	got := PruneNavEntries(entries, 50, 150, 3)
+	if len(got) != 3 {
+		t.Fatalf("len(got) = %d, want 3", len(got))
 	}
 	for _, e := range got {
-		if e.Name == "###StubA" || e.Name == "###StubB" {
-			t.Errorf("stub entry %q (WordCount too low) should have been removed", e.Name)
+		if e.Name == "###Short1" || e.Name == "###Medium1" {
+			t.Errorf("shortest entry %q should have been removed first", e.Name)
 		}
 	}
 }
@@ -1332,8 +1294,7 @@ func TestBuildNavEntries_WordCount(t *testing.T) {
 	sections := []parser.Section{
 		{Heading: parser.Heading{Line: 1, Depth: 2, Text: "Section"}, Start: 1, End: 2},
 	}
-	cfg := config.Defaults()
-	got := buildNavEntries(sections, content, cfg)
+	got := buildNavEntries(sections, content)
 	if len(got) != 1 {
 		t.Fatalf("len(got) = %d, want 1", len(got))
 	}
@@ -1459,9 +1420,8 @@ func TestTildePrefix_NotAddedWhenEmpty(t *testing.T) {
 		{Heading: parser.Heading{Line: 1, Depth: 1, Text: "A"}, Start: 1, End: 1},
 	}
 	content := "# A\n"
-	cfg := config.Defaults()
 
-	got := buildNavEntries(sections, content, cfg)
+	got := buildNavEntries(sections, content)
 
 	if len(got) != 1 {
 		t.Fatalf("len(entries) = %d, want 1", len(got))
@@ -1473,41 +1433,21 @@ func TestTildePrefix_NotAddedWhenEmpty(t *testing.T) {
 }
 
 func TestTildePrefix_HintAppending(t *testing.T) {
-	content := `# Main
-
-Intro text here.
-
-## Section A
-
-Section A content with some meaningful words for keyword extraction.
-More detailed content about authentication and token management.
-
-### Subsection A1
-
-Detail for A1.
-
-### Subsection A2
-
-Detail for A2.
-
-## Section B
-
-Section B content.
-`
-	sections := []parser.Section{
-		{Heading: parser.Heading{Line: 1, Depth: 1, Text: "Main"}, Start: 1, End: 30},
-		{Heading: parser.Heading{Line: 5, Depth: 2, Text: "Section A"}, Start: 5, End: 20},
-		{Heading: parser.Heading{Line: 11, Depth: 3, Text: "Subsection A1"}, Start: 11, End: 13},
-		{Heading: parser.Heading{Line: 15, Depth: 3, Text: "Subsection A2"}, Start: 15, End: 17},
-		{Heading: parser.Heading{Line: 22, Depth: 2, Text: "Section B"}, Start: 22, End: 30},
+	// When PruneNavEntries collapses hintable h3 entries into the parent's About,
+	// the hint is appended to whatever About already contains. If the parent About
+	// starts with ~ (auto-generated prefix), the > hints must come after ~ — not
+	// interspersed or prefixed.
+	entries := []navblock.NavEntry{
+		{Start: 1, N: 30, Name: "#Main", About: "~intro text", WordCount: 10},
+		// Section A: N=16 is between sub(10) and expand(100) → hintable parent
+		{Start: 5, N: 16, Name: "##Section A", About: "~authentication token management", WordCount: 20},
+		{Start: 11, N: 2, Name: "###Subsection A1", About: "~detail a1", WordCount: 5},
+		{Start: 15, N: 2, Name: "###Subsection A2", About: "~detail a2", WordCount: 5},
+		{Start: 22, N: 8, Name: "##Section B", About: "~section b content", WordCount: 5},
 	}
 
-	cfg := config.Config{
-		SubThreshold:    10,
-		ExpandThreshold: 100,
-	}
-
-	got := buildNavEntries(sections, content, cfg)
+	// 5 entries, cap to 3 → must drop 2 h3 entries; Section A N=16 ≥ subThreshold(10) → hintable
+	got := PruneNavEntries(entries, 10, 100, 3)
 
 	var sectionA *navblock.NavEntry
 	for i := range got {
@@ -1835,14 +1775,12 @@ func TestFile_LineNumbersCorrectOnFirstGenerate(t *testing.T) {
 }
 
 // TestFile_LineNumbersCorrectWithH3Children verifies that nav entry s values are
-// correct even when h2 sections have h3 children that buildNavEntries skips.
-// This is the common real-world case: skipped h3s make len(originalEntries) <
-// len(sections), which previously caused applyAdjustedLines to silently bail out
-// and return unadjusted (pre-nav-block) line numbers.
+// correct even with multi-level headings (h1/h2/h3). buildNavEntries now includes
+// all sections; PruneNavEntries may prune h3s when over budget. Regardless,
+// every retained entry's s must point to the correct heading line.
 func TestFile_LineNumbersCorrectWithH3Children(t *testing.T) {
 	// Build a file with h1 and several h2 sections, each with h3 subsections.
-	// Each h2 is small enough to stay below ExpandThreshold (default 200), so
-	// buildNavEntries skips the h3s and returns fewer entries than len(sections).
+	// 1 h1 + 5 h2 + 10 h3 = 16 entries, under MaxNavEntries=20, so all are kept.
 	var b strings.Builder
 	b.WriteString("# Top Level\n\n")
 	b.WriteString(strings.Repeat("Intro content.\n", 5))
@@ -1864,8 +1802,6 @@ func TestFile_LineNumbersCorrectWithH3Children(t *testing.T) {
 
 	cfg := config.Defaults()
 	cfg.MinLines = 10
-	// Leave ExpandThreshold at default (200) so h2 sections don't expand.
-	// This ensures h3s are skipped: len(originalEntries) < len(sections).
 
 	_, err := File(path, cfg, false)
 	if err != nil {
@@ -1881,22 +1817,6 @@ func TestFile_LineNumbersCorrectWithH3Children(t *testing.T) {
 	pr := navblock.ParseNavBlock(got)
 	if !pr.Found {
 		t.Fatal("nav block not found after generate")
-	}
-
-	// h3 entries must not appear: buildNavEntries skips them when the parent h2
-	// is below ExpandThreshold, and the nav block should only contain h1/h2.
-	for _, entry := range pr.Block.Nav {
-		depth := 0
-		for _, ch := range entry.Name {
-			if ch == '#' {
-				depth++
-			} else {
-				break
-			}
-		}
-		if depth >= 3 {
-			t.Errorf("h3+ entry %q found in nav block; expected only h1/h2 (ExpandThreshold not reached)", entry.Name)
-		}
 	}
 
 	fileLines := strings.Split(got, "\n")
@@ -1971,5 +1891,82 @@ func TestFile_MinLinesBoundary(t *testing.T) {
 	if strings.Contains(string(data), "nav[") {
 		t.Errorf("file with %d lines should not have nav[] entries (threshold %d); off-by-1 in totalLines",
 			targetNewlines, threshold)
+	}
+}
+
+// TestPruneNavEntries_Idempotent verifies that calling PruneNavEntries twice on the
+// same base entries (with Start values shifted on the second call to simulate an
+// offset adjustment) produces structurally identical pruning decisions: the same
+// entries survive, the same become hints, and the hint text on parent entries is
+// identical. This also confirms PruneNavEntries does not mutate the original slice.
+func TestPruneNavEntries_Idempotent(t *testing.T) {
+	// Base entries: 1 h1 + 1 h2 (medium parent, N=80) + 5 h3.
+	// With cap=2, all 5 h3s must be pruned to reach the budget; medium parent gets hints.
+	base := []navblock.NavEntry{
+		{Start: 1, N: 200, Name: "#Top", About: "~top"},
+		{Start: 10, N: 80, Name: testParent, About: "~parent desc"},
+		{Start: 20, N: 5, Name: "###Child1", About: "~c1"},
+		{Start: 30, N: 5, Name: "###Child2", About: "~c2"},
+		{Start: 40, N: 5, Name: "###Child3", About: "~c3"},
+		{Start: 50, N: 5, Name: "###Child4", About: "~c4"},
+		{Start: 55, N: 5, Name: "###Child5", About: "~c5"},
+	}
+
+	// First call — baseline result.
+	got1 := PruneNavEntries(base, 50, 150, 2)
+
+	// Verify the original slice was not mutated.
+	if base[1].About != "~parent desc" {
+		t.Errorf("original base[1].About = %q after first PruneNavEntries call; should be unchanged (no mutation)", base[1].About)
+	}
+
+	// Build shifted copy: same entries with Start += 5 to simulate offset adjustment.
+	shifted := make([]navblock.NavEntry, len(base))
+	copy(shifted, base)
+	for i := range shifted {
+		shifted[i].Start += 5
+	}
+
+	// Second call on shifted entries.
+	got2 := PruneNavEntries(shifted, 50, 150, 2)
+
+	// Structural check: both results must have the same length.
+	if len(got1) != len(got2) {
+		t.Fatalf("first call len=%d, second call len=%d; pruning decisions should be structurally identical", len(got1), len(got2))
+	}
+
+	// Both must have exactly 2 entries (h1 + h2; all 5 h3s pruned to reach cap=2).
+	if len(got1) != 2 {
+		t.Errorf("len(got1) = %d, want 2 (h1 + h2 after all h3s pruned to cap=2)", len(got1))
+	}
+
+	// Locate the parent entry in each result and compare hint text.
+	var parent1, parent2 *navblock.NavEntry
+	for i := range got1 {
+		if got1[i].Name == testParent {
+			parent1 = &got1[i]
+		}
+	}
+	for i := range got2 {
+		if got2[i].Name == testParent {
+			parent2 = &got2[i]
+		}
+	}
+
+	if parent1 == nil {
+		t.Fatal(testParent + " not found in first result")
+	}
+	if parent2 == nil {
+		t.Fatal(testParent + " not found in second result")
+	}
+
+	// The hint text (everything after the > separator) should be identical across both calls.
+	if parent1.About != parent2.About {
+		t.Errorf("hint text diverged between calls:\n  call1 About = %q\n  call2 About = %q", parent1.About, parent2.About)
+	}
+
+	// Both should contain > hints.
+	if !strings.Contains(parent1.About, ">") {
+		t.Errorf("parent1.About = %q, should contain > hints", parent1.About)
 	}
 }

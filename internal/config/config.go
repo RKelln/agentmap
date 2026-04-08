@@ -16,7 +16,6 @@ type Config struct {
 	ExpandThreshold int      `yaml:"expand_threshold"`
 	MaxDepth        int      `yaml:"max_depth"`
 	MaxNavEntries   int      `yaml:"max_nav_entries"`  // default 20
-	NavStubWords    int      `yaml:"nav_stub_words"`   // default 20
 	IndexInlineMax  int      `yaml:"index_inline_max"` // default 20
 	Exclude         []string `yaml:"exclude"`
 }
@@ -27,9 +26,8 @@ func Defaults() Config {
 		MinLines:        50,
 		SubThreshold:    50,
 		ExpandThreshold: 150,
-		MaxDepth:        3,
+		MaxDepth:        6,
 		MaxNavEntries:   20,
-		NavStubWords:    20,
 		IndexInlineMax:  20,
 		Exclude:         []string{".agentmap", ".agentmap/**", "AGENTMAP.md", "AGENTS.md", "CLAUDE.md", "LICENSE.md"},
 	}
@@ -71,9 +69,6 @@ func Load(path string) (Config, error) {
 	}
 	if user.MaxNavEntries != 0 {
 		cfg.MaxNavEntries = user.MaxNavEntries
-	}
-	if user.NavStubWords != 0 {
-		cfg.NavStubWords = user.NavStubWords
 	}
 	if user.IndexInlineMax != 0 {
 		cfg.IndexInlineMax = user.IndexInlineMax
