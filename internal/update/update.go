@@ -532,7 +532,7 @@ func buildUpdatedBlock(oldBlock navblock.NavBlock, sections []parser.Section, _ 
 	return navblock.NavBlock{
 		Purpose: oldBlock.Purpose,
 		Lines:   outLines,
-		Nav:     generate.FilterNavEntries(newNav, cfg.MaxNavEntries, cfg.NavStubWords),
+		Nav:     generate.PruneNavEntries(newNav, cfg.SubThreshold, cfg.ExpandThreshold, cfg.MaxNavEntries),
 		See:     oldBlock.See,
 	}
 }

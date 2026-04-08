@@ -108,7 +108,7 @@ func CheckFile(path string, cfg config.Config, warnUnreviewed bool) (bool, strin
 	sections := parser.ComputeSections(headings, totalLines)
 
 	// §W1: Apply the same large-file cap as generate: build lightweight NavEntry slice
-	// with WordCount, pass through FilterNavEntries for consistent filtering.
+	// with WordCount, pass through PruneNavEntries for consistent filtering.
 	navEntries := make([]navblock.NavEntry, len(sections))
 	for i, s := range sections {
 		prefix := strings.Repeat("#", s.Depth)
@@ -119,7 +119,7 @@ func CheckFile(path string, cfg config.Config, warnUnreviewed bool) (bool, strin
 			WordCount: navblock.SectionWordCount(lines, s.Start, s.End-s.Start+1),
 		}
 	}
-	filteredEntries := generate.FilterNavEntries(navEntries, cfg.MaxNavEntries, cfg.NavStubWords)
+	filteredEntries := generate.PruneNavEntries(navEntries, cfg.SubThreshold, cfg.ExpandThreshold, cfg.MaxNavEntries)
 
 	// Rebuild navSections from filtered entries (match by start line).
 	navSections := make([]parser.Section, 0, len(filteredEntries))

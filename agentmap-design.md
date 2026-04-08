@@ -118,7 +118,7 @@ This provides **absolute depth** — an agent landing on any entry knows its exa
 **Rules:**
 - Every entry has at least one `#`. There are no unmarked entries.
 - Depth is absolute, not relative. `##` always means h2 regardless of surrounding entries.
-- Maximum tracked depth: configurable via `max_depth` (default h3). This is a heuristic to keep nav entries within budget — in a shallow document all tracked headings get full entries regardless of depth. Headings deeper than `max_depth` are not included; the agent reads the parent section to find them.
+- Maximum tracked depth: configurable via `max_depth` (default h6). This is a heuristic to keep nav entries within budget — in a shallow document all tracked headings get full entries regardless of depth. Headings deeper than `max_depth` are not included; the agent reads the parent section to find them.
 
 ### 3.4 Complete Example
 
@@ -661,7 +661,7 @@ sub_threshold: 50
 expand_threshold: 150
 
 # Maximum heading depth to track (heuristic to stay near max_nav_entries budget)
-max_depth: 3
+max_depth: 6
 
 # Files/directories to exclude (in addition to .gitignore)
 exclude:
@@ -698,7 +698,7 @@ All configuration is optional. Sensible defaults:
 | `max_nav_entries` | 20 | Soft cap on nav entries; the primary budget constraint |
 | `sub_threshold` | 50 | No subsection hints/entries below this (heuristic) |
 | `expand_threshold` | 150 | Full subsection entries above this; `>` hints between (heuristic) |
-| `max_depth` | 3 | Heading depth limit (heuristic to stay near budget) |
+| `max_depth` | 6 | Heading depth limit (heuristic to stay near budget) |
 | `exclude` | `[]` | Additional excludes beyond .gitignore |
 
 ## 11. Edge Cases
