@@ -83,7 +83,10 @@ func CheckFile(path string, cfg config.Config, warnUnreviewed bool) (bool, strin
 	}
 
 	lines := strings.Split(string(content), "\n")
-	totalLines := len(lines)
+	// Use strings.Count for totalLines rather than len(lines): strings.Split
+	// produces a spurious trailing empty element for POSIX files ending with \n,
+	// overcounting by 1. strings.Count("\n") equals wc -l.
+	totalLines := strings.Count(string(content), "\n")
 
 	pr := navblock.ParseNavBlock(string(content))
 	oldBlock, hasBlock, corrupted := pr.Block, pr.Found, pr.Corrupted
