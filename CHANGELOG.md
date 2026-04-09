@@ -4,6 +4,68 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.1.0-rc.7] — agentmap next: stateful single-file agent workflow — 2026-04-09
+
+This release introduces `agentmap next`, a new command that solves context-window
+overload for small models working through large index task lists. Instead of handing
+a model the full 1000-line task list, `next` emits one self-contained file prompt at
+a time, tracks state between calls, and automatically updates and checks off completed
+files. The full agent loop is now just: edit a file, run `agentmap next`, repeat.
+
+### Added
+
+- **`agentmap next`** — finds the next unchecked entry in `.agentmap/index-tasks.md`
+  and prints a self-contained single-file prompt (file path + current nav block +
+  rewrite instructions). Solves context-window overload for large projects (e.g. 84-file
+  task lists that previously required 1000+ lines of context before any work started).
+- **`agentmap next --count N`** — emits N consecutive prompts (separated by `---`) in
+  one call, for batched agent workflows.
+- **Stateful next-state** — `agentmap next` now tracks in-flight files in
+  `.agentmap/next-state` (one relPath per line). On each call it flushes state —
+  running `update` + check-off on every previously-emitted file — then writes the new
+  batch. The complete agent loop is: `<edit file> → agentmap next → <edit file> → agentmap next → …`
+- **Blocked state** — if a file in state still has `~` descriptions when `next` is
+  called, it prints a clear warning and stops, preventing silent forward progress on
+  incomplete work.
+- **Auto check-off on `agentmap update`** — after a successful non-dry-run update,
+  `update` automatically flips `- [ ]` to `- [x]` in the task list for any file whose
+  nav block no longer has `~` descriptions. Works for both single-file and bulk
+  (`update .`) invocations.
+
+### Fixed
+
+- **`agentmap generate` heading offset** — files whose YAML frontmatter `---` is
+  followed by a blank line had every heading line number written 1 too low. `separatorLines`
+  now correctly detects whether a blank already exists at the insertion boundary.
+- **Task list stale line numbers** — directed agents to run `agentmap update .` before
+  starting description rewrites when `agentmap check` reports mismatches (affects projects
+  indexed before the generate frontmatter fix).
+- **`index-fixture` nav blocks** — corrected stale line numbers in four fixture files
+  and added missing H1 nav entries that `generate` now includes.
+
+### Changed
+
+- **Task list format** — restructured `index-tasks.md` for small-model clarity: leads
+  with a concise 5-step workflow and a before/after example; embeds the actual nav block
+  in each task entry; moves the full nav-writing-guide to an appendix; collapses the
+  two-checkbox-per-file format to a single checkbox.
+- **Post-index instructions** — `agentmap index` output now says `Run agentmap next`
+  rather than listing manual per-file steps.
+- **Task list preamble** — updated "Your job" section to describe the `agentmap next`
+  loop instead of the old `agentmap update <file>` + manual checkbox workflow.
+- **Guide appendix** — task list appendix now uses `RulesContent` (sections 3–7 only)
+  so the workflow/scratch sections already covered by the task list header are not
+  duplicated; `agentmap guide` still shows the full guide unchanged.
+
+### Infrastructure
+
+- Added `internal/next` package (303 lines) with `FindTaskList`, `Next`, `FlushState`,
+  `WriteState`, `RenderPrompt`, `RenderDone`, `RenderBlocked`.
+- 542-line test suite for `internal/next` covering all state transitions.
+- 112-line regression tests for the `generate` frontmatter offset fix.
+
+---
+
 ## [v0.1.0-rc.6] — Post-index agent workflow improvements — 2026-04-09
 
 Two targeted fixes to the post-`index` experience: a false-failure bug in
