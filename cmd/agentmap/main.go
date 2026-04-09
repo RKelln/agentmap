@@ -14,6 +14,7 @@ import (
 	"github.com/RKelln/agentmap/internal/index"
 	"github.com/RKelln/agentmap/internal/initcmd"
 	"github.com/RKelln/agentmap/internal/navblock"
+	"github.com/RKelln/agentmap/internal/next"
 	"github.com/RKelln/agentmap/internal/parser"
 	"github.com/RKelln/agentmap/internal/update"
 	"github.com/spf13/cobra"
@@ -480,6 +481,63 @@ Runs uninit first unless --keep-config is set.`,
 	},
 }
 
+var nextCmd = &cobra.Command{
+	Use:   "next [task-list-path]",
+	Short: "Print a single-file prompt for the next unchecked task",
+	Long: `Find the next unchecked entry in index-tasks.md and print a self-contained
+prompt for a small-model agent. The agent edits one file, runs agentmap update,
+then calls agentmap next again to get the following task.
+
+With no arguments, searches upward from the current directory for
+.agentmap/index-tasks.md. An explicit path may be given instead.
+
+Use --count N to emit prompts for N consecutive unchecked files.`,
+	Args: cobra.MaximumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		count, _ := cmd.Flags().GetInt("count")
+		if count < 1 {
+			count = 1
+		}
+
+		// Resolve the task list path.
+		var taskListPath string
+		if len(args) > 0 {
+			abs, err := filepath.Abs(args[0])
+			if err != nil {
+				return fmt.Errorf("next: resolve path: %w", err)
+			}
+			taskListPath = abs
+		} else {
+			cwd, err := os.Getwd()
+			if err != nil {
+				return fmt.Errorf("next: get cwd: %w", err)
+			}
+			taskListPath, err = next.FindTaskList(cwd)
+			if err != nil {
+				return err
+			}
+		}
+
+		printed := 0
+		for printed < count {
+			task, err := next.Next(taskListPath, printed)
+			if err != nil {
+				return err
+			}
+			if task == nil {
+				fmt.Print(next.RenderDone(filepath.Dir(filepath.Dir(taskListPath))))
+				return nil
+			}
+			if printed > 0 {
+				fmt.Println("---")
+			}
+			fmt.Print(next.RenderPrompt(task))
+			printed++
+		}
+		return nil
+	},
+}
+
 func init() {
 	// generate flags
 	generateCmd.Flags().Int("min-lines", 50, "Minimum file size for full nav block")
@@ -519,7 +577,10 @@ func init() {
 	// upgrade flags
 	upgradeCmd.Flags().Bool("check", false, "Only check if an update is available; do not update")
 
-	rootCmd.AddCommand(generateCmd, updateCmd, checkCmd, versionCmd, hookCmd, guideCmd, indexCmd, initCmd, uninitCmd, uninstallCmd, upgradeCmd)
+	// next flags
+	nextCmd.Flags().Int("count", 1, "Number of consecutive task prompts to print")
+
+	rootCmd.AddCommand(generateCmd, updateCmd, checkCmd, versionCmd, hookCmd, guideCmd, indexCmd, initCmd, uninitCmd, uninstallCmd, upgradeCmd, nextCmd)
 }
 
 func main() {
