@@ -12,6 +12,7 @@ import (
 	"github.com/RKelln/agentmap/internal/discovery"
 	"github.com/RKelln/agentmap/internal/generate"
 	"github.com/RKelln/agentmap/internal/gitutil"
+	"github.com/RKelln/agentmap/internal/index"
 	"github.com/RKelln/agentmap/internal/navblock"
 	"github.com/RKelln/agentmap/internal/parser"
 )
@@ -78,6 +79,7 @@ func Update(root string, cfg config.Config, dryRun, quiet bool) error {
 	}
 
 	var anyChanged bool
+	taskListPath := index.TaskListPath(root)
 	for _, f := range files {
 		fullPath := filepath.Join(root, f)
 		var changedLines []gitutil.LineRange
@@ -93,6 +95,12 @@ func Update(root string, cfg config.Config, dryRun, quiet bool) error {
 			anyChanged = true
 			if !quiet {
 				fmt.Println(report)
+			}
+		}
+		// Auto-check the task list entry if the file is now fully reviewed.
+		if !dryRun {
+			if err := index.CheckOffTaskEntry(taskListPath, fullPath, f); err != nil {
+				fmt.Fprintf(os.Stderr, "warning: %s: task list check-off: %v\n", f, err)
 			}
 		}
 	}

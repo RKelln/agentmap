@@ -1067,3 +1067,138 @@ func TestFixture_BuildFilesBlock_PreIndexed(t *testing.T) {
 	}
 	_ = wantOrder // reference for human readability
 }
+
+// --- CheckOffTaskEntry tests ---
+
+func TestCheckOffTaskEntry_ChecksOffWhenNoTilde(t *testing.T) {
+	dir := t.TempDir()
+
+	// A file with a fully-reviewed nav block (no ~).
+	mdPath := filepath.Join(dir, "docs/auth.md")
+	writeFile(t, mdPath, `<!-- AGENT:NAV
+purpose:token lifecycle; OAuth2 exchange
+nav[2]{s,n,name,about}:
+8,17,##Token Exchange,OAuth2 code-for-token flow
+26,15,##Token Refresh,silent rotation and expiry
+-->
+
+# Authentication
+
+## Token Exchange
+
+content here.
+
+## Token Refresh
+
+more content.
+`)
+
+	// A task list with an unchecked entry.
+	taskListPath := filepath.Join(dir, ".agentmap", "index-tasks.md")
+	writeFile(t, taskListPath, `# agentmap index tasks
+
+Progress: 0/1 files complete
+
+## docs/auth.md (41 lines)
+
+- [ ]
+
+`+"```"+`
+<!-- AGENT:NAV
+purpose:~token OAuth2 PKCE authentication flow
+-->
+`+"```"+`
+`)
+
+	if err := CheckOffTaskEntry(taskListPath, mdPath, "docs/auth.md"); err != nil {
+		t.Fatalf("CheckOffTaskEntry() error = %v", err)
+	}
+
+	data, err := os.ReadFile(taskListPath)
+	if err != nil {
+		t.Fatalf("read task list: %v", err)
+	}
+	if !strings.Contains(string(data), "- [x]") {
+		t.Error("task list entry should be checked off")
+	}
+	if strings.Contains(string(data), "- [ ]") {
+		t.Error("unchecked checkbox should have been replaced")
+	}
+}
+
+func TestCheckOffTaskEntry_NoCheckoffWhenTildeRemains(t *testing.T) {
+	dir := t.TempDir()
+
+	// A file that still has ~ in its nav block.
+	mdPath := filepath.Join(dir, "docs/auth.md")
+	writeFile(t, mdPath, `<!-- AGENT:NAV
+purpose:~token OAuth2 PKCE authentication flow
+nav[1]{s,n,name,about}:
+8,17,##Token Exchange,~OAuth2 flow
+-->
+
+# Authentication
+
+## Token Exchange
+
+content.
+`)
+
+	taskListPath := filepath.Join(dir, ".agentmap", "index-tasks.md")
+	writeFile(t, taskListPath, "## docs/auth.md (12 lines)\n\n- [ ]\n\n")
+
+	if err := CheckOffTaskEntry(taskListPath, mdPath, "docs/auth.md"); err != nil {
+		t.Fatalf("CheckOffTaskEntry() error = %v", err)
+	}
+
+	data, err := os.ReadFile(taskListPath)
+	if err != nil {
+		t.Fatalf("read task list: %v", err)
+	}
+	if strings.Contains(string(data), "- [x]") {
+		t.Error("entry should not be checked off when ~ still present")
+	}
+}
+
+func TestCheckOffTaskEntry_NoopWhenTaskListMissing(t *testing.T) {
+	dir := t.TempDir()
+
+	mdPath := filepath.Join(dir, "docs/auth.md")
+	writeFile(t, mdPath, `<!-- AGENT:NAV
+purpose:token lifecycle
+-->
+
+# Authentication
+`)
+
+	// No task list file exists.
+	err := CheckOffTaskEntry(filepath.Join(dir, ".agentmap", "index-tasks.md"), mdPath, "docs/auth.md")
+	if err != nil {
+		t.Errorf("CheckOffTaskEntry() should be no-op when task list missing, got error = %v", err)
+	}
+}
+
+func TestCheckOffTaskEntry_NoopWhenEntryNotInList(t *testing.T) {
+	dir := t.TempDir()
+
+	mdPath := filepath.Join(dir, "docs/auth.md")
+	writeFile(t, mdPath, `<!-- AGENT:NAV
+purpose:token lifecycle
+-->
+
+# Authentication
+`)
+
+	taskListPath := filepath.Join(dir, ".agentmap", "index-tasks.md")
+	writeFile(t, taskListPath, "## docs/other.md (10 lines)\n\n- [ ]\n\n")
+
+	if err := CheckOffTaskEntry(taskListPath, mdPath, "docs/auth.md"); err != nil {
+		t.Fatalf("CheckOffTaskEntry() error = %v", err)
+	}
+
+	// Task list should be unchanged.
+	data, _ := os.ReadFile(taskListPath)
+	if strings.Contains(string(data), "- [x]") {
+		t.Error("unrelated entry should not be modified")
+	}
+}

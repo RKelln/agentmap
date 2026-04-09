@@ -4,6 +4,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/RKelln/agentmap/internal/check"
@@ -162,6 +163,20 @@ var updateCmd = &cobra.Command{
 			}
 			if !quiet && report != "" {
 				fmt.Println(report)
+			}
+			// Auto-check the task list entry if the file is now fully reviewed.
+			if !dryRun {
+				repoRoot := findRepoRoot(root, cfgPath)
+				if repoRoot != "" {
+					absFile, _ := filepath.Abs(root)
+					relPath, relErr := filepath.Rel(repoRoot, absFile)
+					if relErr == nil {
+						taskListPath := index.TaskListPath(repoRoot)
+						if err := index.CheckOffTaskEntry(taskListPath, absFile, relPath); err != nil {
+							fmt.Fprintf(os.Stderr, "warning: task list check-off: %v\n", err)
+						}
+					}
+				}
 			}
 			return nil
 		}
@@ -510,5 +525,28 @@ func init() {
 func main() {
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
+	}
+}
+
+// findRepoRoot returns the repository root for a given file path and optional
+// config file path. When cfgPath is non-empty, its directory is the root.
+// Otherwise, walk upward from the file's directory to find a .agentmap/ dir.
+func findRepoRoot(filePath, cfgPath string) string {
+	if cfgPath != "" {
+		return filepath.Dir(cfgPath)
+	}
+	dir, err := filepath.Abs(filepath.Dir(filePath))
+	if err != nil {
+		return ""
+	}
+	for {
+		if _, err := os.Stat(filepath.Join(dir, ".agentmap")); err == nil {
+			return dir
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return ""
+		}
+		dir = parent
 	}
 }

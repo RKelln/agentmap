@@ -58,6 +58,7 @@ The correct workflow for a new file:
 
 ---
 
+<!-- rules-start -->
 ## 3. Writing `purpose` Lines
 
 `purpose` is a one-line summary of the **entire file**. An agent reading only this line should know
