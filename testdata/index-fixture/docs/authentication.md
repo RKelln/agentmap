@@ -1,8 +1,9 @@
 <!-- AGENT:NAV
 purpose:~token lifecycle authentication; OAuth2 flows
-nav[2]{s,n,name,about}:
-15,17,##Token Exchange,~OAuth2 authorization code flow
-32,15,##Token Refresh,~silent rotation; sliding window expiry
+nav[3]{s,n,name,about}:
+9,39,#Authentication,~OAuth2 authorization code flow; bearer token requirements
+16,17,##Token Exchange,~OAuth2 authorization code flow
+33,15,##Token Refresh,~silent rotation; sliding window expiry
 -->
 
 # Authentication

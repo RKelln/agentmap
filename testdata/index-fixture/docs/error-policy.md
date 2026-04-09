@@ -1,8 +1,9 @@
 <!-- AGENT:NAV
 purpose:error handling policy; retry strategy; circuit breaker configuration
-nav[2]{s,n,name,about}:
-14,21,##Error Codes,HTTP status code mapping; structured error payload schema
-35,16,##Retry Policy,exponential backoff parameters; idempotency requirements
+nav[3]{s,n,name,about}:
+9,43,#Error Policy,JSON error payload format; HTTP status code usage
+15,21,##Error Codes,HTTP status code mapping; structured error payload schema
+36,16,##Retry Policy,exponential backoff parameters; idempotency requirements
 -->
 
 # Error Policy
