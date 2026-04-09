@@ -196,6 +196,118 @@ Content here.
 	}
 }
 
+func TestFile_FrontmatterHeadingLineNumbers(t *testing.T) {
+	// Regression: when a file has YAML frontmatter followed by a blank line,
+	// the first generate produced heading line numbers that were off by +1.
+	// cleanBlankLines merges the existing blank (after ---) with the separator,
+	// so the separator doesn't add a net new line.
+	content := "---\ntitle: Test\n---\n\n# Heading One\n\nSome content here.\n\n## Section Two\n\nMore content.\n" +
+		strings.Repeat("Extra line to exceed min_lines.\n", 45)
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "fm.md")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := config.Defaults()
+	cfg.MinLines = 10
+
+	_, err := File(path, cfg, false)
+	if err != nil {
+		t.Fatalf("File() error = %v", err)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(data)
+
+	// Parse the generated nav block and verify line numbers match actual positions.
+	pr := navblock.ParseNavBlock(got)
+	if !pr.Found {
+		t.Fatal("nav block not found in output")
+	}
+
+	// Find actual heading positions in the final content.
+	headings, _ := parser.ParseHeadings(got, cfg.MaxDepth)
+	if len(headings) == 0 {
+		t.Fatal("no headings found in output")
+	}
+
+	// Build a map of heading name -> actual line from the final content.
+	actualLines := make(map[string]int)
+	for _, h := range headings {
+		actualLines[navblock.NormalizeHeading(h.Text)] = h.Line
+	}
+
+	// Check each nav entry's Start matches the actual heading position.
+	for _, entry := range pr.Block.Nav {
+		name := navblock.NormalizeHeading(entry.Name)
+		actual, ok := actualLines[name]
+		if !ok {
+			t.Errorf("nav entry %q not found in headings", entry.Name)
+			continue
+		}
+		if entry.Start != actual {
+			t.Errorf("nav entry %q: Start=%d, but heading is actually at line %d (off by %d)",
+				entry.Name, entry.Start, actual, entry.Start-actual)
+		}
+	}
+}
+
+func TestFile_NoFrontmatterLeadingBlankLineNumbers(t *testing.T) {
+	// Regression: files starting with a blank line before the first heading
+	// also had the separator absorbed by the existing blank.
+	content := "\n# Heading\n\nContent here.\n\n## Section\n\nMore content.\n" +
+		strings.Repeat("Extra line.\n", 45)
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "leading-blank.md")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := config.Defaults()
+	cfg.MinLines = 10
+
+	_, err := File(path, cfg, false)
+	if err != nil {
+		t.Fatalf("File() error = %v", err)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(data)
+
+	pr := navblock.ParseNavBlock(got)
+	if !pr.Found {
+		t.Fatal("nav block not found in output")
+	}
+
+	headings, _ := parser.ParseHeadings(got, cfg.MaxDepth)
+	actualLines := make(map[string]int)
+	for _, h := range headings {
+		actualLines[navblock.NormalizeHeading(h.Text)] = h.Line
+	}
+
+	for _, entry := range pr.Block.Nav {
+		name := navblock.NormalizeHeading(entry.Name)
+		actual, ok := actualLines[name]
+		if !ok {
+			t.Errorf("nav entry %q not found in headings", entry.Name)
+			continue
+		}
+		if entry.Start != actual {
+			t.Errorf("nav entry %q: Start=%d, but heading is actually at line %d (off by %d)",
+				entry.Name, entry.Start, actual, entry.Start-actual)
+		}
+	}
+}
+
 func TestFile_DryRun(t *testing.T) {
 	content := `# Authentication
 

@@ -109,9 +109,29 @@ func File(path string, cfg config.Config, dryRun bool, outputPath ...string) (st
 		// line after the nav block (via cleanBlankLines). This blank is not part of
 		// newBlockLines, so add 1 to account for it. For existing nav blocks the blank
 		// was already present, so it cancels out and no adjustment is needed.
+		//
+		// Exception: when a blank line already exists at the insertion boundary
+		// (after frontmatter closing --- or at the very start of the file),
+		// cleanBlankLines merges that existing blank with the new separator
+		// instead of adding a net new line. In that case the separator is
+		// "free" and separatorLines stays 0.
 		separatorLines := 0
 		if oldBlockLines == 0 {
 			separatorLines = 1
+			if fmEnd := navblock.FindFrontmatterEnd(lines); fmEnd >= 0 {
+				// Frontmatter path: nav block inserted after closing ---.
+				// If a blank line already follows the ---, cleanBlankLines
+				// will collapse the two blanks (separator + existing) into one.
+				if fmEnd+1 < len(lines) && strings.TrimSpace(lines[fmEnd+1]) == "" {
+					separatorLines = 0
+				}
+			} else if len(lines) > 0 && strings.TrimSpace(lines[0]) == "" {
+				// No-frontmatter path: nav block prepended to content.
+				// If the file starts with a blank line, the separator "\n"
+				// between blockText and content merges with it — cleanBlankLines
+				// sees exactly one blank and does not insert another.
+				separatorLines = 0
+			}
 		}
 		offset := newBlockLines + separatorLines - oldBlockLines
 
