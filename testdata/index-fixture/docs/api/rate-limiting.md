@@ -1,8 +1,8 @@
 <!-- AGENT:NAV
 purpose:~rate limit tiers; burst allowance; quota tracking
 nav[2]{s,n,name,about}:
-10,18,##Rate Limits,~per-endpoint rate limit tiers; response headers
-29,20,##Burst Allowance,~burst credit system; replenishment rate
+14,21,##Rate Limits,~per-endpoint rate limit tiers; response headers
+35,14,##Burst Allowance,~burst credit system; replenishment rate
 -->
 
 # Rate Limiting

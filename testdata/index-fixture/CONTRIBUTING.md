@@ -1,8 +1,8 @@
 <!-- AGENT:NAV
 purpose:contribution guidelines; pull request workflow; dev environment setup
 nav[2]{s,n,name,about}:
-10,18,##Getting Started,dev environment setup; fork and clone workflow
-29,22,##Pull Requests,branch naming conventions; review checklist; merge criteria
+14,18,##Getting Started,dev environment setup; fork and clone workflow
+32,18,##Pull Requests,branch naming conventions; review checklist; merge criteria
 -->
 
 # Contributing
