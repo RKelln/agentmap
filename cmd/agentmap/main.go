@@ -301,7 +301,9 @@ Files with no ~ anywhere → skip (already fully indexed).`,
 						"  `about` value with concise human-quality text (remove the ~ prefix).\n"+
 						"  Also add `see` entries for any files that are closely related.\n"+
 						"  Run `agentmap update <file>` after editing each file, then check\n"+
-						"  off its entry. Run `agentmap check` when the list is complete.\n\n",
+						"  off its entry. Run `agentmap check` when the list is complete.\n"+
+						"  If `agentmap check` reports line-number mismatches before you start,\n"+
+						"  run `agentmap update .` first to sync them, then proceed.\n\n",
 					result.TaskPath)
 			} else if dryRun {
 				fmt.Println("(dry-run: no files written)")
