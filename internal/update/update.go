@@ -526,7 +526,11 @@ func insertNavBlock(content, blockText string) string {
 		if blockEnd+1 < len(lines) {
 			after = strings.Join(lines[blockEnd+1:], "\n")
 		}
-		result := before + blockText + "\n" + after
+		sep := ""
+		if before != "" {
+			sep = "\n"
+		}
+		result := before + sep + blockText + "\n" + after
 		return cleanBlankLines(result)
 	}
 

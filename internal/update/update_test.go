@@ -1189,3 +1189,61 @@ func TestMatchSectionsToNav_MoreOccurrencesThanEntries(t *testing.T) {
 		t.Errorf("section at line 50 should not be matched")
 	}
 }
+
+// TestFile_FrontmatterNavBlockSeparation verifies that update preserves the
+// newline between the YAML frontmatter closing "---" and the "<!-- AGENT:NAV"
+// line. Previously, insertNavBlock would concatenate them as "---<!-- AGENT:NAV"
+// because strings.Join(lines[:blockStart], "\n") produces no trailing newline.
+func TestFile_FrontmatterNavBlockSeparation(t *testing.T) {
+	dir := t.TempDir()
+
+	content := `---
+marp: true
+theme: default
+---
+<!-- AGENT:NAV
+purpose:Test presentation file
+lines:10
+nav[1]{s,n,name,about}:
+8,3,#First Slide,First slide content
+-->
+
+# First Slide
+
+Some content here.
+
+More content.
+
+End.
+`
+	path := writeTempFile(t, dir, "test.md", content)
+	cfg := config.Defaults()
+
+	_, err := File(path, cfg, false, false)
+	if err != nil {
+		t.Fatalf("File() error: %v", err)
+	}
+
+	result, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(result)
+
+	// The frontmatter close "---" must be on its own line, not merged with <!-- AGENT:NAV.
+	if strings.Contains(got, "---<!-- AGENT:NAV") {
+		t.Errorf("frontmatter close merged with nav block opener: got %q", got[:100])
+	}
+	// The nav block opener must appear on its own line.
+	lines := strings.Split(got, "\n")
+	foundSep := false
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "<!-- AGENT:NAV" {
+			foundSep = true
+			break
+		}
+	}
+	if !foundSep {
+		t.Errorf("nav block opener not found on its own line in:\n%s", got)
+	}
+}
