@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.1.0-rc.6] — Post-index agent workflow improvements — 2026-04-09
+
+Two targeted fixes to the post-`index` experience: a false-failure bug in
+`agentmap check` that made every file look out of sync, and a ready-to-paste
+agent prompt printed at the end of `agentmap index` to guide the description
+review workflow.
+
+### Fixed
+
+- `agentmap check` reported false line-range mismatches for the last section in
+  every POSIX file. `strings.Split` on a trailing-newline file produces a
+  spurious empty trailing element, so `len(lines)` overcounted `totalLines` by 1.
+  Fixed by using `strings.Count(content, "\n")` — consistent with `generate`
+  and `update`, and equal to `wc -l`. Regression test added.
+
+### Added
+
+- `agentmap index` now prints a ready-to-paste agent prompt after writing the
+  task list. The prompt directs the agent to read `.agentmap/index-tasks.md`
+  for instructions, rewrite every `~`-prefixed `purpose` and `about` value,
+  add `see` entries for closely related files, run `agentmap update <file>`
+  after each edit, and finish with `agentmap check`.
+
+---
+
 ## [v0.1.0-rc.5] — Budget-first nav pruning and embedded guide — 2026-04-08
 
 This release replaces the old per-section threshold branching in nav generation
