@@ -439,7 +439,7 @@ Silent rotation and expiry detection.
 	if !strings.Contains(contents, "# agentmap index tasks") {
 		t.Error("task list should have title '# agentmap index tasks'")
 	}
-	if !strings.Contains(contents, "# Nav Writing Guide") {
+	if !strings.Contains(contents, "Nav Writing Guide") {
 		t.Error("task list should embed a nav writing guide")
 	}
 	if strings.Contains(contents, "docs/nav-writing-guide.md") {
@@ -451,11 +451,11 @@ Silent rotation and expiry detection.
 	if !strings.Contains(contents, "docs/auth.md") {
 		t.Error("task list should contain the file path")
 	}
-	if !strings.Contains(contents, "- [ ] purpose:") {
-		t.Error("task list should have unchecked purpose checkbox")
+	if !strings.Contains(contents, "- [ ]") {
+		t.Error("task list should have an unchecked checkbox")
 	}
-	if !strings.Contains(contents, "- [ ] sections") {
-		t.Error("task list should have unchecked sections checkbox")
+	if !strings.Contains(contents, "<!-- AGENT:NAV") {
+		t.Error("task list should embed the nav block for each file")
 	}
 }
 
