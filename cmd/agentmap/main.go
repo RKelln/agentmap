@@ -294,6 +294,15 @@ Files with no ~ anywhere → skip (already fully indexed).`,
 				result.Generated, result.TaskFiles, result.Skipped)
 			if result.TaskPath != "" {
 				fmt.Printf("Task list: %s\n", result.TaskPath)
+				fmt.Printf(
+					"\nNext step — paste this prompt into your agent:\n\n"+
+						"  Read %s for instructions, then work through\n"+
+						"  each file in the task list: rewrite every ~-prefixed `purpose` and\n"+
+						"  `about` value with concise human-quality text (remove the ~ prefix).\n"+
+						"  Also add `see` entries for any files that are closely related.\n"+
+						"  Run `agentmap update <file>` after editing each file, then check\n"+
+						"  off its entry. Run `agentmap check` when the list is complete.\n\n",
+					result.TaskPath)
 			} else if dryRun {
 				fmt.Println("(dry-run: no files written)")
 			}
