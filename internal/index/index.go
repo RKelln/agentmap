@@ -218,19 +218,17 @@ func renderTaskList(tasks []TaskEntry) string {
 	b.WriteString(`## Your job
 
 Each file below has an AGENT:NAV block with ` + "`~`" + `-prefixed descriptions (auto-generated noise).
-Rewrite every ` + "`~`" + ` value with a concise human description, then run ` + "`agentmap update <file>`" + `.
+Rewrite every ` + "`~`" + ` value with a concise human description, then run ` + "`agentmap next`" + ` to advance.
 
-**For each file in this list:**
+**Workflow — repeat until done:**
 
-1. Read the nav block shown below (already in the file).
-2. Read the file content for any sections you are unsure about.
-3. Rewrite every ` + "`~`" + `-prefixed ` + "`purpose`" + ` and ` + "`about`" + ` value — remove the ` + "`~`" + `, replace keyword noise with a clear description.
-4. Optionally add ` + "`see`" + ` entries for closely related files.
-5. Run: ` + "`agentmap update <file>`" + `
-6. Mark the entry complete: change ` + "`- [ ]`" + ` to ` + "`- [x]`" + ` in this file.
-7. Move to the next file.
+1. Run ` + "`agentmap next`" + ` to get the next file to work on.
+2. Read the file and rewrite every ` + "`~`" + `-prefixed ` + "`purpose`" + ` and ` + "`about`" + ` — remove the ` + "`~`" + `, replace keyword noise with a clear description.
+3. Optionally add ` + "`see`" + ` entries for closely related files.
+4. Save the file.
+5. Run ` + "`agentmap next`" + ` again — it updates line numbers, checks off this file, and prints the next task.
 
-When all entries are checked, run ` + "`agentmap check`" + ` to verify line numbers.
+When all entries are checked, ` + "`agentmap next`" + ` prints a completion message with the final ` + "`agentmap check`" + ` command.
 
 ---
 
@@ -265,7 +263,7 @@ nav[2]{s,n,name,about}:
 -->
 ` + "```" + `
 
-Then run: ` + "`agentmap update docs/auth.md`" + `
+Then run: ` + "`agentmap next`" + `
 
 ---
 

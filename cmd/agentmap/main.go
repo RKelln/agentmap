@@ -311,16 +311,11 @@ Files with no ~ anywhere → skip (already fully indexed).`,
 			if result.TaskPath != "" {
 				fmt.Printf("Task list: %s\n", result.TaskPath)
 				fmt.Printf(
-					"\nNext step — paste this prompt into your agent:\n\n"+
-						"  Read %s for instructions, then work through\n"+
-						"  each file in the task list: rewrite every ~-prefixed `purpose` and\n"+
-						"  `about` value with concise human-quality text (remove the ~ prefix).\n"+
-						"  Also add `see` entries for any files that are closely related.\n"+
-						"  Run `agentmap update <file>` after editing each file, then check\n"+
-						"  off its entry. Run `agentmap check` when the list is complete.\n"+
-						"  If `agentmap check` reports line-number mismatches before you start,\n"+
-						"  run `agentmap update .` first to sync them, then proceed.\n\n",
-					result.TaskPath)
+					"\nNext step:\n\n" +
+						"  Run `agentmap next` — it prints a single-file prompt for your agent.\n" +
+						"  The agent rewrites the ~-prefixed descriptions, saves the file,\n" +
+						"  then runs `agentmap next` again to advance to the next file.\n" +
+						"  When all files are done, `agentmap next` prints the final check command.\n\n")
 			} else if dryRun {
 				fmt.Println("(dry-run: no files written)")
 			}
@@ -483,10 +478,16 @@ Runs uninit first unless --keep-config is set.`,
 
 var nextCmd = &cobra.Command{
 	Use:   "next [task-list-path]",
-	Short: "Print a single-file prompt for the next unchecked task",
-	Long: `Find the next unchecked entry in index-tasks.md and print a self-contained
-prompt for a small-model agent. The agent edits one file, runs agentmap update,
-then calls agentmap next again to get the following task.
+	Short: "Advance progress and print the next unchecked task prompt",
+	Long: `Flush any previously-emitted files (update + check-off), then find the
+next unchecked entry in index-tasks.md and print a self-contained prompt.
+
+State is tracked in .agentmap/next-state. On each call, next runs
+agentmap update + check-off on every file in the state, then emits the
+next N unchecked entries and records them as the new state.
+
+If a file in state still has ~ descriptions, next prints a warning and
+stops so the agent can fix it before advancing.
 
 With no arguments, searches upward from the current directory for
 .agentmap/index-tasks.md. An explicit path may be given instead.
@@ -518,21 +519,53 @@ Use --count N to emit prompts for N consecutive unchecked files.`,
 			}
 		}
 
-		printed := 0
-		for printed < count {
-			task, err := next.Next(taskListPath, printed)
+		repoRoot := filepath.Dir(filepath.Dir(taskListPath))
+
+		// Flush state: update + check-off previously-emitted files.
+		result, err := next.FlushState(taskListPath, repoRoot)
+		if err != nil {
+			return err
+		}
+		if result.Blocked {
+			fmt.Print(next.RenderBlocked(result.BlockedPath))
+			return nil
+		}
+
+		// Collect the next N unchecked entries.
+		var tasks []*next.Task
+		for i := 0; i < count; i++ {
+			task, err := next.Next(taskListPath, i)
 			if err != nil {
 				return err
 			}
 			if task == nil {
-				fmt.Print(next.RenderDone(filepath.Dir(filepath.Dir(taskListPath))))
-				return nil
+				break
 			}
-			if printed > 0 {
+			tasks = append(tasks, task)
+		}
+
+		if len(tasks) == 0 {
+			// Clear state and report done.
+			_ = next.WriteState(taskListPath, nil)
+			fmt.Print(next.RenderDone(repoRoot))
+			return nil
+		}
+
+		// Write new state.
+		relPaths := make([]string, len(tasks))
+		for i, t := range tasks {
+			relPaths[i] = t.RelPath
+		}
+		if err := next.WriteState(taskListPath, relPaths); err != nil {
+			return err
+		}
+
+		// Print prompts.
+		for i, task := range tasks {
+			if i > 0 {
 				fmt.Println("---")
 			}
 			fmt.Print(next.RenderPrompt(task))
-			printed++
 		}
 		return nil
 	},

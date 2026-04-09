@@ -327,8 +327,9 @@ func TestRenderPrompt_ContainsFilePath(t *testing.T) {
 	if !strings.Contains(got, authMD) {
 		t.Errorf("prompt does not contain file path: %q", got)
 	}
-	if !strings.Contains(got, "agentmap update "+authMD) {
-		t.Errorf("prompt does not contain update command: %q", got)
+	// update is no longer a manual step — next handles it automatically.
+	if strings.Contains(got, "agentmap update") {
+		t.Errorf("prompt should not contain 'agentmap update' (handled by next): %q", got)
 	}
 	if !strings.Contains(got, "agentmap next") {
 		t.Errorf("prompt does not contain next command: %q", got)
@@ -365,5 +366,177 @@ func TestRenderDone_ContainsCheckCommand(t *testing.T) {
 	got := next.RenderDone("/repo")
 	if !strings.Contains(got, "agentmap check") {
 		t.Errorf("done message does not contain check command: %q", got)
+	}
+}
+
+// --- RenderPrompt instruction tests ---
+
+func TestRenderPrompt_NoUpdateStep(t *testing.T) {
+	task := &next.Task{
+		RelPath:     authMD,
+		NavBlockRaw: "<!-- AGENT:NAV\npurpose:~stub\n-->",
+		RepoRoot:    "/repo",
+	}
+	got := next.RenderPrompt(task)
+	// Should NOT tell the agent to run agentmap update separately.
+	if strings.Contains(got, "agentmap update") {
+		t.Errorf("prompt should not contain 'agentmap update': %q", got)
+	}
+	// Should tell the agent to run agentmap next.
+	if !strings.Contains(got, "agentmap next") {
+		t.Errorf("prompt should contain 'agentmap next': %q", got)
+	}
+}
+
+// --- WriteState / FlushState tests ---
+
+func TestWriteState_CreatesFile(t *testing.T) {
+	dir := t.TempDir()
+	taskListPath := filepath.Join(dir, ".agentmap", "index-tasks.md")
+	writeFile(t, taskListPath, "# tasks\n")
+
+	if err := next.WriteState(taskListPath, []string{authMD, "docs/errors.md"}); err != nil {
+		t.Fatalf("WriteState() error = %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, ".agentmap", "next-state"))
+	if err != nil {
+		t.Fatalf("read next-state: %v", err)
+	}
+	got := string(data)
+	if !strings.Contains(got, authMD) {
+		t.Errorf("state file missing %q: %q", authMD, got)
+	}
+	if !strings.Contains(got, "docs/errors.md") {
+		t.Errorf("state file missing docs/errors.md: %q", got)
+	}
+}
+
+func TestWriteState_NilClearsFile(t *testing.T) {
+	dir := t.TempDir()
+	taskListPath := filepath.Join(dir, ".agentmap", "index-tasks.md")
+	writeFile(t, taskListPath, "# tasks\n")
+	// Write state then clear it.
+	if err := next.WriteState(taskListPath, []string{authMD}); err != nil {
+		t.Fatalf("WriteState() error = %v", err)
+	}
+	if err := next.WriteState(taskListPath, nil); err != nil {
+		t.Fatalf("WriteState(nil) error = %v", err)
+	}
+	// File should be gone.
+	_, err := os.Stat(filepath.Join(dir, ".agentmap", "next-state"))
+	if !os.IsNotExist(err) {
+		t.Errorf("expected next-state to be removed, err = %v", err)
+	}
+}
+
+func TestFlushState_NoStateFile_IsNoop(t *testing.T) {
+	dir := t.TempDir()
+	taskListPath := filepath.Join(dir, ".agentmap", "index-tasks.md")
+	writeFile(t, taskListPath, "# tasks\n")
+
+	result, err := next.FlushState(taskListPath, dir)
+	if err != nil {
+		t.Fatalf("FlushState() error = %v", err)
+	}
+	if result.Blocked {
+		t.Errorf("expected not blocked")
+	}
+}
+
+func TestFlushState_BlocksWhenTildeRemains(t *testing.T) {
+	dir := t.TempDir()
+	taskListPath := makeTaskList(t, dir, []struct {
+		relPath string
+		checked bool
+	}{
+		{authMD, false},
+	})
+	// Write file with ~ still present.
+	writeFile(t, filepath.Join(dir, authMD), "<!-- AGENT:NAV\npurpose:~token lifecycle authentication\n-->\n\n# Auth\n")
+
+	if err := next.WriteState(taskListPath, []string{authMD}); err != nil {
+		t.Fatalf("WriteState() error = %v", err)
+	}
+
+	result, err := next.FlushState(taskListPath, dir)
+	if err != nil {
+		t.Fatalf("FlushState() error = %v", err)
+	}
+	if !result.Blocked {
+		t.Errorf("expected Blocked=true when ~ remains")
+	}
+	if result.BlockedPath != authMD {
+		t.Errorf("BlockedPath = %q, want %s", result.BlockedPath, authMD)
+	}
+	// Entry should still be unchecked.
+	data, _ := os.ReadFile(taskListPath)
+	if !strings.Contains(string(data), "- [ ]") {
+		t.Errorf("task should still be unchecked when blocked")
+	}
+}
+
+func TestFlushState_ChecksOffCleanFile(t *testing.T) {
+	dir := t.TempDir()
+	taskListPath := makeTaskList(t, dir, []struct {
+		relPath string
+		checked bool
+	}{
+		{authMD, false},
+		{"docs/errors.md", false},
+	})
+	// Write file with NO ~ remaining.
+	writeFile(t, filepath.Join(dir, authMD), "<!-- AGENT:NAV\npurpose:token lifecycle authentication\n-->\n\n# Auth\n")
+
+	if err := next.WriteState(taskListPath, []string{authMD}); err != nil {
+		t.Fatalf("WriteState() error = %v", err)
+	}
+
+	result, err := next.FlushState(taskListPath, dir)
+	if err != nil {
+		t.Fatalf("FlushState() error = %v", err)
+	}
+	if result.Blocked {
+		t.Errorf("expected not blocked for clean file")
+	}
+
+	// Entry should be checked off.
+	data, _ := os.ReadFile(taskListPath)
+	if !strings.Contains(string(data), "- [x]") {
+		t.Errorf("task should be checked off after flush")
+	}
+	// Second entry should still be unchecked.
+	if strings.Count(string(data), "- [ ]") != 1 {
+		t.Errorf("expected exactly 1 unchecked entry remaining")
+	}
+	// State file should be empty/cleared.
+	statePath := filepath.Join(dir, ".agentmap", "next-state")
+	stateData, _ := os.ReadFile(statePath)
+	if strings.TrimSpace(string(stateData)) != "" {
+		t.Errorf("state file should be cleared after flush, got %q", string(stateData))
+	}
+}
+
+func TestFlushState_MissingFileSkips(t *testing.T) {
+	dir := t.TempDir()
+	taskListPath := makeTaskList(t, dir, []struct {
+		relPath string
+		checked bool
+	}{
+		{"docs/gone.md", false},
+	})
+	// Don't create the file.
+
+	if err := next.WriteState(taskListPath, []string{"docs/gone.md"}); err != nil {
+		t.Fatalf("WriteState() error = %v", err)
+	}
+
+	result, err := next.FlushState(taskListPath, dir)
+	if err != nil {
+		t.Fatalf("FlushState() error = %v", err)
+	}
+	// Missing file should not block.
+	if result.Blocked {
+		t.Errorf("missing file should not block flush")
 	}
 }

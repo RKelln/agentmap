@@ -1,7 +1,11 @@
 // Package next implements the agentmap next command: find the next unchecked
-// task in index-tasks.md and print a self-contained, single-file prompt for a
-// small-model agent. The agent rewrites the nav block, runs agentmap update,
-// then calls agentmap next again to get the following task.
+// task in index-tasks.md, run update+check-off on any previously-emitted files,
+// and print a self-contained single-file prompt for a small-model agent.
+//
+// State is tracked in .agentmap/next-state (one relPath per line). On each
+// invocation, next flushes the state — running update+check-off on every path
+// listed — then emits the next N unchecked entries and records them as the new
+// state.
 package next
 
 import (
@@ -10,10 +14,13 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/RKelln/agentmap/internal/config"
+	"github.com/RKelln/agentmap/internal/index"
 	"github.com/RKelln/agentmap/internal/navblock"
+	"github.com/RKelln/agentmap/internal/update"
 )
 
-// Task is the next unchecked task found in the index-tasks.md.
+// Task is a single unchecked entry from index-tasks.md.
 type Task struct {
 	// RelPath is the file path relative to the repo root.
 	RelPath string
@@ -23,6 +30,14 @@ type Task struct {
 	NavBlockRaw string
 	// RepoRoot is the root directory of the repo.
 	RepoRoot string
+}
+
+// stateFileName is the name of the state file inside .agentmap/.
+const stateFileName = "next-state"
+
+// statePath returns the path to the next-state file.
+func statePath(taskListPath string) string {
+	return filepath.Join(filepath.Dir(taskListPath), stateFileName)
 }
 
 // FindTaskList searches upward from startDir for .agentmap/index-tasks.md.
@@ -46,11 +61,127 @@ func FindTaskList(startDir string) (string, error) {
 	return "", fmt.Errorf("next: no .agentmap/index-tasks.md found searching upward from %s", startDir)
 }
 
-// Next reads taskListPath, finds the first unchecked entry (skipping the first
-// skip entries) that corresponds to a markdown file, reads the nav block from
-// the file, and returns a Task. Returns (nil, nil) when all tasks are done.
-// Use skip=0 for the first call; increment by 1 for each subsequent call when
-// emitting multiple prompts without modifying the task list between calls.
+// FlushResult is the result of flushing the state file.
+type FlushResult struct {
+	// Blocked is set if a file still has ~ descriptions and we should stop.
+	Blocked bool
+	// BlockedPath is the relPath of the file that blocked progress.
+	BlockedPath string
+}
+
+// FlushState reads the next-state file and runs update+check-off on each path.
+// Returns a FlushResult. If any file still has ~ descriptions, Blocked is set
+// and the caller should stop and warn the user.
+// Missing files are warned about but do not block progress.
+func FlushState(taskListPath, repoRoot string) (FlushResult, error) {
+	sp := statePath(taskListPath)
+	data, err := os.ReadFile(sp)
+	if os.IsNotExist(err) {
+		return FlushResult{}, nil // nothing to flush
+	}
+	if err != nil {
+		return FlushResult{}, fmt.Errorf("next: read state: %w", err)
+	}
+
+	paths := parseState(string(data))
+	if len(paths) == 0 {
+		return FlushResult{}, nil
+	}
+
+	cfg, _ := loadConfig(repoRoot)
+	taskList := index.TaskListPath(repoRoot)
+
+	for _, relPath := range paths {
+		absPath := filepath.Join(repoRoot, relPath)
+
+		// Check if file still has ~ descriptions.
+		if hasRemainingAuto(absPath) {
+			return FlushResult{Blocked: true, BlockedPath: relPath}, nil
+		}
+
+		// File is clean: run update to refresh line numbers.
+		if _, statErr := os.Stat(absPath); statErr == nil {
+			if _, updErr := update.File(absPath, cfg, false, true); updErr != nil {
+				// Non-fatal: warn via stderr but continue.
+				fmt.Fprintf(os.Stderr, "warning: %s: update: %v\n", relPath, updErr)
+			}
+		} else {
+			fmt.Fprintf(os.Stderr, "warning: %s: file not found, skipping\n", relPath)
+		}
+
+		// Check off the entry in the task list.
+		if err := index.CheckOffTaskEntry(taskList, absPath, relPath); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: %s: check-off: %v\n", relPath, err)
+		}
+	}
+
+	// Clear the state file — all paths flushed successfully.
+	if err := os.WriteFile(sp, []byte(""), 0o644); err != nil {
+		return FlushResult{}, fmt.Errorf("next: clear state: %w", err)
+	}
+	return FlushResult{}, nil
+}
+
+// WriteState writes the given relPaths to the next-state file.
+func WriteState(taskListPath string, relPaths []string) error {
+	if len(relPaths) == 0 {
+		return clearState(taskListPath)
+	}
+	content := strings.Join(relPaths, "\n") + "\n"
+	return os.WriteFile(statePath(taskListPath), []byte(content), 0o644)
+}
+
+// clearState removes or empties the state file.
+func clearState(taskListPath string) error {
+	sp := statePath(taskListPath)
+	if err := os.Remove(sp); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("next: clear state: %w", err)
+	}
+	return nil
+}
+
+// parseState splits a state file into relPaths, ignoring blank lines.
+func parseState(content string) []string {
+	var paths []string
+	for _, line := range strings.Split(content, "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			paths = append(paths, line)
+		}
+	}
+	return paths
+}
+
+// hasRemainingAuto returns true if the file at path has any ~ descriptions.
+func hasRemainingAuto(path string) bool {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false // missing file doesn't block
+	}
+	pr := navblock.ParseNavBlock(string(data))
+	if !pr.Found {
+		return false
+	}
+	if navblock.IsAutoGenerated(pr.Block.Purpose) {
+		return true
+	}
+	for _, e := range pr.Block.Nav {
+		if navblock.IsAutoGenerated(e.About) {
+			return true
+		}
+	}
+	return false
+}
+
+// loadConfig loads agentmap.yml from the repo root, falling back to defaults.
+func loadConfig(repoRoot string) (config.Config, error) {
+	cfgPath := filepath.Join(repoRoot, "agentmap.yml")
+	return config.Load(cfgPath)
+}
+
+// Next reads taskListPath, skips the first skip unchecked entries, and returns
+// the (skip+1)th unchecked entry with its nav block. Returns (nil, nil) when
+// all tasks are done.
 func Next(taskListPath string, skip int) (*Task, error) {
 	data, err := os.ReadFile(taskListPath)
 	if err != nil {
@@ -58,9 +189,6 @@ func Next(taskListPath string, skip int) (*Task, error) {
 	}
 	content := string(data)
 
-	// Scan line by line: find file-entry headings followed by "- [ ]".
-	// Entry headings look like: "## path/to/file.md (N lines)"
-	// Non-entry headings (preamble): "## Your job", "## Rules (quick ref)", etc.
 	lines := strings.Split(content, "\n")
 	repoRoot := filepath.Dir(filepath.Dir(taskListPath)) // .agentmap/ -> root
 
@@ -73,7 +201,7 @@ func Next(taskListPath string, skip int) (*Task, error) {
 	for _, line := range lines {
 		if strings.HasPrefix(line, "## ") {
 			rest := line[3:]
-			// File entry headings end with " (N lines)" where N is a number.
+			// File entry headings end with " (N lines)" or " (1 line)".
 			if parenIdx := strings.LastIndex(rest, " ("); parenIdx >= 0 {
 				suffix := rest[parenIdx:]
 				if strings.HasSuffix(suffix, " lines)") || strings.HasSuffix(suffix, " line)") {
@@ -103,14 +231,14 @@ func Next(taskListPath string, skip int) (*Task, error) {
 				}, nil
 			}
 			found++
-			current = nil // don't match this entry again
+			current = nil
 		}
 		if current != nil && line == "- [x]" {
 			current = nil
 		}
 	}
 
-	return nil, nil // all done (or no entries found)
+	return nil, nil // all done
 }
 
 // readNavBlock reads the raw AGENT:NAV block text from a file.
@@ -124,7 +252,6 @@ func readNavBlock(path string) string {
 	if !pr.Found {
 		return ""
 	}
-	// Reconstruct the raw block from the Start/End line indices (1-indexed).
 	lines := strings.Split(string(data), "\n")
 	if pr.Start < 1 || pr.End < 1 || pr.End > len(lines) {
 		return ""
@@ -157,8 +284,7 @@ func RenderPrompt(t *Task) string {
 	b.WriteString("   - Never edit `s`, `n`, `nav[N]`, `see[N]`, or line numbers.\n")
 	b.WriteString("3. Optionally add `see` entries for closely related files.\n")
 	b.WriteString("4. Save the file.\n")
-	b.WriteString("5. Run: `agentmap update " + t.RelPath + "`\n")
-	b.WriteString("6. Run: `agentmap next` to get the next file.\n")
+	b.WriteString("5. Run: `agentmap next` to advance and get the next file.\n")
 
 	return b.String()
 }
@@ -166,4 +292,12 @@ func RenderPrompt(t *Task) string {
 // RenderDone formats the completion message when all tasks are checked off.
 func RenderDone(repoRoot string) string {
 	return "All tasks complete. Run: agentmap check " + repoRoot + "\n"
+}
+
+// RenderBlocked formats the warning message when a file still has ~ descriptions.
+func RenderBlocked(relPath string) string {
+	return fmt.Sprintf(
+		"Blocked: %s still has ~ descriptions. Finish rewriting it, save the file, then run `agentmap next` again.\n",
+		relPath,
+	)
 }
