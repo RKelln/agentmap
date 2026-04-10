@@ -7,6 +7,39 @@ Do not hand-edit metadata (`s`, `n`, `nav[N]`, `see[N]`) or line numbers — `ag
 
 ---
 
+## Command Workflow
+
+### Single file or small set
+
+```
+agentmap generate <file>     # writes skeleton with ~-prefixed descriptions
+                             # skips files that already have a nav block; use --force to overwrite
+# rewrite each ~ description in the nav block
+agentmap update <file>       # refreshes line numbers; flags new/changed sections
+agentmap check <file>        # validates nav block is in sync; run before committing
+```
+
+### Bulk indexing (new repo or large directory)
+
+```
+agentmap index .             # generates skeletons for all unindexed files;
+                             # writes .agentmap/index-tasks.md checklist
+agentmap next                # prints a self-contained prompt for the next unchecked file;
+                             # flushes previously-emitted files (update + check-off) first
+# agent rewrites ~ descriptions in that file, saves it, then calls:
+agentmap next                # advance to the next file; repeat until done
+```
+
+`agentmap next` handles the update + check-off loop automatically. When all files are done it prints the final check command.
+
+### update on a mixed directory
+
+`agentmap update <dir>` handles both cases in one pass:
+- Files **with** a nav block → refresh line numbers, flag changed sections.
+- Files **without** a nav block → delegate to `generate` (same as running `agentmap generate` on that file).
+
+---
+
 ## The Mental Model
 
 An agent navigating a codebase opens a file based on a guess — a filename, an index entry, a
@@ -74,8 +107,6 @@ Read(offset=s, limit=n)    # read exactly the section flagged by update
 ---
 
 ## 2. Starting from Scratch
-
-Don't craft a nav block by hand and then run `agentmap generate` — it will overwrite your work.
 
 The correct workflow for a new file:
 1. Write the file content (no nav block yet).
