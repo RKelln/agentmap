@@ -9,20 +9,24 @@ Do not hand-edit metadata (`s`, `n`, `nav[N]`, `see[N]`) or line numbers — `ag
 
 ## The Mental Model
 
-An agent navigating a codebase reads a nav block **before** opening any file. It scans up to 20
-entries in one pass and makes a binary decision per entry: read this section, or skip it. Every
-word costs tokens. A vague or redundant description forces the agent to open the file anyway —
-defeating the purpose of the nav block entirely.
+A nav block serves two distinct navigation decisions:
 
-**The goal of every description:** let an agent skip this file or section with confidence, or
-jump directly to the right line without reading anything else.
+- **`purpose`** — used by an agent scanning many files (e.g. via AGENTMAP.md) to decide whether
+  this file is relevant to its task. The agent may never open the file if `purpose` rules it out.
+- **`about`** — used by an agent already reading this file to decide which section answers its
+  question, without reading every section.
+
+Both decisions happen under token pressure with no additional context. Every word costs tokens.
+A vague or redundant description forces the agent to read anyway — defeating the nav block entirely.
+
+**The goal of every description:** enable a skip-or-jump decision with no further reading.
 
 Two properties matter above all others:
 
 1. **Disambiguation** — distinguishes this entry from its siblings. An agent can only navigate if
    descriptions differ meaningfully. `token management` fails when three sections exist; `sliding-window expiry` does not.
-2. **Decision support** — contains enough information to act on without opening the file.
-   If the agent would still need to read the section to know whether it's relevant, the description failed.
+2. **Decision support** — contains enough information to act on. If the agent still needs to read
+   the section to know whether it's relevant, the description failed.
 
 Everything else — word count, filler avoidance, format — is in service of these two.
 
@@ -80,8 +84,8 @@ The correct workflow for a new file:
 <!-- rules-start -->
 ## 3. Writing `purpose` Lines
 
-`purpose` is a one-line summary of the **entire file**. An agent reading only this line decides
-whether to open the file at all.
+`purpose` is a one-line summary of the **entire file**. An agent scanning many files reads only
+this line to decide if the file is relevant to its task.
 
 **Rules:** under 10 words; no commas (use semicolons); no `~` prefix after you write it.
 
@@ -102,8 +106,8 @@ and mechanisms over category labels.
 
 ## 4. Writing `about` Fields
 
-`about` is a one-line summary of **one section**. An agent reading only this line decides whether
-to jump to that section or skip it.
+`about` is a one-line summary of **one section**. An agent already reading this file uses it to
+jump directly to the right section without reading each one.
 
 **Rules:** under 10 words; no commas; no `~` prefix after you write it.
 
@@ -224,8 +228,8 @@ Before committing a description, check:
 **1. Disambiguation** — Does it distinguish this entry from its siblings? If a sibling description
 could be swapped in without loss — rewrite it.
 
-**2. Decision support** — Could an agent skip or jump to this section based on this description
-alone, without opening the file? If not — it's too vague.
+**2. Decision support** — Could an agent identify the right section from this description
+alone, without reading it? If not — it's too vague.
 
 **3. No restatement** — Does it add information the heading doesn't already give? If not — leave it blank.
 
