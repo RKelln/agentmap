@@ -92,6 +92,8 @@ testdata/           -- sample markdown files for tests
 - Nav entries capped at ~20 (`max_nav_entries`); `max_depth` and `sub/expand_threshold` are heuristics toward that budget
 - Files under `min_lines` (default 50) get purpose-only blocks
 
+<!-- agentmap:init -->
+
 ## Reading Markdown Files
 
 Use AGENTMAP.md first for file search/discovery.
@@ -106,13 +108,14 @@ read a files first 50 lines then use AGENT:NAV to target reads.
 
 ## Before Committing Markdown Changes
 
-1. Run: `agentmap update <changed files>`
-2. Review output for sections marked content-changed or new.
-3. Read flagged sections and update their descriptions in the nav block.
+1. Run: `agentmap update <changed files>` — refreshes heading line numbers and flags content-changed or new sections.
+2. Edit the nav block directly: update `purpose`; `about`; and `see` descriptions for any flagged sections.
     - Do not edit s;n counts; nav[N]; or see[N] by hand.
-    - Update only `purpose`; `about`; and `see` descriptions.
     - Keep nav block format stable; add a `see` block after nav entries if needed.
+3. Run: `agentmap update <changed files>` again — syncs AGENTMAP.md index with the updated purposes.
 4. Commit.
+   
+<!-- /agentmap:init -->
 
 ## Writing Nav Descriptions
 
