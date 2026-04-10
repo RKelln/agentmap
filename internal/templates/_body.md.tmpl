@@ -1,21 +1,20 @@
 ## Reading Markdown Files
 
-Use AGENTMAP.md first for search/discovery.
+Use AGENTMAP.md first for file search/discovery.
 Flow: read AGENTMAP.md -> identify file -> read AGENT:NAV -> jump to section.
 
-AGENT:NAV appears immediately after frontmatter.
-Read the first 50 lines then use AGENT:NAV to target reads.
+AGENT:NAV appears immediately after frontmatter so you can 
+read a files first 50 lines then use AGENT:NAV to target reads.
 
 - If purpose does not match your task stop reading.
 - Use s;n ranges: Read(offset=s; limit=n).
-- If a description has `>` hints (e.g. `topic>sub1;sub2;sub3`); scan hints before reading the full parent section.
+- `>` is a hint for subsections that are not listed directly in the nav.
 
 ## Before Committing Markdown Changes
 
-1. Run: agentmap update <changed files>
-2. Review output for sections marked content-changed or new.
-3. Read flagged sections and update their descriptions in the nav block.
+1. Run: `agentmap update <changed files>` — refreshes heading line numbers and flags content-changed or new sections.
+2. Edit the nav block directly: update `purpose`; `about`; and `see` descriptions for any flagged sections.
     - Do not edit s;n counts; nav[N]; or see[N] by hand.
-    - Update only purpose; about; and see descriptions.
     - Keep nav block format stable; add a `see` block after nav entries if needed.
+3. Run: `agentmap update <changed files>` again — syncs AGENTMAP.md index with the updated purposes.
 4. Commit.

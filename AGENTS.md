@@ -94,14 +94,25 @@ testdata/           -- sample markdown files for tests
 
 ## Reading Markdown Files
 
-Read the AGENT:NAV block at the top after any frontmatter.
-Read the first 50 lines of a file before reading the rest of the file.
+Use AGENTMAP.md first for file search/discovery.
+Flow: read AGENTMAP.md -> identify file -> read AGENT:NAV -> jump to section.
 
-- If purpose doesn't match your task; stop reading.
-- Use s,n line ranges: Read(offset=s; limit=n) for the section you need.
-- For cross-file discovery use this flow: Read AGENTMAP.md -> identify file -> read AGENT:NAV -> jump to section.
-- If indexing was run on a subdirectory; read <indexed-path>/AGENTMAP.md for that scope.
-- Check see before searching; the file you need may be listed.
+AGENT:NAV appears immediately after frontmatter so you can 
+read a files first 50 lines then use AGENT:NAV to target reads.
+
+- If purpose does not match your task stop reading.
+- Use s;n ranges: Read(offset=s; limit=n).
+- `>` is a hint for subsections that are not listed directly in the nav.
+
+## Before Committing Markdown Changes
+
+1. Run: `agentmap update <changed files>`
+2. Review output for sections marked content-changed or new.
+3. Read flagged sections and update their descriptions in the nav block.
+    - Do not edit s;n counts; nav[N]; or see[N] by hand.
+    - Update only `purpose`; `about`; and `see` descriptions.
+    - Keep nav block format stable; add a `see` block after nav entries if needed.
+4. Commit.
 
 ## Writing Nav Descriptions
 

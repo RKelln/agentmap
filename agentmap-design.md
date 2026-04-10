@@ -486,20 +486,24 @@ Add this to the project's AGENTS.md:
 ```markdown
 ## Reading Markdown Files
 
-Every markdown file over 50 lines has an AGENT:NAV block in the first
-20 lines. Read it before reading the rest of the file.
+Use AGENTMAP.md first for file search/discovery.
+Flow: read AGENTMAP.md -> identify file -> read AGENT:NAV -> jump to section.
 
-- If purpose doesn't match your task; stop reading.
-- Use s;n line ranges: Read(offset=s; limit=n) for the section you need.
-- If a description has `>` hints (e.g. `topic>sub1;sub2;sub3`); scan the hints to find the right subsection before reading the whole parent section.
-- Check see before searching; the file you need may be listed.
-- If line numbers seem off; grep for the heading as fallback.
+AGENT:NAV appears immediately after frontmatter so you can 
+read a files first 50 lines then use AGENT:NAV to target reads.
+
+- If purpose does not match your task stop reading.
+- Use s;n ranges: Read(offset=s; limit=n).
+- `>` is a hint for subsections that are not listed directly in the nav.
 
 ## Before Committing Markdown Changes
 
-1. Run: agentmap update <changed files>
+1. Run: `agentmap update <changed files>`
 2. Review output for sections marked content-changed or new.
 3. Read flagged sections and update their descriptions in the nav block.
+    - Do not edit s;n counts; nav[N]; or see[N] by hand.
+    - Update only `purpose`; `about`; and `see` descriptions.
+    - Keep nav block format stable; add a `see` block after nav entries if needed.
 4. Commit.
 ```
 
