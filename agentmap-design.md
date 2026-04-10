@@ -251,6 +251,7 @@ the description and the hints have been reviewed.
 - `--llm` — Use an LLM to generate descriptions instead of keyword extraction. Requires LLM configuration (see section 7).
 - `--min-lines N` — Override minimum file size threshold (default: 50).
 - `--sub-threshold N` — Override subheading inclusion threshold (default: 50 lines). Sections under this size get no subsection info.
+- `--drop-subtitles` — Exclude structural headings (lone subtitles with no same-depth siblings) from the nav block entirely, regardless of budget. Without this flag, structural headings are still pruned first when budget is exceeded but included when budget allows.
 - `--expand-threshold N` — Override full-expansion threshold (default: 150 lines). These thresholds are pruning heuristics that only apply when the `max_nav_entries` budget is exceeded: sections with parent N >= expand-threshold are kept as full entries (unkillable); sections with parent N in [sub-threshold, expand-threshold) become `>` hints on the parent entry; sections with parent N < sub-threshold are dropped silently (see section 3.8 and §11.4).
 - `--dry-run` — Print what would be generated without writing files.
 
@@ -713,9 +714,38 @@ Heading text is stored as-is in the `name` field, with two exceptions:
 - Commas are stripped (they would break CSV parsing).
 - Leading/trailing whitespace is stripped.
 
-### 11.3 Empty Sections
+### 11.3 Empty Sections and Heading Clusters
 
-A heading immediately followed by another heading (no content between them) produces a section with `s == e` (single line — the heading itself). Include it in the nav block; the empty `about` field signals there's no content.
+**Consecutive same-depth heading drop (always applied in `generate`):**
+
+A run of consecutive headings at the same depth with no lines between them (not even blank lines) represents a metadata block or heading cluster. Only the first heading in the run is kept; the rest are dropped before nav generation.
+
+Examples:
+```
+# Title
+# Key: value    ← dropped (same depth, no lines between)
+# Key: value    ← dropped
+```
+```
+# H1
+## Sub1
+## Sub2         ← dropped (same depth as Sub1, no lines between)
+```
+```
+# H1
+## Sub1
+               ← blank line breaks the run
+## Sub2         ← kept
+## Sub3         ← dropped (same depth as Sub2, no lines between)
+```
+
+This rule operates in `generate` (not the parser). The parser reports all headings faithfully; `generate` filters before building the nav entry list.
+
+**Structural (lone subtitle) tagging:**
+
+A heading is tagged `structural` if it is the only heading at its depth within its parent section — i.e., it has no siblings at the same depth under the same parent. Lone subtitles are low-information: they cannot be navigated to independently since there is no second sibling to distinguish them from.
+
+Structural headings are treated as lowest-priority during budget pruning (pruned before any depth-based pruning). With `--drop-subtitles` they are excluded from the nav block entirely regardless of budget.
 
 ### 11.4 Very Large Files
 
@@ -723,13 +753,14 @@ Files with many headings would produce a nav block that itself costs significant
 
 **Algorithm:**
 
-1. **Include all** — start with all headings up to `max_depth` as full nav entries.
+1. **Include all** — start with all headings up to `max_depth` as full nav entries, after applying the consecutive same-depth drop (§11.3).
 2. **Check budget** — if total entries ≤ `max_nav_entries`, done.
-3. **Prune depth-first** — remove the deepest entries first. For each removed entry:
+3. **Prune structural first** — remove entries tagged `structural` (lone subtitles). Apply `sub_threshold`/`expand_threshold` rules to each removed entry as in step 4.
+4. **Prune depth-first** — remove the deepest remaining entries first. For each removed entry:
    - If its parent section is under `sub_threshold`: drop entirely (cheap to read in full).
    - If its parent section is between `sub_threshold` and `expand_threshold`: collapse to a `>` hint on the parent entry.
    - If its parent section is over `expand_threshold`: keep as a full entry (too large to scan without offsets).
-4. **Repeat** until within budget or no more prunable entries remain.
+5. **Repeat** until within budget or no more prunable entries remain.
 
 Shallow entries (those with no parent in the nav block) are never pruned. If shallow entries alone exceed the cap, the overrun is accepted.
 
