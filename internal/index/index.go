@@ -235,7 +235,7 @@ When all entries are checked, ` + "`agentmap next`" + ` prints a completion mess
 ## Rules (quick ref)
 
 - ` + "`purpose`" + `: one-line file summary; under 10 words; semicolons not commas
-- ` + "`about`" + `: one-line section summary; don't restate the heading; under 10 words
+	- ` + "`about`" + `: one-line section summary; don't restate the heading; under 10 words; leave blank if nothing to add
 - ` + "`see`" + `: only add when another file must be read together with this one
 - Never edit ` + "`s`" + `, ` + "`n`" + `, ` + "`nav[N]`" + `, or ` + "`see[N]`" + ` — only ` + "`purpose`" + `, ` + "`about`" + `, and ` + "`see`" + ` entries
 

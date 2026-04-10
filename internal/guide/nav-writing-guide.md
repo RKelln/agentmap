@@ -91,15 +91,20 @@ whether to read that section.
 **`about` must never restate the heading.** The heading is already visible in the `name` field.
 Repeating it wastes the description slot and gives the reader nothing new.
 
+**If you cannot add new information, leave `about` empty** — a trailing comma with nothing after it
+(`43,9,#Heading,`) is valid and preferable to noise. Self-explanatory headings like `##Summary` or
+`##Open Questions` often need no `about`.
+
 | | Example (heading: `##Token Refresh`) |
 |---|---|
 | Bad — restates heading | `token refresh` |
 | Bad — restates with filler | `overview of token refresh` |
 | Bad — still has `~` | `~silent rotation expiry detection` |
 | Good — adds new information | `silent rotation and sliding-window expiry` |
+| Good — nothing to add | _(empty)_ |
 
 **Ask yourself:** would a reader learn anything from the `about` that they couldn't already infer
-from the heading alone? If no — rewrite it.
+from the heading alone? If no — leave it blank.
 
 Avoid filler words: `overview`, `introduction`, `details`, `information`, `description`. Use the
 actual mechanism, policy, or concept the section covers.

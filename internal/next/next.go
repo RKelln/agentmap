@@ -280,7 +280,7 @@ func RenderPrompt(t *Task) string {
 	b.WriteString("   - Remove the `~` prefix.\n")
 	b.WriteString("   - Replace keyword noise with a concise human description.\n")
 	b.WriteString("   - `purpose`: one-line file summary; under 10 words; semicolons not commas.\n")
-	b.WriteString("   - `about`: one-line section summary; don't restate the heading; under 10 words.\n")
+	b.WriteString("   - `about`: one-line section summary; don't restate the heading; under 10 words; leave blank if nothing to add.\n")
 	b.WriteString("   - Never edit `s`, `n`, `nav[N]`, `see[N]`, or line numbers.\n")
 	b.WriteString("3. Optionally add `see` entries for closely related files.\n")
 	b.WriteString("4. Save the file.\n")
