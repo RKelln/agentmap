@@ -143,7 +143,13 @@ func File(path string, cfg config.Config, dryRun, quiet bool, changedLines ...[]
 		return noChanges, nil
 	}
 	if !hasBlock {
-		return noChanges, nil
+		// No nav block: delegate to generate so that `update <dir>` works on
+		// a mixed directory containing both new and already-indexed files.
+		report, err := generate.File(path, cfg, dryRun, true)
+		if err != nil {
+			return "", fmt.Errorf("update: generate nav block for %s: %w", path, err)
+		}
+		return report, nil
 	}
 
 	// Compute content lines (total newlines minus the nav block itself).
@@ -161,15 +167,15 @@ func File(path string, cfg config.Config, dryRun, quiet bool, changedLines ...[]
 	// Handle purpose-only files: no headings, but lines:N may still need updating.
 	if len(headings) == 0 {
 		// Only refresh lines:N if the block already has it (non-zero).
-		linesChanged := oldBlock.Lines != 0 && oldBlock.Lines != contentLines
+		linesChanged := oldBlock.Lines != 0 && oldBlock.Lines != totalLines
 		if !linesChanged {
 			return noChanges, nil
 		}
 		oldLinesCount := oldBlock.Lines
-		oldBlock.Lines = contentLines
+		oldBlock.Lines = totalLines
 		blockText := navblock.RenderNavBlock(oldBlock)
 		if dryRun {
-			return fmt.Sprintf("Updated: %s\n  lines-updated: %d -> %d", path, oldLinesCount, contentLines), nil
+			return fmt.Sprintf("Updated: %s\n  lines-updated: %d -> %d", path, oldLinesCount, totalLines), nil
 		}
 		newContent := insertNavBlock(string(content), blockText)
 		if err := os.WriteFile(path, []byte(newContent), 0o644); err != nil {
@@ -178,22 +184,22 @@ func File(path string, cfg config.Config, dryRun, quiet bool, changedLines ...[]
 		if quiet {
 			return noChanges, nil
 		}
-		return fmt.Sprintf("Updated: %s\n  lines-updated: %d -> %d", path, oldLinesCount, contentLines), nil
+		return fmt.Sprintf("Updated: %s\n  lines-updated: %d -> %d", path, oldLinesCount, totalLines), nil
 	}
 
 	// If the existing nav block has no nav entries and the file is below MinLines,
 	// generate intentionally wrote a purpose-only block for this file. Don't add
 	// new nav entries here — only refresh lines:N to stay consistent with generate.
 	if len(oldBlock.Nav) == 0 && contentLines < cfg.MinLines {
-		linesChanged := oldBlock.Lines != 0 && oldBlock.Lines != contentLines
+		linesChanged := oldBlock.Lines != 0 && oldBlock.Lines != totalLines
 		if !linesChanged {
 			return noChanges, nil
 		}
 		oldLinesCount := oldBlock.Lines
-		oldBlock.Lines = contentLines
+		oldBlock.Lines = totalLines
 		blockText := navblock.RenderNavBlock(oldBlock)
 		if dryRun {
-			return fmt.Sprintf("Updated: %s\n  lines-updated: %d -> %d", path, oldLinesCount, contentLines), nil
+			return fmt.Sprintf("Updated: %s\n  lines-updated: %d -> %d", path, oldLinesCount, totalLines), nil
 		}
 		newContent := insertNavBlock(string(content), blockText)
 		if err := os.WriteFile(path, []byte(newContent), 0o644); err != nil {
@@ -202,7 +208,7 @@ func File(path string, cfg config.Config, dryRun, quiet bool, changedLines ...[]
 		if quiet {
 			return noChanges, nil
 		}
-		return fmt.Sprintf("Updated: %s\n  lines-updated: %d -> %d", path, oldLinesCount, contentLines), nil
+		return fmt.Sprintf("Updated: %s\n  lines-updated: %d -> %d", path, oldLinesCount, totalLines), nil
 	}
 
 	// Use pre-computed ranges if provided, otherwise fall back to per-file git diff.
@@ -214,7 +220,7 @@ func File(path string, cfg config.Config, dryRun, quiet bool, changedLines ...[]
 	}
 	entryReports := buildEntryReports(oldBlock.Nav, sections, fileChanges)
 
-	hasChanges := (oldBlock.Lines != 0 && oldBlock.Lines != contentLines)
+	hasChanges := (oldBlock.Lines != 0 && oldBlock.Lines != totalLines)
 	for _, er := range entryReports {
 		if er.Type != ReportOK {
 			hasChanges = true
@@ -226,7 +232,7 @@ func File(path string, cfg config.Config, dryRun, quiet bool, changedLines ...[]
 		return noChanges, nil
 	}
 
-	block := buildUpdatedBlock(oldBlock, sections, entryReports, lines, cfg, contentLines)
+	block := buildUpdatedBlock(oldBlock, sections, entryReports, lines, cfg, contentLines, totalLines)
 	blockText := navblock.RenderNavBlock(block)
 
 	// If the new nav block is a different size than the old one (entries added or
@@ -433,7 +439,7 @@ func buildEntryReports(oldNav []navblock.NavEntry, sections []parser.Section, ch
 	return reports
 }
 
-func buildUpdatedBlock(oldBlock navblock.NavBlock, sections []parser.Section, _ []ReportEntry, lines []string, cfg config.Config, contentLines int) navblock.NavBlock {
+func buildUpdatedBlock(oldBlock navblock.NavBlock, sections []parser.Section, _ []ReportEntry, lines []string, cfg config.Config, _, totalLines int) navblock.NavBlock {
 	// Build multi-map: name -> []NavEntry to handle duplicate heading names.
 	// matchSectionsToNav uses exact-match first, then proximity — ensuring each
 	// nav entry is paired with the section at the same absolute line before
@@ -475,7 +481,7 @@ func buildUpdatedBlock(oldBlock navblock.NavBlock, sections []parser.Section, _ 
 	// Only carry forward lines:N if the original block had it.
 	outLines := 0
 	if oldBlock.Lines != 0 {
-		outLines = contentLines
+		outLines = totalLines
 	}
 
 	return navblock.NavBlock{

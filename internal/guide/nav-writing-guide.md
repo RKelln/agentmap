@@ -117,6 +117,8 @@ jump directly to the right section without reading each one.
 
 **Rules:** under 10 words; no commas; no `~` prefix after you write it.
 
+**Do not enumerate.** If a section contains a numbered list, do not copy the list items into `about`. Name the concept the list represents. `seven core commitments` is wrong; `load-bearing ethical commitments and their rationale` is still too long; `ethical foundations; 7 commitments` is the right shape. An agent needs to identify the section, not preview its contents.
+
 **Prefer noun phrases over sentences.** `sliding-window expiry and silent rotation` is faster to
 scan and more precise than `how token expiry and rotation work`. Concrete terms beat category
 labels: `PKCE code exchange` beats `authorization flow`.
@@ -135,6 +137,7 @@ Repeating it wastes the slot and gives the reader nothing to act on.
 | Bad — restates heading | `token refresh` |
 | Bad — restates with filler | `overview of token refresh` |
 | Bad — still has `~` | `~silent rotation expiry detection` |
+| Bad — enumerates content | `7 principles: creating intelligence changes humanity; intelligence is not disembodied; power concentrates` |
 | Good — adds new information | `silent rotation and sliding-window expiry` |
 | Good — nothing to add | _(empty)_ |
 
@@ -188,9 +191,21 @@ scan to decide which subsection to jump to.
 51,80,##Token Exchange,OAuth2 code-for-token flow>PKCE;client-credentials;device-flow
 ```
 
+**Hint length discipline.** The most common failure modes:
+
+| | Example (heading: `##Step-by-Step`) |
+|---|---|
+| Bad — verbose hints | `full phase walkthrough>Step 1 — Prepare edit manifests;Auto-classification rules;Step 2 — Phase 1: Auto edits (batched serial);Step 3 — Phase 2: Interactive items` |
+| Bad — meaningless after trimming | `full walkthrough with commands>prepare;auto-rules;phase-1;phase-2;phase-3;final-report` |
+| Good | `full walkthrough with commands>prepare;auto-classify;auto-edits;interactive;proposals;report` |
+
+The bad-verbose example pastes subsection content verbatim — hints should be labels, not summaries.
+The bad-trim example removed meaning to hit a word count — `phase-1` tells the agent nothing it didn't already know from the section number. Use the fewest words that still distinguish each subsection from its siblings.
+
 **Rules for `>` hints:**
 - One hint per subsection that has no nav entry of its own — don't add or drop entries, just rewrite the text.
 - 1-2 words per hint; no commas (use hyphens for compound terms).
+- Each hint must be a short label that distinguishes the subsection from its siblings — not a number, not a copy of the full heading, not a sentence fragment.
 - The description before `>` must still pass the anti-restatement rule on its own.
 - `agentmap update` preserves the full `about` value (description and hints) unchanged.
 

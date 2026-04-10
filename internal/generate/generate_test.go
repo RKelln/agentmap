@@ -40,7 +40,7 @@ Silent rotation and expiry detection.
 	cfg := config.Defaults()
 	cfg.MinLines = 10
 
-	report, err := File(path, cfg, false)
+	report, err := File(path, cfg, false, true)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -86,7 +86,7 @@ Some helper utilities.
 	cfg := config.Defaults()
 	cfg.MinLines = 50
 
-	report, err := File(path, cfg, false)
+	report, err := File(path, cfg, false, true)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -132,7 +132,7 @@ OAuth2 flow.
 	cfg := config.Defaults()
 	cfg.MinLines = 5 // content is 7 lines; keep well below to test nav replacement, not threshold
 
-	_, err := File(path, cfg, false)
+	_, err := File(path, cfg, false, true)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -171,7 +171,7 @@ Content here.
 	cfg := config.Defaults()
 	cfg.MinLines = 10
 
-	_, err := File(path, cfg, false)
+	_, err := File(path, cfg, false, true)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -213,7 +213,7 @@ func TestFile_FrontmatterHeadingLineNumbers(t *testing.T) {
 	cfg := config.Defaults()
 	cfg.MinLines = 10
 
-	_, err := File(path, cfg, false)
+	_, err := File(path, cfg, false, true)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -272,7 +272,7 @@ func TestFile_NoFrontmatterLeadingBlankLineNumbers(t *testing.T) {
 	cfg := config.Defaults()
 	cfg.MinLines = 10
 
-	_, err := File(path, cfg, false)
+	_, err := File(path, cfg, false, true)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -332,7 +332,7 @@ Even more content.
 	cfg := config.Defaults()
 	cfg.MinLines = 10
 
-	report, err := File(path, cfg, true)
+	report, err := File(path, cfg, true, true)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -824,7 +824,7 @@ func TestFile_LargeFileCapLineNumbers(t *testing.T) {
 	cfg.SubThreshold = 20
 	cfg.ExpandThreshold = 200
 
-	_, err := File(path, cfg, false)
+	_, err := File(path, cfg, false, true)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -1008,7 +1008,7 @@ Another paragraph here.
 	cfg := config.Defaults()
 	cfg.MinLines = 10
 
-	_, err := File(path, cfg, false)
+	_, err := File(path, cfg, false, true)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -1061,7 +1061,7 @@ Content B.
 	cfg.SubThreshold = 50
 	cfg.ExpandThreshold = 150
 
-	_, err := File(path, cfg, false)
+	_, err := File(path, cfg, false, true)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -1460,7 +1460,7 @@ func BenchmarkFileDryRun(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				if _, err := File(path, cfg, true); err != nil {
+				if _, err := File(path, cfg, true, true); err != nil {
 					b.Fatal(err)
 				}
 			}
@@ -1499,7 +1499,7 @@ Silent rotation and expiry detection logic.
 	cfg := config.Defaults()
 	cfg.MinLines = 10
 
-	_, err := File(path, cfg, false)
+	_, err := File(path, cfg, false, true)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -1668,7 +1668,7 @@ func TestFile_IdempotentLargeNavBlock(t *testing.T) {
 	cfg.MinLines = 10
 
 	// First run
-	_, err := File(path, cfg, false)
+	_, err := File(path, cfg, false, true)
 	if err != nil {
 		t.Fatalf("File() first run error = %v", err)
 	}
@@ -1684,7 +1684,7 @@ func TestFile_IdempotentLargeNavBlock(t *testing.T) {
 	}
 
 	// Second run — should be idempotent (no new nav block added)
-	_, err = File(path, cfg, false)
+	_, err = File(path, cfg, false, true)
 	if err != nil {
 		t.Fatalf("File() second run error = %v", err)
 	}
@@ -1781,7 +1781,7 @@ func TestFile_IdempotentDesignClean(t *testing.T) {
 	cfg.MinLines = 10
 
 	// First run: generates the real nav block
-	_, err = File(outPath, cfg, false)
+	_, err = File(outPath, cfg, false, true)
 	if err != nil {
 		t.Fatalf("File() first run error = %v", err)
 	}
@@ -1800,7 +1800,7 @@ func TestFile_IdempotentDesignClean(t *testing.T) {
 	}
 
 	// Second run: should be idempotent — count must not increase
-	_, err = File(outPath, cfg, false)
+	_, err = File(outPath, cfg, false, true)
 	if err != nil {
 		t.Fatalf("File() second run error = %v", err)
 	}
@@ -1841,7 +1841,7 @@ func TestFile_LineNumbersCorrectOnFirstGenerate(t *testing.T) {
 	cfg := config.Defaults()
 	cfg.MinLines = 10
 
-	_, err := File(path, cfg, false)
+	_, err := File(path, cfg, false, true)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -1915,7 +1915,7 @@ func TestFile_LineNumbersCorrectWithH3Children(t *testing.T) {
 	cfg := config.Defaults()
 	cfg.MinLines = 10
 
-	_, err := File(path, cfg, false)
+	_, err := File(path, cfg, false, true)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -1988,7 +1988,7 @@ func TestFile_MinLinesBoundary(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	report, err := File(path, cfg, false)
+	report, err := File(path, cfg, false, true)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -2080,5 +2080,141 @@ func TestPruneNavEntries_Idempotent(t *testing.T) {
 	// Both should contain > hints.
 	if !strings.Contains(parent1.About, ">") {
 		t.Errorf("parent1.About = %q, should contain > hints", parent1.About)
+	}
+}
+
+// TestFile_LinesFieldIsTotalLines verifies that generate stores the total file
+// line count in lines:N — matching what an editor displays — not content lines
+// (which would exclude the nav block itself).
+func TestFile_SkipsExistingNavBlockByDefault(t *testing.T) {
+	content := `# Auth Guide
+
+Token lifecycle management.
+
+## Token Exchange
+
+OAuth2 code-for-token flow.
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "auth.md")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := config.Defaults()
+	cfg.MinLines = 5
+
+	// First generate: no existing block, should succeed.
+	report, err := File(path, cfg, false, false)
+	if err != nil {
+		t.Fatalf("first File() error = %v", err)
+	}
+	if !strings.Contains(report, "Generated:") {
+		t.Errorf("first call report = %q, want 'Generated:'", report)
+	}
+
+	// Overwrite the purpose with a hand-written value.
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	original := string(data)
+	modified := strings.Replace(original, "~", "hand-written", 1)
+	if err := os.WriteFile(path, []byte(modified), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Second generate without --force: should skip.
+	report, err = File(path, cfg, false, false)
+	if err != nil {
+		t.Fatalf("second File() error = %v", err)
+	}
+	if report != SkippedExisting {
+		t.Errorf("second call report = %q, want %q", report, SkippedExisting)
+	}
+
+	// Confirm hand-written value was not overwritten.
+	data, err = os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "hand-written") {
+		t.Error("hand-written description was overwritten by generate without --force")
+	}
+}
+
+func TestFile_ForceOverwritesExistingNavBlock(t *testing.T) {
+	content := `# Auth Guide
+
+Token lifecycle management.
+
+## Token Exchange
+
+OAuth2 code-for-token flow.
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "auth.md")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := config.Defaults()
+	cfg.MinLines = 5
+
+	// First generate.
+	if _, err := File(path, cfg, false, false); err != nil {
+		t.Fatalf("first File() error = %v", err)
+	}
+
+	// Second generate with force=true: should overwrite.
+	report, err := File(path, cfg, false, true)
+	if err != nil {
+		t.Fatalf("force File() error = %v", err)
+	}
+	if !strings.Contains(report, "Generated:") {
+		t.Errorf("force call report = %q, want 'Generated:'", report)
+	}
+}
+
+func TestFile_LinesFieldIsTotalLines(t *testing.T) {
+	content := `# Auth Guide
+
+Token lifecycle management.
+
+## Token Exchange
+
+OAuth2 code-for-token flow.
+
+## Token Refresh
+
+Silent rotation and expiry detection.
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "auth.md")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := config.Defaults()
+	cfg.MinLines = 5
+
+	if _, err := File(path, cfg, false, true); err != nil {
+		t.Fatalf("File() error = %v", err)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pr := navblock.ParseNavBlock(string(data))
+	if !pr.Found {
+		t.Fatal("nav block not found after generate")
+	}
+
+	totalLines := strings.Count(string(data), "\n")
+	if pr.Block.Lines != totalLines {
+		t.Errorf("lines:N = %d, want total file lines %d (nav block has %d lines)",
+			pr.Block.Lines, totalLines, pr.End-pr.Start+1)
 	}
 }

@@ -43,7 +43,7 @@ var guideCmd = &cobra.Command{
 var generateCmd = &cobra.Command{
 	Use:   "generate [path]",
 	Short: "Generate nav blocks for markdown files",
-	Long:  "Parse markdown headings, generate descriptions, write full nav blocks.\nPath can be a directory (recursive) or a single .md file.",
+	Long:  "Parse markdown headings, generate descriptions, write full nav blocks.\nFiles that already have a nav block are skipped by default. Use --force to overwrite.\nPath can be a directory (recursive) or a single .md file.",
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		root := "."
@@ -77,6 +77,7 @@ var generateCmd = &cobra.Command{
 		}
 
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		force, _ := cmd.Flags().GetBool("force")
 		output, _ := cmd.Flags().GetString("output")
 		debug, _ := cmd.Flags().GetBool("debug")
 
@@ -115,22 +116,26 @@ var generateCmd = &cobra.Command{
 				}
 				return nil
 			}
-			report, err := generate.File(root, cfg, dryRun, output)
+			report, err := generate.File(root, cfg, dryRun, force, output)
 			if err != nil {
 				return err
+			}
+			if report == generate.SkippedExisting {
+				fmt.Printf("Skipped: %s (already has nav block; use --force to overwrite)\n", root)
+				return nil
 			}
 			fmt.Println(report)
 			return nil
 		}
 
-		return generate.Generate(root, cfg, dryRun)
+		return generate.Generate(root, cfg, dryRun, force)
 	},
 }
 
 var updateCmd = &cobra.Command{
 	Use:   "update [path]",
 	Short: "Refresh line numbers in existing nav blocks",
-	Long:  "Fast line-number refresh. Preserves all descriptions.",
+	Long:  "Fast line-number refresh. Preserves all descriptions.\nFiles with no nav block are passed to generate automatically.",
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		root := "."
@@ -580,6 +585,7 @@ func init() {
 	generateCmd.Flags().Int("sub-threshold", 50, "Minimum section size for subsection info")
 	generateCmd.Flags().Int("expand-threshold", 150, "Section size for full h3 entries")
 	generateCmd.Flags().Bool("dry-run", false, "Print without writing files")
+	generateCmd.Flags().BoolP("force", "f", false, "Overwrite existing nav blocks")
 	generateCmd.Flags().StringP("output", "o", "", "Write output to file instead of modifying source")
 	generateCmd.Flags().BoolP("debug", "D", false, "Show parsed headings and section ranges instead of generating")
 

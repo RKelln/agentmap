@@ -125,7 +125,7 @@ Content for section two.
 	cfg := config.Defaults()
 	cfg.MinLines = 50
 
-	err := Generate(dir, cfg, false)
+	err := Generate(dir, cfg, false, true)
 	if err != nil {
 		t.Fatalf("Generate() error = %v", err)
 	}
@@ -243,7 +243,7 @@ This is a real section after the code fence.
 	cfg := config.Defaults()
 	cfg.MinLines = 50
 
-	_, err := File(filepath.Join(dir, "code-fence.md"), cfg, false)
+	_, err := File(filepath.Join(dir, "code-fence.md"), cfg, false, true)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -315,7 +315,7 @@ Final section.
 	cfg := config.Defaults()
 	cfg.MinLines = 50
 
-	_, err := File(filepath.Join(dir, "duplicates.md"), cfg, false)
+	_, err := File(filepath.Join(dir, "duplicates.md"), cfg, false, true)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -374,7 +374,7 @@ func TestGenerate_EmptyFile(t *testing.T) {
 	cfg := config.Defaults()
 
 	// Should not crash
-	_, err := File(filepath.Join(dir, "empty.md"), cfg, false)
+	_, err := File(filepath.Join(dir, "empty.md"), cfg, false, true)
 	if err != nil {
 		t.Fatalf("File() on empty file error = %v", err)
 	}
@@ -438,7 +438,7 @@ func TestGenerate_LargeFile(t *testing.T) {
 	cfg := config.Defaults()
 	cfg.MinLines = 50
 
-	_, err := File(filepath.Join(dir, "large.md"), cfg, false)
+	_, err := File(filepath.Join(dir, "large.md"), cfg, false, true)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -513,7 +513,7 @@ Silent rotation and sliding-window expiry detection.
 	cfg := config.Defaults()
 	cfg.MinLines = 50
 
-	_, err := File(filepath.Join(dir, "auth.md"), cfg, false)
+	_, err := File(filepath.Join(dir, "auth.md"), cfg, false, true)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -576,7 +576,7 @@ func TestGenerate_SubsectionHints(t *testing.T) {
 
 	writeTempFile(t, dir, "hints.md", b.String())
 
-	_, err := File(filepath.Join(dir, "hints.md"), cfg, false)
+	_, err := File(filepath.Join(dir, "hints.md"), cfg, false, true)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -676,7 +676,7 @@ Brief other section.
 	cfg.SubThreshold = 50
 	cfg.ExpandThreshold = 150
 
-	_, err := File(filepath.Join(dir, "expand.md"), cfg, false)
+	_, err := File(filepath.Join(dir, "expand.md"), cfg, false, true)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -749,7 +749,7 @@ Detail B.
 
 	writeTempFile(t, dir, "small.md", content)
 
-	_, err := File(filepath.Join(dir, "small.md"), cfg, false)
+	_, err := File(filepath.Join(dir, "small.md"), cfg, false, true)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}

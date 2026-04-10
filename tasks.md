@@ -237,6 +237,7 @@ Safe, idempotent command that configures a project's agents to understand AGENT:
       2. Edit the nav block directly: update `purpose`; `about`; and `see` descriptions for any flagged sections.
          - Do not edit s;n counts; nav[N]; or see[N] by hand.
          - Keep nav block format stable; add a `see` block after nav entries if needed.
+         - Run `agentmap guide` for full instructions on writing nav descriptions.
       3. Run: `agentmap update <changed files>` again — syncs AGENTMAP.md index with the updated purposes.
       4. Commit.
    ```

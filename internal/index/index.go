@@ -327,7 +327,7 @@ func BuildIndex(root string, cfg config.Config, dryRun, force bool) (Result, err
 		case force || (!pr.Found && !hasNavMarker):
 			// Generate skeleton.
 			if !dryRun {
-				if _, err := generate.File(fullPath, cfg, false); err != nil {
+				if _, err := generate.File(fullPath, cfg, false, true); err != nil {
 					return Result{}, fmt.Errorf("index: generate %s: %w", relPath, err)
 				}
 			}
@@ -441,8 +441,14 @@ const (
 )
 
 // buildFilesBlockText converts FileEntry list to navblock.FilesBlock and renders it.
-// It reads each file to compute an accurate content line count (total newlines minus nav block).
+// It reads each file to compute total line count (strings.Count("\n") — matches editor display).
 func buildFilesBlockText(root string, entries []FileEntry) string {
+	return buildFilesBlockTextWithLines(root, entries, 0)
+}
+
+// buildFilesBlockTextWithLines is like buildFilesBlockText but sets Lines on the FilesBlock.
+// Pass lines=0 to omit lines:N from the rendered output.
+func buildFilesBlockTextWithLines(root string, entries []FileEntry, lines int) string {
 	repoName := filepath.Base(filepath.Clean(root))
 	if repoName == "." || repoName == "" {
 		// Fallback: use absolute path base.
@@ -452,24 +458,17 @@ func buildFilesBlockText(root string, entries []FileEntry) string {
 	}
 	fb := navblock.FilesBlock{
 		Purpose: "project file index for " + repoName,
+		Lines:   lines,
 	}
 	for _, e := range entries {
-		contentLines := 0
+		fileLines := 0
 		fullPath := filepath.Join(root, e.RelPath)
 		if data, err := os.ReadFile(fullPath); err == nil {
-			pr := navblock.ParseNavBlock(string(data))
-			navBlockLines := 0
-			if pr.Found {
-				navBlockLines = pr.End - pr.Start + 1
-			}
-			contentLines = strings.Count(string(data), "\n") - navBlockLines
-			if contentLines < 0 {
-				contentLines = 0
-			}
+			fileLines = strings.Count(string(data), "\n")
 		}
 		fb.Entries = append(fb.Entries, navblock.FilesEntry{
 			RelPath: e.RelPath,
-			Lines:   contentLines,
+			Lines:   fileLines,
 			About:   e.Purpose,
 		})
 	}
@@ -538,7 +537,8 @@ func WriteFilesBlock(root string, entries []FileEntry, cfg config.Config, dryRun
 	agentsMDPath := filepath.Join(root, "AGENTS.md")
 
 	if len(entries) <= cfg.IndexInlineMax {
-		// Small project: inline in AGENTS.md.
+		// Small project: inline in AGENTS.md. lines:N not written for inline blocks
+		// (the block is embedded inside AGENTS.md, not the whole file).
 		if err := updateOrCreateAgentsMD(agentsMDPath, blockText, dryRun); err != nil {
 			return "", fmt.Errorf("writefilesblock: update AGENTS.md: %w", err)
 		}
@@ -546,9 +546,17 @@ func WriteFilesBlock(root string, entries []FileEntry, cfg config.Config, dryRun
 	}
 
 	// Large project: write AGENTMAP.md + pointer in AGENTS.md.
+	// Compute lines:N from the final file content (blockText + trailing newline).
+	// Adding lines:N itself adds one line, so add 1 to the count before inserting.
+	finalContent := blockText + "\n"
+	totalLines := strings.Count(finalContent, "\n") + 1 // +1 for the lines:N line itself
+	if totalLines > 0 {
+		finalContent = buildFilesBlockTextWithLines(root, entries, totalLines) + "\n"
+	}
+
 	agentmapMDPath := filepath.Join(root, "AGENTMAP.md")
 	if !dryRun {
-		if err := os.WriteFile(agentmapMDPath, []byte(blockText+"\n"), 0o644); err != nil {
+		if err := os.WriteFile(agentmapMDPath, []byte(finalContent), 0o644); err != nil {
 			return "", fmt.Errorf("writefilesblock: write AGENTMAP.md: %w", err)
 		}
 	}

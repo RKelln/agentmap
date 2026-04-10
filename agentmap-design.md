@@ -82,6 +82,11 @@ relative/path.md,reason to read it
 - Single line. Describes what the file is and when an agent should read further.
 - Written by `generate` (via keyword extraction or LLM). Preserved by `update`.
 
+**lines:** `lines:N` *(optional)*
+- Total line count of the file (`wc -l` equivalent — number of newlines). Matches what an editor displays.
+- Written by `generate`; refreshed by `update` whenever it writes the block.
+- Lets an agent decide how much to read before opening the file. Omitted for files with no nav block.
+
 **nav:** `nav[N]{s,n,name,about}:`
 - `N` = total number of entries (including subheadings).
 - `s` = start line number (1-indexed, inclusive).
@@ -245,9 +250,10 @@ the description and the hints have been reviewed.
    e. Generate `about` descriptions using Tier 1 keyword extraction (default) or LLM (with `--llm` flag). All keyword-generated descriptions are prefixed with `~` to signal auto-generated content.
    f. Generate `purpose` from first paragraph of file or keyword extraction. Keyword-generated purpose is also prefixed with `~`.
    g. Write nav block at correct position (after frontmatter, before first heading).
-3. If a nav block already exists, **overwrite it entirely**. This is a full regeneration command.
+3. If a nav block already exists, **skip the file** (safe default). Use `--force` to overwrite.
 
 **Flags:**
+- `--force` — Overwrite existing nav blocks. Without this flag, files that already have a nav block are skipped.
 - `--llm` — Use an LLM to generate descriptions instead of keyword extraction. Requires LLM configuration (see section 7).
 - `--min-lines N` — Override minimum file size threshold (default: 50).
 - `--sub-threshold N` — Override subheading inclusion threshold (default: 50 lines). Sections under this size get no subsection info.
@@ -261,6 +267,7 @@ Generated: docs/authentication.md (6 sections)
 Generated: docs/error-policy.md (3 sections)
 Skipped: docs/changelog.md (under 50 lines; purpose-only)
 Skipped: README.md (under 50 lines; purpose-only)
+Skipped: docs/existing.md (already has nav block; use --force to overwrite)
 ```
 
 ### 4.2 `agentmap update [path]`
@@ -268,8 +275,10 @@ Skipped: README.md (under 50 lines; purpose-only)
 **Purpose:** Fast line-number refresh. Preserves all descriptions. This is the pre-commit and agent-facing command.
 
 **Behavior:**
-1. Find all markdown files under `path` that have an existing `<!-- AGENT:NAV` block.
+1. Find all markdown files under `path`.
 2. For each file:
+   - If the file has **no nav block**: delegate to `generate` (same as running `agentmap generate` on that file). This makes `update <dir>` work correctly on a mixed directory of new and already-indexed files.
+   - If the file has an existing nav block:
    a. Parse the existing nav block (extract entries with their `name` and `about` fields).
    b. Reparse the markdown to get current headings and line numbers.
    c. Match existing nav entries to current headings by heading text (`name` field, ignoring `#` prefixes).
@@ -502,6 +511,7 @@ read a files first 50 lines then use AGENT:NAV to target reads.
 2. Edit the nav block directly: update `purpose`; `about`; and `see` descriptions for any flagged sections.
     - Do not edit s;n counts; nav[N]; or see[N] by hand.
     - Keep nav block format stable; add a `see` block after nav entries if needed.
+    - Run `agentmap guide` for full instructions on writing nav descriptions.
 3. Run: `agentmap update <changed files>` again — syncs AGENTMAP.md index with the updated purposes.
 4. Commit.
 ```

@@ -38,7 +38,7 @@ func TestBuildUpdatedBlock_CommaStripping(t *testing.T) {
 		},
 	}
 
-	updated := buildUpdatedBlock(oldBlock, sections, nil, nil, config.Defaults(), 0)
+	updated := buildUpdatedBlock(oldBlock, sections, nil, nil, config.Defaults(), 0, 0)
 	if len(updated.Nav) != 1 {
 		t.Fatalf("nav count = %d, want 1", len(updated.Nav))
 	}
@@ -255,14 +255,28 @@ OAuth2 flow.
 	path := writeTempFile(t, dir, "auth.md", content)
 
 	cfg := config.Defaults()
+	cfg.MinLines = 5
 
 	report, err := File(path, cfg, false, false)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
 
-	if report != noChanges {
-		t.Errorf("expected noChanges for file without nav block, got: %s", report)
+	// update delegates to generate for files with no nav block.
+	if report == noChanges {
+		t.Error("update returned noChanges for a nav-less file; expected delegation to generate")
+	}
+	if !strings.Contains(report, "Generated:") && !strings.Contains(report, "Skipped:") {
+		t.Errorf("expected generate report, got: %s", report)
+	}
+
+	// File should now have a nav block.
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "<!-- AGENT:NAV") {
+		t.Error("file has no AGENT:NAV block after update delegated to generate")
 	}
 }
 
@@ -283,8 +297,13 @@ Some helper utilities.
 		t.Fatalf("File() error = %v", err)
 	}
 
-	if report != noChanges {
-		t.Errorf("expected noChanges for file without nav block, got: %s", report)
+	// update delegates to generate for files with no nav block.
+	// For a tiny file, generate writes a purpose-only block.
+	if report == noChanges {
+		t.Error("update returned noChanges for a nav-less file; expected delegation to generate")
+	}
+	if !strings.Contains(report, "Skipped:") && !strings.Contains(report, "Generated:") {
+		t.Errorf("expected generate report (purpose-only skipped), got: %s", report)
 	}
 }
 
@@ -925,8 +944,8 @@ func TestFile_PurposeOnlyBelowMinLines(t *testing.T) {
 	cfg := config.Defaults() // MinLines=50 by default
 
 	// Sub-case 1: lines:N is already correct → noChanges (nothing to do).
-	// Content has 6 content lines (10 total newlines minus 4 nav block lines).
-	const content = "<!-- AGENT:NAV\npurpose:test\nlines:6\n-->\n\n# Admin UI Guide\n\nThis document has been split.\n\nSee sub-docs.\n"
+	// Content has 10 total lines (strings.Count("\n") on the full file).
+	const content = "<!-- AGENT:NAV\npurpose:test\nlines:10\n-->\n\n# Admin UI Guide\n\nThis document has been split.\n\nSee sub-docs.\n"
 	path := writeTempFile(t, dir, "short.md", content)
 
 	report, err := File(path, cfg, true /* dry-run */, false)
@@ -937,11 +956,11 @@ func TestFile_PurposeOnlyBelowMinLines(t *testing.T) {
 		t.Errorf("sub-case 1: report = %q, want noChanges", report)
 	}
 
-	// Sub-case 2: lines:N is stale → reports lines-updated, but still no nav entries.
+	// Sub-case 2: lines:N is stale → reports lines-updated and writes correct total lines.
 	const contentStale = "<!-- AGENT:NAV\npurpose:test\nlines:99\n-->\n\n# Admin UI Guide\n\nThis document has been split.\n\nSee sub-docs.\n"
 	path2 := writeTempFile(t, dir, "short2.md", contentStale)
 
-	report2, err := File(path2, cfg, true /* dry-run */, false)
+	report2, err := File(path2, cfg, false /* not dry-run */, false)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -950,6 +969,20 @@ func TestFile_PurposeOnlyBelowMinLines(t *testing.T) {
 	}
 	if !strings.Contains(report2, "lines-updated") {
 		t.Errorf("sub-case 2: expected lines-updated in report; got:\n%s", report2)
+	}
+
+	// Verify the written value equals total file lines, not content lines.
+	data2, err := os.ReadFile(path2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pr2 := navblock.ParseNavBlock(string(data2))
+	if !pr2.Found {
+		t.Fatal("sub-case 2: nav block not found after update")
+	}
+	wantLines := strings.Count(string(data2), "\n")
+	if pr2.Block.Lines != wantLines {
+		t.Errorf("sub-case 2: lines:N = %d, want total file lines %d", pr2.Block.Lines, wantLines)
 	}
 }
 
@@ -1031,7 +1064,7 @@ func TestFile_DuplicateHeadingMatching(t *testing.T) {
 			{Start: 39, N: 17, Name: "##Step-by-Step Setup", About: "existing desc"},
 		},
 	}
-	updated := buildUpdatedBlock(oldBlock, sections, nil, nil, cfg, 50)
+	updated := buildUpdatedBlock(oldBlock, sections, nil, nil, cfg, 50, 50)
 
 	// Find the entry matched to line 39 (third section).
 	var matchedAbout string
@@ -1077,7 +1110,7 @@ func TestFile_BothDuplicatesInNav(t *testing.T) {
 
 	cfg := config.Defaults()
 	cfg.MaxDepth = 2
-	updated := buildUpdatedBlock(oldBlock, sections, nil, nil, cfg, 50)
+	updated := buildUpdatedBlock(oldBlock, sections, nil, nil, cfg, 50, 50)
 
 	want := map[int]string{
 		10: "first desc",
@@ -1203,7 +1236,7 @@ theme: default
 ---
 <!-- AGENT:NAV
 purpose:Test presentation file
-lines:10
+lines:18
 nav[1]{s,n,name,about}:
 8,3,#First Slide,First slide content
 -->
@@ -1245,5 +1278,107 @@ End.
 	}
 	if !foundSep {
 		t.Errorf("nav block opener not found on its own line in:\n%s", got)
+	}
+}
+
+func TestFile_GeneratesNavBlockWhenMissing(t *testing.T) {
+	// update on a file with no nav block should delegate to generate
+	// and produce a nav block (not silently skip).
+	content := `# Setup Guide
+
+Installation and configuration steps.
+
+## Prerequisites
+
+Required tools and versions.
+
+## Installation
+
+Step-by-step install procedure.
+
+## Configuration
+
+Environment variables and config file.
+`
+	dir := t.TempDir()
+	path := writeTempFile(t, dir, "setup.md", content)
+
+	cfg := config.Defaults()
+	cfg.MinLines = 5
+
+	report, err := File(path, cfg, false, false)
+	if err != nil {
+		t.Fatalf("File() error = %v", err)
+	}
+
+	// update should report generation, not noChanges.
+	if report == noChanges {
+		t.Error("update returned noChanges for a file with no nav block; expected delegation to generate")
+	}
+	if !strings.Contains(report, "Generated:") {
+		t.Errorf("report = %q, want to contain 'Generated:'", report)
+	}
+
+	// The file should now have a nav block.
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "<!-- AGENT:NAV") {
+		t.Error("file has no AGENT:NAV block after update delegated to generate")
+	}
+}
+
+func TestUpdate_SkipsAndGeneratesMixedDir(t *testing.T) {
+	// update on a directory containing both indexed and unindexed files
+	// should refresh the indexed file and generate for the unindexed one.
+	dir := t.TempDir()
+
+	// File 1: already has a nav block.
+	existing := `<!-- AGENT:NAV
+purpose:Existing indexed file
+lines:10
+nav[1]{s,n,name,about}:
+7,3,#Existing,existing section
+-->
+
+# Existing
+
+Some content here to make it long enough.
+
+More content for the file.
+`
+	writeTempFile(t, dir, "existing.md", existing)
+
+	// File 2: no nav block.
+	newFile := `# New File
+
+Brand new content that needs indexing.
+
+## Section One
+
+First section content.
+
+## Section Two
+
+Second section content.
+`
+	writeTempFile(t, dir, "new.md", newFile)
+
+	cfg := config.Defaults()
+	cfg.MinLines = 5
+
+	if err := Update(dir, cfg, false, true); err != nil {
+		t.Fatalf("Update() error = %v", err)
+	}
+
+	// new.md should now have a nav block.
+	newPath := filepath.Join(dir, "new.md")
+	newData, err := os.ReadFile(newPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(newData), "<!-- AGENT:NAV") {
+		t.Errorf("new.md has no AGENT:NAV block after Update(); update did not delegate to generate")
 	}
 }

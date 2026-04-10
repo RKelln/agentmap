@@ -329,6 +329,7 @@ type FilesEntry struct {
 // FilesBlock represents a project-level AGENT:NAV files block.
 type FilesBlock struct {
 	Purpose string
+	Lines   int // total line count of the AGENTMAP.md file itself; 0 if unknown
 	Entries []FilesEntry
 }
 
@@ -363,6 +364,9 @@ func RenderFilesBlock(block FilesBlock) string {
 
 	b.WriteString("<!-- AGENT:NAV\n")
 	b.WriteString("purpose:" + block.Purpose + "\n")
+	if block.Lines > 0 {
+		fmt.Fprintf(&b, "lines:%d\n", block.Lines)
+	}
 	fmt.Fprintf(&b, "files[%d]{path,lines,about}:\n", len(entries))
 
 	var lastDir string
@@ -422,6 +426,10 @@ func ParseFilesBlock(content string) (FilesBlock, bool) {
 		}
 		if strings.HasPrefix(line, "purpose:") {
 			fb.Purpose = strings.TrimPrefix(line, "purpose:")
+			continue
+		}
+		if strings.HasPrefix(line, "lines:") {
+			fb.Lines, _ = strconv.Atoi(strings.TrimSpace(strings.TrimPrefix(line, "lines:")))
 			continue
 		}
 		if strings.HasPrefix(line, "files[") && strings.HasSuffix(line, "}:") {

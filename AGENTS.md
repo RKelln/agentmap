@@ -86,9 +86,9 @@ testdata/           -- sample markdown files for tests
 
 - No commas in nav block field values (`about`; `why`; `purpose`; subsection hints) -- use semicolons as separators
 - No quoting or escaping in nav blocks
-- `update` never writes descriptions -- only refreshes line numbers
+- `update` never writes descriptions -- only refreshes line numbers; delegates to `generate` for files with no nav block
 - `check` never modifies files -- only validates
-- `generate` overwrites existing nav blocks entirely
+- `generate` skips files that already have a nav block by default; use `--force` to overwrite
 - Nav entries capped at ~20 (`max_nav_entries`); `max_depth` and `sub/expand_threshold` are heuristics toward that budget
 - Files under `min_lines` (default 50) get purpose-only blocks
 
