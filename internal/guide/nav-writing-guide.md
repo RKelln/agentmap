@@ -9,17 +9,21 @@ Do not hand-edit metadata (`s`, `n`, `nav[N]`, `see[N]`) or line numbers — `ag
 
 ## The Mental Model
 
-A nav block serves two distinct navigation decisions:
+An agent navigating a codebase opens a file based on a guess — a filename, an index entry, a
+search result. The nav block is read immediately to validate that guess:
 
-- **`purpose`** — used by an agent scanning many files (e.g. via AGENTMAP.md) to decide whether
-  this file is relevant to its task. The agent may never open the file if `purpose` rules it out.
-- **`about`** — used by an agent already reading this file to decide which section answers its
-  question, without reading every section.
+- **`purpose`** — confirms or rejects the guess. The agent already has the file open; `purpose`
+  tells it whether it guessed right. Must be specific enough to rule in *and* rule out quickly.
+- **`about`** — routes within the file once confirmed. The agent reads only the sections that
+  answer its question, skipping the rest.
+- **`see`** — exit ramp when the guess was wrong. Points directly to the right file without a
+  new search.
 
-Both decisions happen under token pressure with no additional context. Every word costs tokens.
-A vague or redundant description forces the agent to read anyway — defeating the nav block entirely.
+All three decisions happen under token pressure with no additional context. Every word costs
+tokens. A vague or redundant description forces the agent to read sections it shouldn't have
+to — defeating the nav block entirely.
 
-**The goal of every description:** enable a skip-or-jump decision with no further reading.
+**The goal of every description:** enable a confirm/route/exit decision with no further reading.
 
 Two properties matter above all others:
 
@@ -84,8 +88,8 @@ The correct workflow for a new file:
 <!-- rules-start -->
 ## 3. Writing `purpose` Lines
 
-`purpose` is a one-line summary of the **entire file**. An agent scanning many files reads only
-this line to decide if the file is relevant to its task.
+`purpose` is a one-line summary of the **entire file**. The agent reads it to confirm or reject
+its guess about whether this is the right file.
 
 **Rules:** under 10 words; no commas (use semicolons); no `~` prefix after you write it.
 
@@ -100,7 +104,7 @@ and mechanisms over category labels.
 | Bad — category label | `authentication system` |
 | Good | `token lifecycle; OAuth2 exchange; refresh and revocation policies` |
 
-**Ask yourself:** if I read only this line, would I know whether to open this file *instead of* its neighbours?
+**Ask yourself:** if I read only this line, would I know whether I'm in the right file *vs.* a neighbour on the same topic?
 
 ---
 
