@@ -4,6 +4,49 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.1.0-rc.9] — Nav writing guide overhaul; generate/update UX improvements — 2026-04-10
+
+Focused release improving the agent-facing nav writing guide and making
+`generate` and `update` safer and smarter to use together.
+
+### Added
+
+- **`agentmap guide` command workflow section** — new opening section covering
+  the single-file flow (`generate` → edit → `update` → `check`) and the bulk
+  indexing flow (`index` → `next` loop), including `update` behaviour on mixed
+  directories. Agents can now orient themselves from `agentmap guide` alone.
+
+- **`agentmap generate --force` / `-f` flag** — `generate` now skips files that
+  already have a nav block by default (safe mode). Pass `--force` to overwrite
+  existing nav blocks, restoring the previous behaviour.
+
+### Changed
+
+- **`agentmap update` delegates to `generate` for nav-less files** — running
+  `update <dir>` on a mixed directory now generates nav blocks for files that
+  don't have one yet, instead of silently skipping them. This makes `update`
+  the single command needed for both new and already-indexed files.
+
+- **`agentmap guide` nav writing guide rewritten** — reorganised around
+  disambiguation-first framing; new mental model section (confirm/route/exit);
+  dual-role `purpose` guidance (index scan + in-file confirm); noun-phrase
+  preference for `about`; hint length discipline table with real failure-mode
+  examples; quality checklist reordered with disambiguation first.
+
+- **`agentmap update` refreshes AGENTMAP.md files block** — `update` and
+  `agentmap next` flush now both trigger a files-block refresh so the project
+  index stays in sync with updated `purpose` fields.
+
+### Documentation
+
+- `agentmap-design.md` §4.1 and §4.2 updated to reflect `generate` safe
+  default, `--force` flag, and `update` delegation behaviour.
+- `AGENTS.md` key design constraints updated to match new behaviour.
+- Two-pass update workflow for nav description editing clarified in
+  `agentmap-design.md` and agent template (`_body.md.tmpl`).
+
+---
+
 ## [v0.1.0-rc.8] — Nav quality and YAML frontmatter fix — 2026-04-10
 
 Bug fix and nav description quality improvements for the `agentmap next` workflow.

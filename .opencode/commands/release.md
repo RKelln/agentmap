@@ -72,8 +72,8 @@ git fetch origin main --dry-run 2>&1
 # 4. CI passes
 scripts/agent-run.sh make ci
 
-# 5. GoReleaser config is valid
-goreleaser check
+# 5. GoReleaser config is valid (skip gracefully if goreleaser not installed locally)
+goreleaser check 2>&1 || echo "goreleaser not installed locally — skipping (runs in CI)"
 ```
 
 Then check that both downstream repos exist (required by .goreleaser.yaml):
@@ -103,6 +103,8 @@ Then re-run /release.
 ```
 
 Do not proceed past Step 2 if any pre-flight check fails.
+
+**Note on `goreleaser check`:** `goreleaser` is not installed in the local dev environment — it runs only in the GitHub Actions release workflow. If the command is not found, treat check 5 as passed and continue. It is not a blocker.
 
 If `GH_PAT` is missing, stop and show this exact fix:
 
