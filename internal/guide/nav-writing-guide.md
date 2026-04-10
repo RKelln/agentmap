@@ -58,18 +58,18 @@ relative/path.md,linked file purpose relative to this file
 Read the AGENT:NAV block first. This gives you purpose, section names,
 and line ranges before you commit to reading further.
 
+**Read the entire file before writing any descriptions.** You need the full picture to write
+descriptions that disambiguate correctly — a section's `about` should be written knowing what
+its siblings and parent sections contain, not in isolation.
+
 Never hand-edit nav line metadata while doing description work. Keep your edits to `purpose`, `about`,
 and `see`; then run `agentmap update` to refresh line numbers.
 
-Use line ranges from the nav block to read only what you need:
+Use line ranges from the nav block to read only what you need when re-reading for detail:
 
 ```
 Read(offset=s, limit=n)    # read exactly the section flagged by update
 ```
-
-Skim the full section content before writing its description. A description written from the heading
-alone is usually wrong — the actual content often surprises. For sections with `>` hints (e.g.
-`topic>sub1;sub2;sub3`), read the subsections too before writing the parent `about`.
 
 ---
 
@@ -140,6 +140,22 @@ Repeating it wastes the slot and gives the reader nothing to act on.
 
 **Ask yourself:** would an agent skip the right section based on this description alone?
 If it could plausibly apply to a sibling section — rewrite it.
+
+### Nested sections
+
+When a section has a parent in the nav block, the parent heading and its `about` are already
+visible context. A child `about` should only say what distinguishes it from its siblings — not
+repeat concepts the parent already covers.
+
+```
+## Authentication — token lifecycle; OAuth2 exchange
+### Token Refresh — silent rotation; sliding-window expiry   ← good: specific to refresh
+### Token Refresh — token refresh and OAuth2 mechanism       ← bad: repeats parent context
+### Token Revocation — immediate invalidation; blocklist     ← good: specific to revocation
+```
+
+The reader already knows they're inside `##Authentication`. The child only needs to differentiate
+itself from `###Token Revocation` and `###Token Introspection` — not re-explain the auth context.
 
 ### Sections with `>` hints
 

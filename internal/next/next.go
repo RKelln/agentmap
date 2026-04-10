@@ -275,12 +275,13 @@ func RenderPrompt(t *Task) string {
 	}
 
 	b.WriteString("Instructions:\n\n")
-	b.WriteString("1. Open `" + t.RelPath + "` and read it.\n")
+	b.WriteString("1. Read the entire `" + t.RelPath + "` before writing any descriptions.\n")
 	b.WriteString("2. Rewrite every `~`-prefixed `purpose` and `about` value.\n")
 	b.WriteString("   - Remove the `~` prefix.\n")
 	b.WriteString("   - Replace keyword noise with a concise human description.\n")
 	b.WriteString("   - `purpose`: one-line file summary; under 10 words; semicolons not commas.\n")
-	b.WriteString("   - `about`: one-line section summary; don't restate the heading; under 10 words; leave blank if nothing to add.\n")
+	b.WriteString("   - `about`: one-line section summary; don't restate the heading or parent context; under 10 words; leave blank if nothing to add.\n")
+	b.WriteString("   - For nested sections: write relative to the parent — only say what distinguishes this section from its siblings.\n")
 	b.WriteString("   - Never edit `s`, `n`, `nav[N]`, `see[N]`, or line numbers.\n")
 	b.WriteString("3. Optionally add `see` entries for closely related files.\n")
 	b.WriteString("4. Save the file.\n")
