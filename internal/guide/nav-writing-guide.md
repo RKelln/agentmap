@@ -148,10 +148,10 @@ visible context. A child `about` should only say what distinguishes it from its 
 repeat concepts the parent already covers.
 
 ```
-## Authentication — token lifecycle; OAuth2 exchange
-### Token Refresh — silent rotation; sliding-window expiry   ← good: specific to refresh
-### Token Refresh — token refresh and OAuth2 mechanism       ← bad: repeats parent context
-### Token Revocation — immediate invalidation; blocklist     ← good: specific to revocation
+## Authentication,token lifecycle; OAuth2 exchange
+### Token Refresh,silent rotation; sliding-window expiry   ← good: specific to refresh
+### Token Refresh,token refresh and OAuth2 mechanism       ← bad: repeats parent context
+### Token Revocation,immediate invalidation; blocklist     ← good: specific to revocation
 ```
 
 The reader already knows they're inside `##Authentication`. The child only needs to differentiate
