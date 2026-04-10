@@ -108,6 +108,15 @@ func Update(root string, cfg config.Config, dryRun, quiet bool) error {
 	if len(files) > 0 && !anyChanged {
 		fmt.Println("No changes")
 	}
+
+	// Refresh AGENTMAP.md (or inline AGENTS.md block) so the files index stays in sync
+	// with any purpose fields that may have been updated in nav blocks.
+	if !dryRun {
+		if err := index.RefreshFilesBlock(root, cfg, false); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: refresh files block: %v\n", err)
+		}
+	}
+
 	return nil
 }
 

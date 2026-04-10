@@ -119,6 +119,12 @@ func FlushState(taskListPath, repoRoot string) (FlushResult, error) {
 	if err := os.WriteFile(sp, []byte(""), 0o644); err != nil {
 		return FlushResult{}, fmt.Errorf("next: clear state: %w", err)
 	}
+
+	// Refresh AGENTMAP.md so purpose fields written by the agent are reflected in the index.
+	if err := index.RefreshFilesBlock(repoRoot, cfg, false); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: refresh files block: %v\n", err)
+	}
+
 	return FlushResult{}, nil
 }
 

@@ -177,6 +177,9 @@ var updateCmd = &cobra.Command{
 							fmt.Fprintf(os.Stderr, "warning: task list check-off: %v\n", err)
 						}
 					}
+					if err := index.RefreshFilesBlock(repoRoot, cfg, false); err != nil {
+						fmt.Fprintf(os.Stderr, "warning: refresh files block: %v\n", err)
+					}
 				}
 			}
 			return nil

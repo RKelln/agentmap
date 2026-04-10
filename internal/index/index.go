@@ -514,6 +514,23 @@ func updateOrCreateAgentsMD(agentsMDPath, blockText string, dryRun bool) error {
 	return os.WriteFile(agentsMDPath, []byte(existingContent), 0o644)
 }
 
+// RefreshFilesBlock rebuilds the AGENTMAP.md (or AGENTS.md inline block) from the current
+// purpose fields of all indexed files. Called by update after refreshing nav blocks so that
+// the files index stays in sync without requiring a full agentmap index run.
+func RefreshFilesBlock(root string, cfg config.Config, dryRun bool) error {
+	entries, err := BuildFilesBlock(root, cfg)
+	if err != nil {
+		return fmt.Errorf("refreshfilesblock: %w", err)
+	}
+	if len(entries) == 0 {
+		return nil
+	}
+	if _, err := WriteFilesBlock(root, entries, cfg, dryRun); err != nil {
+		return fmt.Errorf("refreshfilesblock: %w", err)
+	}
+	return nil
+}
+
 // WriteFilesBlock writes the files block to AGENTS.md (inline) or AGENTMAP.md (dedicated).
 // Returns the destination path.
 func WriteFilesBlock(root string, entries []FileEntry, cfg config.Config, dryRun bool) (string, error) {
