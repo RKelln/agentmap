@@ -7,6 +7,27 @@ Do not hand-edit metadata (`s`, `n`, `nav[N]`, `see[N]`) or line numbers — `ag
 
 ---
 
+## The Mental Model
+
+An agent navigating a codebase reads a nav block **before** opening any file. It scans up to 20
+entries in one pass and makes a binary decision per entry: read this section, or skip it. Every
+word costs tokens. A vague or redundant description forces the agent to open the file anyway —
+defeating the purpose of the nav block entirely.
+
+**The goal of every description:** let an agent skip this file or section with confidence, or
+jump directly to the right line without reading anything else.
+
+Two properties matter above all others:
+
+1. **Disambiguation** — distinguishes this entry from its siblings. An agent can only navigate if
+   descriptions differ meaningfully. `token management` fails when three sections exist; `sliding-window expiry` does not.
+2. **Decision support** — contains enough information to act on without opening the file.
+   If the agent would still need to read the section to know whether it's relevant, the description failed.
+
+Everything else — word count, filler avoidance, format — is in service of these two.
+
+---
+
 ## Quick Reference
 
 ```
@@ -20,7 +41,6 @@ relative/path.md,linked file purpose relative to this file
 ```
 
 **Order is strict:** `purpose` first, then `nav[...]` and its entries, then optional `see[...]` and its entries, then closing `-->`.
-You may add and remove `see` entries as appropriate to document changes.
 
 ---
 
@@ -40,8 +60,7 @@ Read(offset=s, limit=n)    # read exactly the section flagged by update
 
 Skim the full section content before writing its description. A description written from the heading
 alone is usually wrong — the actual content often surprises. For sections with `>` hints (e.g.
-`topic>sub1;sub2;sub3`), read the subsections too before writing the parent `about`. Try to include
-each subsection or decide what is most useful and informative if too many subsections.
+`topic>sub1;sub2;sub3`), read the subsections too before writing the parent `about`.
 
 ---
 
@@ -61,35 +80,41 @@ The correct workflow for a new file:
 <!-- rules-start -->
 ## 3. Writing `purpose` Lines
 
-`purpose` is a one-line summary of the **entire file**. An agent reading only this line should know
-whether the file is relevant to their task.
+`purpose` is a one-line summary of the **entire file**. An agent reading only this line decides
+whether to open the file at all.
 
 **Rules:** under 10 words; no commas (use semicolons); no `~` prefix after you write it.
 
+**Write for the sibling question:** a file doesn't exist alone — it sits next to others on the
+same topic. `purpose` must distinguish *this* file from its neighbours. Prefer concrete nouns
+and mechanisms over category labels.
+
 | | Example |
 |---|---|
-| Bad | `~authentication OAuth2 PKCE token flow redirect` |
-| Bad | `Overview of the authentication system and how it works` |
+| Bad — auto noise | `~authentication OAuth2 PKCE token flow redirect` |
+| Bad — too vague | `Overview of the authentication system and how it works` |
+| Bad — category label | `authentication system` |
 | Good | `token lifecycle; OAuth2 exchange; refresh and revocation policies` |
 
-The bad keyword example is auto-generated noise. The bad prose example is too long and vague.
-The good example tells an agent exactly what topics are covered and whether to keep reading.
-
-**Ask yourself:** if I read only this line, would I know whether to open this file?
+**Ask yourself:** if I read only this line, would I know whether to open this file *instead of* its neighbours?
 
 ---
 
 ## 4. Writing `about` Fields
 
-`about` is a one-line summary of **one section**. An agent reading only this line should know
-whether to read that section.
+`about` is a one-line summary of **one section**. An agent reading only this line decides whether
+to jump to that section or skip it.
 
 **Rules:** under 10 words; no commas; no `~` prefix after you write it.
+
+**Prefer noun phrases over sentences.** `sliding-window expiry and silent rotation` is faster to
+scan and more precise than `how token expiry and rotation work`. Concrete terms beat category
+labels: `PKCE code exchange` beats `authorization flow`.
 
 ### The anti-restatement rule
 
 **`about` must never restate the heading.** The heading is already visible in the `name` field.
-Repeating it wastes the description slot and gives the reader nothing new.
+Repeating it wastes the slot and gives the reader nothing to act on.
 
 **If you cannot add new information, leave `about` empty** — a trailing comma with nothing after it
 (`43,9,#Heading,`) is valid and preferable to noise. Self-explanatory headings like `##Summary` or
@@ -103,11 +128,8 @@ Repeating it wastes the description slot and gives the reader nothing new.
 | Good — adds new information | `silent rotation and sliding-window expiry` |
 | Good — nothing to add | _(empty)_ |
 
-**Ask yourself:** would a reader learn anything from the `about` that they couldn't already infer
-from the heading alone? If no — leave it blank.
-
-Avoid filler words: `overview`, `introduction`, `details`, `information`, `description`. Use the
-actual mechanism, policy, or concept the section covers.
+**Ask yourself:** would an agent skip the right section based on this description alone?
+If it could plausibly apply to a sibling section — rewrite it.
 
 ### Sections with `>` hints
 
@@ -145,8 +167,6 @@ scan to decide which subsection to jump to.
 - 1-2 words per hint; no commas (use hyphens for compound terms).
 - The description before `>` must still pass the anti-restatement rule on its own.
 - `agentmap update` preserves the full `about` value (description and hints) unchanged.
-
-**Ask yourself:** if I read only this line, would I know whether to read this section vs. its siblings?
 
 ---
 
@@ -189,9 +209,9 @@ purpose:token lifecycle; OAuth2 exchange flow   # agent-reviewed
 When you rewrite a description, remove the `~`. This signals that a human or agent has reviewed it.
 `agentmap update` preserves `~` unchanged — only a deliberate rewrite removes it.
 
-**Why it matters:** The index task list only includes files and sections that still have `~`
-descriptions. Removing `~` marks that section as done. Files where every description has been
-reviewed drop off the work list.
+**Why it matters:** The index task list only includes files that still have `~` descriptions.
+Removing `~` marks the section done. Files where every description has been reviewed drop off the
+work list.
 
 Do not remove `~` from a description you haven't actually improved — that defeats the tracking.
 
@@ -199,17 +219,17 @@ Do not remove `~` from a description you haven't actually improved — that defe
 
 ## 7. Quality Checklist
 
-Before committing a description, check these four criteria:
+Before committing a description, check:
 
-**1. Decision support** — Would an agent reading only this description know whether to read the section?
-If not, it's too vague.
+**1. Disambiguation** — Does it distinguish this entry from its siblings? If a sibling description
+could be swapped in without loss — rewrite it.
 
-**2. Disambiguation** — Is it specific enough to distinguish from sibling sections?
-`token management` fails if there are three token-related sections; `silent rotation and expiry` does not.
+**2. Decision support** — Could an agent skip or jump to this section based on this description
+alone, without opening the file? If not — it's too vague.
 
-**3. Precision** — Avoid generic words: `overview`; `introduction`; `details`; `information`.
-Use the actual mechanism; policy; or concept the section covers.
+**3. No restatement** — Does it add information the heading doesn't already give? If not — leave it blank.
 
-**4. Format compliance** — Under 10 words; no commas; `~` removed.
+**4. Concrete terms** — Does it name a mechanism; policy; or concept rather than a category?
+`sliding-window expiry` over `expiry details`; `PKCE code exchange` over `authorization flow`.
 
-A description that passes all four takes seconds to write and saves many minutes of agent navigation.
+**5. Format** — Under 10 words; no commas; `~` removed.
