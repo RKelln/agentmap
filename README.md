@@ -198,6 +198,8 @@ See [agentmap-design.md](agentmap-design.md) for the full specification includin
 3. Run `make ci` — test + lint + build must all pass
 4. Open a pull request
 
+GoReleaser is only needed locally if you're modifying `.goreleaser.yaml`. Install via `brew install goreleaser` or see [goreleaser.com](https://goreleaser.com). It is not required for normal development.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).
