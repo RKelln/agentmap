@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.1.0-rc.8] — Nav quality and YAML frontmatter fix — 2026-04-10
+
+Bug fix and nav description quality improvements for the `agentmap next` workflow.
+
+### Fixed
+- `agentmap update` on files with YAML frontmatter (e.g. Marp presentations) was
+  merging the frontmatter closing `---` with the nav block opener `<!-- AGENT:NAV`
+  into a single line (`---<!-- AGENT:NAV`). The parser could not find the nav block,
+  causing `agentmap next` to loop on the same file indefinitely. A regression test
+  covers this case.
+
+### Documentation
+- Guide, `agentmap next` prompt, and index task preamble now explicitly permit
+  leaving `about` blank (trailing comma: `43,9,#Heading,`) when a heading is
+  self-explanatory and no new information can be added. Prevents small models from
+  generating noise like "Cross-section issues notes" to satisfy the rewrite
+  requirement.
+- Design doc (`agentmap-design.md`) updated with §11.3 rules for consecutive
+  same-depth heading cluster collapse and structural (lone subtitle) tagging;
+  §11.4 pruning algorithm updated to prune structural entries before depth-based
+  pruning; `--drop-subtitles` flag specced for `agentmap generate` (implementation
+  deferred post-v0.1.0).
+
 ## [v0.1.0-rc.7] — agentmap next: stateful single-file agent workflow — 2026-04-09
 
 This release introduces `agentmap next`, a new command that solves context-window
