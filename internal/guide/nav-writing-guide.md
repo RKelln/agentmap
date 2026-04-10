@@ -12,8 +12,9 @@ Do not hand-edit metadata (`s`, `n`, `nav[N]`, `see[N]`) or line numbers — `ag
 An agent navigating a codebase opens a file based on a guess — a filename, an index entry, a
 search result. The nav block is read immediately to validate that guess:
 
-- **`purpose`** — confirms or rejects the guess. The agent already has the file open; `purpose`
-  tells it whether it guessed right. Must be specific enough to rule in *and* rule out quickly.
+- **`purpose`** — serves two roles: (1) scanned in the AGENTMAP index to find the right file
+  among many, and (2) read after opening to confirm the guess was correct. Must be specific enough
+  to rule in *and* rule out in both contexts.
 - **`about`** — routes within the file once confirmed. The agent reads only the sections that
   answer its question, skipping the rest.
 - **`see`** — exit ramp when the guess was wrong. Points directly to the right file without a
@@ -88,14 +89,15 @@ The correct workflow for a new file:
 <!-- rules-start -->
 ## 3. Writing `purpose` Lines
 
-`purpose` is a one-line summary of the **entire file**. The agent reads it to confirm or reject
-its guess about whether this is the right file.
+`purpose` is a one-line summary of the **entire file**. It appears in the AGENTMAP index (where
+an agent scans many files to find the right one) and at the top of the file itself (where it
+confirms or rejects the guess that brought the agent here).
 
 **Rules:** under 10 words; no commas (use semicolons); no `~` prefix after you write it.
 
 **Write for the sibling question:** a file doesn't exist alone — it sits next to others on the
-same topic. `purpose` must distinguish *this* file from its neighbours. Prefer concrete nouns
-and mechanisms over category labels.
+same topic. `purpose` must distinguish *this* file from its neighbours in both contexts. Prefer
+concrete nouns and mechanisms over category labels.
 
 | | Example |
 |---|---|
