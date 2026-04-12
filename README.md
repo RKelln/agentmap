@@ -53,10 +53,12 @@ See [AGENTS.md](AGENTS.md) for the full workflow: how to read nav blocks and how
 
 ## Basic Workflow
 
-1. Run `agentmap index .` from repo root (recommended) to create local deterministic `AGENT:NAV` blocks.
-2. Agent (or human) reviews and refines the generated `purpose`, `about`, and `see` descriptions.
-3. After markdown edits, run `agentmap update <changed files>` to refresh line numbers only.
-4. Run `agentmap check <path>` in CI/pre-commit to keep nav blocks in sync.
+1. Run `agentmap index .` from repo root to generate nav blocks and create `.agentmap/index-tasks.md`.
+2. Run `agentmap next` — it prints a self-contained prompt for the next unreviewed file, then auto-updates and checks off completed files on each subsequent call. Repeat until the task list is done.
+3. After any markdown edits, run `agentmap update <changed files>` to refresh line numbers.
+4. Run `agentmap check <path>` in CI/pre-commit to validate nav blocks are in sync.
+
+`agentmap next` handles the update + check-off loop automatically — the agent just edits a file and calls `next` again. Run `agentmap guide` for instructions on writing good `purpose`, `about`, and `see` descriptions.
 
 `index` writes outputs relative to the path you pass. Example: `agentmap index docs/` writes `docs/.agentmap/index-tasks.md` and `docs/AGENTMAP.md`.
 
@@ -71,6 +73,10 @@ irm https://raw.githubusercontent.com/RKelln/agentmap/main/install.ps1 | iex
 
 # Homebrew
 brew install RKelln/agentmap/agentmap
+
+# Scoop (Windows)
+scoop bucket add agentmap https://github.com/RKelln/scoop-agentmap
+scoop install agentmap
 
 # Go
 go install github.com/RKelln/agentmap/cmd/agentmap@latest
@@ -89,13 +95,21 @@ make install
 
 ## Quick Start
 
-First-time setup for a repo (recommended):
+First-time setup (recommended):
 
 ```bash
 agentmap index .
 ```
 
-This creates nav blocks where needed and writes `.agentmap/index-tasks.md` for description review.
+This generates nav blocks for all markdown files and writes `.agentmap/index-tasks.md` — a checklist of files with auto-generated `~`-prefixed descriptions that need human or agent review.
+
+Have an agent review and rewrite descriptions:
+
+```bash
+agentmap next   # prints a prompt for the next unreviewed file
+                # on each subsequent call: auto-updates and checks off the previous file
+                # repeat until the task list is empty
+```
 
 Refresh line numbers after editing markdown:
 
@@ -109,7 +123,7 @@ Validate before committing:
 agentmap check ./docs
 ```
 
-Optional: generate full nav blocks directly (without index task list):
+Optional: generate nav blocks directly without the index task list:
 
 ```bash
 agentmap generate ./docs
@@ -154,21 +168,24 @@ Hook handling in `init`:
 | `agentmap generate [path]` | Create nav blocks for markdown files |
 | `agentmap update [path]` | Refresh line numbers; preserve descriptions |
 | `agentmap check [path]` | Validate nav blocks are in sync |
+| `agentmap index [path]` | Bulk index files and generate task list |
+| `agentmap next` | Auto-update previous file, check it off, print prompt for the next |
+| `agentmap guide` | Print the nav writing guide |
 | `agentmap init [path]` | Configure your agent tool to use agentmap |
 | `agentmap uninit [path]` | Remove agentmap configuration injected by init |
+| `agentmap hook` | Print pre-commit hook templates |
 | `agentmap upgrade` | Upgrade agentmap to the latest version |
 | `agentmap uninstall` | Remove agentmap binary and config |
-| `agentmap index [path]` | Bulk index files and generate task list |
 
 ## CI Integration
 
 Two-line GitHub Actions integration:
 
 ```yaml
-- uses: RKelln/agentmap@main
+- uses: RKelln/agentmap@v0.1.0
 ```
 
-Or with a pinned version:
+Or with a specific path:
 
 ```yaml
 - uses: RKelln/agentmap@v0.1.0
@@ -181,10 +198,11 @@ Or with a pinned version:
 Optional `agentmap.yml` in your project root:
 
 ```yaml
-min_lines: 50
-sub_threshold: 50
-expand_threshold: 150
-max_depth: 3
+min_lines: 50          # files under this get purpose-only blocks (default: 50)
+sub_threshold: 50      # sections under this get no subsection hints (default: 50)
+expand_threshold: 150  # sections over this get full h3 entries (default: 150)
+max_depth: 6           # maximum heading depth to track (default: 6)
+max_nav_entries: 20    # maximum nav entries per file (default: 20)
 ```
 
 ## Design
