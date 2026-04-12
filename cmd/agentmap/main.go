@@ -190,7 +190,7 @@ var updateCmd = &cobra.Command{
 			return nil
 		}
 
-		return update.Update(root, cfg, dryRun, quiet)
+		return update.Update(root, findRepoDirRoot(root, cfgPath), cfg, dryRun, quiet)
 	},
 }
 
@@ -639,6 +639,29 @@ func findRepoRoot(filePath, cfgPath string) string {
 		return filepath.Dir(cfgPath)
 	}
 	dir, err := filepath.Abs(filepath.Dir(filePath))
+	if err != nil {
+		return ""
+	}
+	for {
+		if _, err := os.Stat(filepath.Join(dir, ".agentmap")); err == nil {
+			return dir
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return ""
+		}
+		dir = parent
+	}
+}
+
+// findRepoDirRoot returns the repository root starting the upward search from
+// dirPath itself (not its parent). Used when the input is a directory, not a file.
+// When cfgPath is non-empty, its directory is returned immediately.
+func findRepoDirRoot(dirPath, cfgPath string) string {
+	if cfgPath != "" {
+		return filepath.Dir(cfgPath)
+	}
+	dir, err := filepath.Abs(dirPath)
 	if err != nil {
 		return ""
 	}

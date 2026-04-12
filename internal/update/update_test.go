@@ -1329,6 +1329,55 @@ Environment variables and config file.
 	}
 }
 
+func TestUpdate_SubdirDoesNotCreateAgentsMDInSubdir(t *testing.T) {
+	// When update is called with a subdir, AGENTS.md (or AGENTMAP.md) must be
+	// written to repoRoot, not to the subdir.
+	repoRoot := t.TempDir()
+	subdir := filepath.Join(repoRoot, "docs", "api")
+	if err := os.MkdirAll(subdir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	content := `<!-- AGENT:NAV
+purpose:API reference
+lines:10
+nav[1]{s,n,name,about}:
+8,3,#API,api endpoints
+-->
+
+# API
+
+Some api content here.
+
+More content for the file.
+`
+	writeTempFile(t, subdir, "api.md", content)
+
+	cfg := config.Defaults()
+	cfg.MinLines = 5
+	cfg.IndexInlineMax = 20 // small project → inline AGENTS.md
+
+	// Call Update with the subdir as root but repoRoot as the repo root.
+	if err := Update(subdir, repoRoot, cfg, false, true); err != nil {
+		t.Fatalf("Update() error = %v", err)
+	}
+
+	// AGENTS.md must NOT be created in the subdir.
+	subdirAgents := filepath.Join(subdir, "AGENTS.md")
+	if _, err := os.Stat(subdirAgents); err == nil {
+		t.Errorf("AGENTS.md was created in subdir %s — should only exist at repo root", subdir)
+	}
+
+	// AGENTS.md (or AGENTMAP.md) should be at the repo root.
+	rootAgents := filepath.Join(repoRoot, "AGENTS.md")
+	rootAgentmap := filepath.Join(repoRoot, "AGENTMAP.md")
+	_, agentsErr := os.Stat(rootAgents)
+	_, agentmapErr := os.Stat(rootAgentmap)
+	if agentsErr != nil && agentmapErr != nil {
+		t.Errorf("neither AGENTS.md nor AGENTMAP.md was created at repo root %s", repoRoot)
+	}
+}
+
 func TestUpdate_SkipsAndGeneratesMixedDir(t *testing.T) {
 	// update on a directory containing both indexed and unindexed files
 	// should refresh the indexed file and generate for the unindexed one.
@@ -1368,7 +1417,7 @@ Second section content.
 	cfg := config.Defaults()
 	cfg.MinLines = 5
 
-	if err := Update(dir, cfg, false, true); err != nil {
+	if err := Update(dir, "", cfg, false, true); err != nil {
 		t.Fatalf("Update() error = %v", err)
 	}
 

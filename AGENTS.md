@@ -1,3 +1,21 @@
+<!-- agentmap:index -->
+<!-- AGENT:NAV
+purpose:project file index for agentmap
+files[7]{path,lines,about}:
+testdata/
+code-fences.md,23,heading;code;content;real;another;blocks;fence;file
+error-policy.md,15,circuit;open;policy;retry;service;attempts;backoff;breaker
+tiny.md,7,file;nav;purpose;block;lines;min;threshold;tiny
+testdata/index-fixture/
+CONTRIBUTING.md,50,contribution guidelines; pull request workflow; dev environment setup
+testdata/index-fixture/docs/
+authentication.md,47,token lifecycle authentication; OAuth2 flows
+error-policy.md,51,error handling policy; retry strategy; circuit breaker configuration
+testdata/index-fixture/docs/api/
+rate-limiting.md,49,rate limit tiers; burst allowance; quota tracking
+-->
+<!-- /agentmap:index -->
+
 # AGENTS.md
 
 Go 1.25+. Cobra CLI. Single binary; no runtime dependencies.

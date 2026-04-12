@@ -66,7 +66,13 @@ func (r ReportEntry) String() string {
 }
 
 // Update discovers markdown files with nav blocks under root and updates line numbers.
-func Update(root string, cfg config.Config, dryRun, quiet bool) error {
+// repoRoot is the repository root where AGENTS.md/AGENTMAP.md should be written.
+// When repoRoot is empty it falls back to root (single-root usage).
+func Update(root, repoRoot string, cfg config.Config, dryRun, quiet bool) error {
+	if repoRoot == "" {
+		repoRoot = root
+	}
+
 	files, err := discovery.DiscoverFiles(root, cfg.Exclude)
 	if err != nil {
 		return fmt.Errorf("update: discover files: %w", err)
@@ -79,7 +85,7 @@ func Update(root string, cfg config.Config, dryRun, quiet bool) error {
 	}
 
 	var anyChanged bool
-	taskListPath := index.TaskListPath(root)
+	taskListPath := index.TaskListPath(repoRoot)
 	for _, f := range files {
 		fullPath := filepath.Join(root, f)
 		var changedLines []gitutil.LineRange
@@ -109,10 +115,12 @@ func Update(root string, cfg config.Config, dryRun, quiet bool) error {
 		fmt.Println("No changes")
 	}
 
-	// Refresh AGENTMAP.md (or inline AGENTS.md block) so the files index stays in sync
-	// with any purpose fields that may have been updated in nav blocks.
+	// Refresh AGENTMAP.md (or inline AGENTS.md block) at the repo root so the
+	// files index stays in sync with any purpose fields that may have been updated
+	// in nav blocks. Always use repoRoot — never the scan subdir — so that the
+	// index file is written to the correct location.
 	if !dryRun {
-		if err := index.RefreshFilesBlock(root, cfg, false); err != nil {
+		if err := index.RefreshFilesBlock(repoRoot, cfg, false); err != nil {
 			fmt.Fprintf(os.Stderr, "warning: refresh files block: %v\n", err)
 		}
 	}
