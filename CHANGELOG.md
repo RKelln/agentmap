@@ -4,6 +4,145 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.1.0] — Initial public release — 2026-04-11
+
+agentmap is a CLI tool that writes and maintains `AGENT:NAV` blocks in Markdown
+files — structured navigation metadata that lets AI agents skip irrelevant files
+and jump directly to the right section without reading everything. This is the
+first stable release, shipping all core commands, install scripts, and CI
+integration.
+
+### Added
+
+- **`agentmap generate`** — writes `AGENT:NAV` blocks into Markdown files using
+  TF-IDF keyword extraction for `purpose` and `about` descriptions. Skips files
+  that already have a nav block by default; `--force` / `-f` overwrites. `--debug`
+  / `-D` prints every parsed heading with line numbers for troubleshooting. Handles
+  YAML frontmatter, code-fence-aware parsing, and budget-first nav pruning capped
+  at `max_nav_entries` (default 20).
+
+- **`agentmap update`** — refreshes line numbers in existing nav blocks after
+  content changes, using a two-pass min-distance heading matcher to correctly handle
+  duplicate and shifted headings. Reports `shifted`, `content-changed`, `new`, and
+  `deleted` entries. Delegates to `generate` for files with no nav block, making it
+  the single command for both new and already-indexed files. `--quiet` and
+  `--dry-run` flags supported.
+
+- **`agentmap check`** — validates that all nav block line numbers match the actual
+  file. Exits non-zero on any mismatch. `--warn-unreviewed` prints warnings for
+  entries still carrying the `~` auto-generated prefix. Prints `All nav blocks in
+  sync (N files checked)` on success.
+
+- **`agentmap index`** — bulk-generates nav blocks across a directory tree and
+  produces `AGENTMAP.md` (files block) and `.agentmap/index-tasks.md` (per-file
+  task checklist with embedded nav block and nav-writing guide). `--dry-run`,
+  `--force`, `--files-only` flags. Prints a ready-to-paste agent prompt on
+  completion.
+
+- **`agentmap next`** — stateful single-file agent workflow: reads the index task
+  list, emits a self-contained prompt for the next unchecked file, then on the
+  following call flushes state by running `update` + checking off completed files.
+  Blocks if unreviewed `~` descriptions remain. Solves context-window overload for
+  large projects. `--count N` for batched prompts.
+
+- **`agentmap guide`** — prints the embedded nav-writing guide to stdout. Covers
+  the single-file flow (`generate` → edit → `update` → `check`), the bulk indexing
+  flow (`index` → `next` loop), `purpose` / `about` / `see` field guidance,
+  disambiguation-first framing, the `~` prefix convention, and a quality checklist
+  with good/bad examples.
+
+- **`agentmap init`** — detects agent tool configs (`AGENTS.md`, `CLAUDE.md`,
+  `.cursor/rules`, `.windsurf/rules`, `.continue/rules`, `.roo/rules`,
+  `.amazonq/rules`, `.opencode`, `.aider.conf.yml`) and appends agentmap
+  instructions. Falls back to creating `AGENTS.md`. Installs pre-commit hooks via
+  `.git/hooks`, `.husky`, or `.pre-commit-config.yaml`. Fully idempotent via
+  `agentmap:init` markers. `--dry-run`, `--yes`, `--no-hook`, `--tool` flags.
+
+- **`agentmap uninit`** — reverses `init`: removes `agentmap:init` blocks from
+  Markdown files and deletes tool-specific rule files created by `init`. Fully
+  idempotent; `--dry-run` and `--yes` flags.
+
+- **`agentmap upgrade`** — self-update command using GitHub Releases with checksum
+  validation. `--check` reports available updates without installing. Refuses dev
+  builds and managed installs (Homebrew/Scoop), deferring with the correct package
+  manager command.
+
+- **`agentmap uninstall`** — detects install method (Homebrew, Scoop, `go install`,
+  direct) and defers to package managers or removes the binary directly.
+
+- **`agentmap hook`** — prints pre-commit shell and YAML hook templates for manual
+  integration.
+
+- **`agentmap version`** — prints version and commit SHA (injected at build time).
+
+- **POSIX install script** (`install.sh`) — OS/arch detection, GitHub Releases
+  download, SHA-256 checksum verification, sudo escalation, `--yes` / `--version`
+  / `--bin-dir` flags, PATH hint. Supports prereleases.
+
+- **PowerShell install script** (`install.ps1`) — same pattern for Windows;
+  `Expand-Archive`; user PATH update via `SetEnvironmentVariable`.
+
+- **GitHub Action** (`action.yml`) — composite action: installs agentmap via
+  `install.sh` and runs `agentmap check`; 2-line CI integration for consumer repos.
+
+- **`agentmap.yml` config** — `max_nav_entries` (default 20), `max_depth` (default
+  6), `min_lines` (default 50), `sub_expand_threshold`, `expand_threshold`, and
+  exclude glob patterns. Merges user excludes with defaults so `.agentmap/`
+  protection is never silently lost.
+
+- **Nav block format** — `s,n` (start line, length) format so agents call
+  `Read(offset=s, limit=n)` with zero arithmetic. `lines:N` field on nav blocks and
+  files blocks lets agents know file size before reading. `~` prefix on
+  auto-generated keyword descriptions signals unreviewed content.
+
+### Fixed
+
+- `agentmap update`: writing `AGENTS.md`/`AGENTMAP.md` to repo root when running
+  against a subdirectory (regression introduced in rc.9).
+- `agentmap update`: YAML frontmatter closing `---` merging with nav block opener
+  into a single line, making the nav block invisible to the parser.
+- `agentmap update`: duplicate heading matching via two-pass min-distance algorithm
+  (closest entry wins, not first-in-document-order).
+- `agentmap update`: `totalLines` off-by-1 for POSIX files; `generate`, `update`,
+  `check`, and `index` now all use `strings.Count(content, "\n")` consistently.
+- `agentmap update`: new h3 entries added below `ExpandThreshold` by `update` when
+  `generate` intentionally omitted them, causing nav block growth and line number
+  drift on every run.
+- `agentmap generate`: nav entry line numbers on first generate (uniform offset
+  applied via `shiftEntries`; previously silently bailed when entries/sections
+  lengths mismatched due to skipped h3 children).
+- `agentmap generate`: heading offset for files with a blank line after frontmatter.
+- `agentmap generate`: large nav blocks (27+ entries) producing duplicates on every
+  `generate` run because the 20-line window never found the closing `-->`.
+- `agentmap generate`: `contentLines` (not `totalLines`) used for `MinLines`
+  threshold — nav block size is infrastructure, not document content.
+- `agentmap generate`: `getH3Children` including h3s from later h2 sections when
+  there was no intervening h2 boundary check.
+- `agentmap check`: off-by-1 in `totalLines` for POSIX files.
+- `agentmap upgrade`: prerelease update discovery suppressed when running from a
+  prerelease build.
+- `agentmap install.sh`: version resolver output on stderr so command substitution
+  captures only the tag; checksum lookup matched by archive filename.
+- Parser: CommonMark fence-closing rules enforced (closing fence must use the same
+  character and have no info string); inline `<!-- AGENT:NAV` references in prose
+  no longer toggle HTML comment state.
+- Module path corrected from `ryankelln` to `RKelln` to match GitHub username.
+
+### Infrastructure
+
+- GoReleaser config (`.goreleaser.yaml` v2) for linux/darwin/windows × amd64/arm64
+  with checksums, Homebrew tap push (`RKelln/homebrew-agentmap`), and Scoop bucket
+  push (`RKelln/scoop-agentmap`).
+- GitHub Actions release workflow (`.github/workflows/release.yml`) triggered on
+  `v*` tags.
+- `goreleaser check` CI job validates config on every push/PR.
+- `make smoke` / `make smoke-install` targets for 7-check binary smoke test.
+- CI actions upgraded to `actions/checkout@v5` and `actions/setup-go@v6`.
+- `scripts/agent-run.sh` captures verbose build/test output to `.agent-output/`
+  with summary-only terminal output.
+
+---
+
 ## [v0.1.0-rc.9] — Nav writing guide overhaul; generate/update UX improvements — 2026-04-10
 
 Focused release improving the agent-facing nav writing guide and making
