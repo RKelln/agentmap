@@ -500,6 +500,43 @@ func TestNavBlockRoundTrip_EmptyAbout(t *testing.T) {
 	}
 }
 
+func TestParseNavBlock_LeadingWhitespaceOnEntries(t *testing.T) {
+	// Nav blocks with leading whitespace on inner lines should parse identically
+	// to flush-left blocks, and render without any leading whitespace.
+	indented := `<!-- AGENT:NAV
+purpose:test whitespace tolerance
+nav[2]{s,n,name,about}:
+  1,10,#Section,main section
+  12,5,##Sub,sub content
+-->
+`
+	pr := ParseNavBlock(indented)
+	if !pr.Found {
+		t.Fatal("expected nav block to be found")
+	}
+	block := pr.Block
+	if block.Purpose != "test whitespace tolerance" {
+		t.Errorf("purpose = %q, want %q", block.Purpose, "test whitespace tolerance")
+	}
+	if len(block.Nav) != 2 {
+		t.Fatalf("nav count = %d, want 2", len(block.Nav))
+	}
+	if block.Nav[0].Start != 1 || block.Nav[0].N != 10 || block.Nav[0].Name != "#Section" || block.Nav[0].About != "main section" {
+		t.Errorf("nav[0] = %+v, want {Start:1 N:10 Name:#Section About:main section}", block.Nav[0])
+	}
+	if block.Nav[1].Start != 12 || block.Nav[1].N != 5 || block.Nav[1].Name != "##Sub" || block.Nav[1].About != "sub content" {
+		t.Errorf("nav[1] = %+v, want {Start:12 N:5 Name:##Sub About:sub content}", block.Nav[1])
+	}
+
+	// Rendered output must be flush-left (no leading whitespace).
+	rendered := RenderNavBlock(block)
+	for i, line := range strings.Split(rendered, "\n") {
+		if len(line) > 0 && (line[0] == ' ' || line[0] == '\t') {
+			t.Errorf("rendered line %d has leading whitespace: %q", i, line)
+		}
+	}
+}
+
 func TestCountWords(t *testing.T) {
 	tests := []struct {
 		name  string

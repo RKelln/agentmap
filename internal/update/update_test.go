@@ -1431,3 +1431,69 @@ Second section content.
 		t.Errorf("new.md has no AGENT:NAV block after Update(); update did not delegate to generate")
 	}
 }
+
+func TestFile_NormalizesLeadingWhitespaceInNavEntries(t *testing.T) {
+	// A nav block hand-edited with leading spaces on entry lines should be
+	// normalised (flush-left) after update runs.
+	dir := t.TempDir()
+
+	oldContent := `<!-- AGENT:NAV
+purpose:auth docs
+nav[2]{s,n,name,about}:
+  12,29,#Auth,token lifecycle
+  14,12,##Exchange,OAuth2 code flow
+-->
+# Auth
+
+Token lifecycle.
+
+## Exchange
+
+OAuth2 flow.
+`
+
+	path := writeTempFile(t, dir, "auth.md", oldContent)
+
+	cfg := config.Defaults()
+	cfg.MaxDepth = 3
+
+	_, err := File(path, cfg, false, false)
+	if err != nil {
+		t.Fatalf("File() error = %v", err)
+	}
+
+	data, _ := os.ReadFile(path)
+	content := string(data)
+
+	// Rendered nav block must not contain lines with leading whitespace inside the block.
+	pr := navblock.ParseNavBlock(content)
+	if !pr.Found {
+		t.Fatal("nav block should exist after update")
+	}
+
+	// Check raw text: no line inside the nav block should start with whitespace.
+	inBlock := false
+	for _, line := range strings.Split(content, "\n") {
+		if strings.Contains(line, "<!-- AGENT:NAV") {
+			inBlock = true
+			continue
+		}
+		if strings.Contains(line, "-->") && inBlock {
+			inBlock = false
+			continue
+		}
+		if inBlock && len(line) > 0 && (line[0] == ' ' || line[0] == '\t') {
+			t.Errorf("nav block line has leading whitespace after update: %q", line)
+		}
+	}
+
+	// Descriptions should still be preserved despite the whitespace normalisation.
+	for _, entry := range pr.Block.Nav {
+		if entry.Name == "#Auth" && entry.About != "token lifecycle" {
+			t.Errorf("Auth description = %q, want %q", entry.About, "token lifecycle")
+		}
+		if entry.Name == "##Exchange" && entry.About != "OAuth2 code flow" {
+			t.Errorf("Exchange description = %q, want %q", entry.About, "OAuth2 code flow")
+		}
+	}
+}
