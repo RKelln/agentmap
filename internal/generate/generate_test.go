@@ -1756,14 +1756,15 @@ func TestInsertNavBlock_ReplacesLargeBlockWithFrontmatter(t *testing.T) {
 // design-clean.md (which has <!-- AGENT:NAV only inside code fences) produces
 // exactly one real nav block at the top, and a second run doesn't add another.
 func TestFile_IdempotentDesignClean(t *testing.T) {
-	// Count <!-- AGENT:NAV occurrences in the original (all inside code fences, no real block).
+	// Count <!-- AGENT:NAV occurrences in the original.
+	// 1 real nav block at top + code fence examples = 12 total
 	// Assert the known baseline so test failures are self-documenting.
 	origData, err := os.ReadFile(filepath.Join("..", "..", "testdata", "design-clean.md"))
 	if err != nil {
 		t.Fatalf("read design-clean.md: %v", err)
 	}
 	origCount := strings.Count(string(origData), "<!-- AGENT:NAV")
-	const wantOrigCount = 11 // all inside code-fence examples; none is a real top-level block
+	const wantOrigCount = 12 // 1 real nav block + code fence examples
 	if origCount != wantOrigCount {
 		t.Fatalf("design-clean.md has %d <!-- AGENT:NAV markers, expected %d; update this test if the file changed",
 			origCount, wantOrigCount)
@@ -1791,15 +1792,15 @@ func TestFile_IdempotentDesignClean(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Should be exactly origCount + 1 (the new real block at top)
+	// Should be exactly origCount (generate replaces existing nav block, doesn't add)
 	count1 := strings.Count(string(data1), "<!-- AGENT:NAV")
-	wantCount := origCount + 1
+	wantCount := origCount // generate replaces existing block, count stays same
 	if count1 != wantCount {
-		t.Errorf("after first run: got %d <!-- AGENT:NAV markers, want %d (orig %d + 1 real block)",
+		t.Errorf("after first run: got %d <!-- AGENT:NAV markers, want %d (orig %d)",
 			count1, wantCount, origCount)
 	}
 
-	// Second run: should be idempotent — count must not increase
+	// Second run: should be idempotent — count must be unchanged
 	_, err = File(outPath, cfg, false, true)
 	if err != nil {
 		t.Fatalf("File() second run error = %v", err)

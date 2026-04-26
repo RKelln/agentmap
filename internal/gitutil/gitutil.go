@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -106,6 +107,10 @@ func parseRepoDiff(output string) map[string][]LineRange {
 }
 
 func isGitRepo(dir string) bool {
+	// If dir is a file, check its parent directory
+	if info, err := os.Stat(dir); err == nil && info.Mode().IsRegular() {
+		dir = filepath.Dir(dir)
+	}
 	cmd := exec.Command("git", "rev-parse", "--is-inside-work-tree")
 	cmd.Dir = dir
 	return cmd.Run() == nil
@@ -115,7 +120,8 @@ var hunkHeaderRE = regexp.MustCompile(`^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@`)
 
 func getChangedRanges(path string) ([]LineRange, error) {
 	cmd := exec.Command("git", "diff", "HEAD", "--", path)
-	cmd.Dir = getGitRoot(path)
+	gitRoot := getGitRoot(path)
+	cmd.Dir = gitRoot
 	output, err := cmd.Output()
 	if err != nil {
 		if isUntracked(path) {

@@ -179,11 +179,37 @@ func File(path string, cfg config.Config, dryRun, quiet bool, changedLines ...[]
 
 	// Handle purpose-only files: no headings, but lines:N may still need updating.
 	if len(headings) == 0 {
-		// Only refresh lines:N if the block already has it (non-zero).
+		// Check for content changes even when no headings
+		var fileChanges []gitutil.LineRange
+		if len(changedLines) > 0 && changedLines[0] != nil {
+			fileChanges = changedLines[0]
+		} else {
+			fileChanges = getChangedLines(path)
+		}
+		hasContentChange := len(fileChanges) > 0
+		
+		// Only refresh lines:N if the block already has it (non-zero) or content changed
 		linesChanged := oldBlock.Lines != 0 && oldBlock.Lines != totalLines
-		if !linesChanged {
+		if !linesChanged && !hasContentChange {
 			return noChanges, nil
 		}
+		
+		// If content changed with no headings, report content-changed
+		if hasContentChange {
+			reports := []ReportEntry{{
+				Type:          ReportContentChanged,
+				Name:          "# (purpose-only)",
+				NewStart:     1,
+				NewEnd:       totalLines,
+				ModifiedCount: fileChanges[0].End - fileChanges[0].Start + 1,
+				CurrentAbout:  oldBlock.Purpose,
+			}}
+			if !quiet {
+				return formatReport(path, reports), nil
+			}
+			return noChanges, nil
+		}
+		
 		oldLinesCount := oldBlock.Lines
 		oldBlock.Lines = totalLines
 		blockText := navblock.RenderNavBlock(oldBlock)
@@ -224,11 +250,11 @@ func File(path string, cfg config.Config, dryRun, quiet bool, changedLines ...[]
 		return fmt.Sprintf("Updated: %s\n  lines-updated: %d -> %d", path, oldLinesCount, totalLines), nil
 	}
 
-	// Use pre-computed ranges if provided, otherwise fall back to per-file git diff.
+	// Get file changes for content detection (or nil if not provided)
 	var fileChanges []gitutil.LineRange
 	if len(changedLines) > 0 && changedLines[0] != nil {
 		fileChanges = changedLines[0]
-	} else if len(changedLines) == 0 {
+	} else {
 		fileChanges = getChangedLines(path)
 	}
 	entryReports := buildEntryReports(oldBlock.Nav, sections, fileChanges)
@@ -406,12 +432,7 @@ func buildEntryReports(oldNav []navblock.NavEntry, sections []parser.Section, ch
 			continue
 		}
 
-		reportType := ReportOK
-		oldEnd := oldEntry.Start + oldEntry.N - 1
-		if oldEntry.Start != s.Start || oldEnd != s.End {
-			reportType = ReportShifted
-		}
-
+		// Check content changes FIRST (higher priority than shifted)
 		modifiedCount := 0
 		if len(changedLines) > 0 {
 			for _, cl := range changedLines {
@@ -422,9 +443,14 @@ func buildEntryReports(oldNav []navblock.NavEntry, sections []parser.Section, ch
 					}
 				}
 			}
-			if modifiedCount > 0 {
-				reportType = ReportContentChanged
-			}
+		}
+
+		// Determine report type: content-changed takes priority over shifted/OK
+		reportType := ReportOK
+		if modifiedCount > 0 {
+			reportType = ReportContentChanged
+		} else if oldEntry.Start != s.Start || oldEntry.Start+oldEntry.N-1 != s.End {
+			reportType = ReportShifted
 		}
 
 		reports = append(reports, ReportEntry{

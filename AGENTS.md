@@ -1,11 +1,14 @@
 <!-- agentmap:index -->
 <!-- AGENT:NAV
 purpose:project file index for agentmap
-files[8]{path,lines,about}:
+files[11]{path,lines,about}:
 testdata/
 code-fences.md,23,heading;code;content;real;another;blocks;fence;file
-design-clean.md,883,nav;block;line;file;agent;token;files;markdown
+design-clean.md,883,nav;block;agent;file;line;token;files;markdown
 error-policy.md,15,circuit;open;policy;retry;service;attempts;backoff;breaker
+test-content.md,12,api;authentication;crud;key;oauth2;operations;reference;user
+test-content2.md,18,api;authentication;catalog;crud;key;management;oauth2;operations
+test-large.md,69,additional;content;line;purposes;testing;order;management;user
 tiny.md,7,file;nav;purpose;block;lines;min;threshold;tiny
 testdata/index-fixture/
 CONTRIBUTING.md,50,contribution guidelines; pull request workflow; dev environment setup

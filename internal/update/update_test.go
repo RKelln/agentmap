@@ -87,15 +87,12 @@ Silent rotation and sliding-window expiry.
 		t.Fatalf("File() error = %v", err)
 	}
 
+	// Shifted entries should NOT appear in output (they're auto-handled)
 	if report == noChanges {
 		t.Error("expected changes report, got noChanges")
 	}
-
-	if !strings.Contains(report, "shifted: ##Token Exchange") {
-		t.Errorf("report should contain shifted: ##Token Exchange, got: %s", report)
-	}
-	if !strings.Contains(report, "shifted: ##Token Refresh") {
-		t.Errorf("report should contain shifted: ##Token Refresh, got: %s", report)
+	if strings.Contains(report, "shifted:") {
+		t.Errorf("report should NOT contain 'shifted:' (not shown to agents), got: %s", report)
 	}
 
 	data, _ := os.ReadFile(path)
@@ -750,12 +747,13 @@ Content.
 		t.Fatalf("File() error = %v", err)
 	}
 
+	// Shifted entries should NOT appear in output
 	if report == noChanges {
 		t.Error("expected changes")
 	}
 
-	if !strings.Contains(report, "shifted: ##Section") {
-		t.Errorf("report should contain shifted, got: %s", report)
+	if strings.Contains(report, "shifted:") {
+		t.Errorf("report should NOT contain 'shifted:' (not shown to agents), got: %s", report)
 	}
 
 	data, _ := os.ReadFile(path)
