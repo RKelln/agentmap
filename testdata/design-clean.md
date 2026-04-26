@@ -1,3 +1,34 @@
+<!-- AGENT:NAV
+purpose:~nav;block;line;file;agent;token;files;markdown
+lines:883
+nav[25]{s,n,name,about}:
+32,852,#agentmap: Navigation Maps for AI Agents,~nav;block;line;file;agent
+35,6,##Design Document v0.1,~design;complete;document;implementation;ready
+41,12,##1. Problem,~file;line;tokens;files;markdown
+53,10,##2. Solution,~agents;block;file;read;files
+63,158,##3. Format Specification,~nav;line;token;agent;entries
+65,13,###3.1 Nav Block Structure,~description;nav;path;agent;block
+78,28,###3.2 Field Definitions,~line;file;number;agent;block
+106,21,###3.3 Heading Depth Convention,~depth;token;heading;markdown;absolute
+127,35,###3.4 Complete Example,~token;lifecycle;lines;authentication;revocation
+162,6,###3.5 Placement Rules,~nav;agents;block;frontmatter;lines
+168,7,###3.6 Constraints,~comma;optional;authentication;block;commas
+175,12,###3.7 Purpose-Only Block,~purpose;agent;block;file;line
+187,34,###3.8 Subsection Hints,~hints;subsection;entries;names;threshold
+221,114,##4. CLI Commands,~nav;headings;line;block;file>4.3 `agentmap check [path]`;4.1 `agentmap generate [path]`;4.2 `agentmap update [path]`
+335,64,##5. Description Authoring,~agent;descriptions;description;block;content>5.5 Description Preservation Rules;5.1 Tier 0: Empty;5.3 Tier 2: Agent-Written;5.4 Tier 3: LLM-Generated (optional via `generate --llm`);5.2 Tier 1: Keyword Extraction (default for `generate`)
+399,46,##6. Git Integration,~git;agentmap;commit;update;check
+445,85,##7. Agent Workflow,~agent;nav;token;agentmap;read>7.3 Agent Skill (Optional Enhancement);7.1 AGENTS.md Instructions;7.2 Detailed Agent Workflow
+530,52,##8. Parser Specification,~line;nav;block;heading;headings>8.3 Nav Block Writer;8.2 Nav Block Parser;8.1 Markdown Heading Parser
+582,28,##9. Keyword Extraction (Tier 1),~stopwords;extraction;keyword;markdown;tokens
+610,60,##10. Configuration,~files;gitignore;threshold;file;exclude>10.3 Defaults;10.2 File Discovery and Ignore Rules;10.1 Config File
+670,33,##11. Edge Cases,~block;nav;headings;files;heading
+703,45,##12. Implementation Notes,~git;markdown;parser;tests;integration
+748,42,##13. Future Work (Out of Scope for v0.1),~file;files;markdown;nav;docs
+790,39,##Appendix A: Token Budget Analysis,~token;nav;tokens;000;block
+829,55,##Appendix B: Design Decisions and Rationale,~nav;block;agent;hints;sections>Why HTML comments not YAML frontmatter?;Why `#` for heading depth instead of indentation or relative markers?;Why `check` in the hook not `update`?;Why git diff for change detection not stored hashes?;Why no quoting or escaping?;Why `>` subsection hints instead of always expanding h3s?
+-->
+
 # agentmap: Navigation Maps for AI Agents
 
 
