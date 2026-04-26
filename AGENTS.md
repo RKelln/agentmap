@@ -1,9 +1,7 @@
 <!-- agentmap:index -->
 <!-- AGENT:NAV
 purpose:project file index for agentmap
-files[9]{path,lines,about}:
-test_autogen5.md,92,order;product;user;handling;token;authentication;management;api
-test_simple.md,33,order;user;management;product;api;authentication;search;account
+files[7]{path,lines,about}:
 testdata/
 code-fences.md,23,heading;code;content;real;another;blocks;fence;file
 error-policy.md,15,circuit;open;policy;retry;service;attempts;backoff;breaker
