@@ -159,8 +159,8 @@ func TestBodyIsReadable(t *testing.T) {
 	if !strings.Contains(body, "## Reading Markdown Files") {
 		t.Error("Body() missing '## Reading Markdown Files' section")
 	}
-	if !strings.Contains(body, "## Before Updating Agentmap") {
-		t.Error("Body() missing '## Before Updating Agentmap' section")
+	if !strings.Contains(body, "## After Editing or Creating Markdown Files") {
+		t.Error("Body() missing '## After Editing or Creating Markdown Files' section")
 	}
 }
 

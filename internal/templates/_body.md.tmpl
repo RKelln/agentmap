@@ -10,23 +10,10 @@ read a files first 50 lines then use AGENT:NAV to target reads.
 - Use s;n ranges: Read(offset=s; limit=n).
 - `>` is a hint for subsections that are not listed directly in the nav.
 
-## Before Updating Agentmap
+## After Editing or Creating Markdown Files
 
-**Check if files have AGENT:NAV blocks first:**
-
-```bash
-head -30 <file> | grep -c "AGENT:NAV"
-```
-
-If a file has no AGENT:NAV block; use `agentmap generate` instead of `agentmap update`.
-
-## Running agentmap update
-
-1. Run: `agentmap update <changed files>` — refreshes heading line numbers and flags content-changed or new sections.
-2. Edit each changed file's own nav block: update `purpose`; `about`; and `see` descriptions for any flagged sections.
-    - Do not edit s;n counts; nav[N]; or see[N] by hand.
-    - Keep nav block format stable; add a `see` block after nav entries if needed.
-    - Run `agentmap guide` for full instructions on writing nav descriptions.
-    - **Do not hand-edit AGENTMAP.md** — it is updated automatically by `agentmap update`.
-3. Run: `agentmap update <changed files>` again — syncs AGENTMAP.md index with the updated purposes.
-4. Commit.
+1. Run: `agentmap update <changed files>` — refreshes line numbers; adds nav blocks to new files
+2. Run: `agentmap check <files> --warn-unreviewed` — checks for auto-generated descriptions (marked with `~`)
+3. For each file with unreviewed descriptions: edit the nav block to replace `~description` with your own description (remove the `~` prefix)
+4. Run: `agentmap update <files>` again — syncs AGENTMAP.md index with your descriptions
+5. Commit
