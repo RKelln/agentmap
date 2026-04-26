@@ -10,7 +10,28 @@ read a files first 50 lines then use AGENT:NAV to target reads.
 - Use s;n ranges: Read(offset=s; limit=n).
 - `>` is a hint for subsections that are not listed directly in the nav.
 
-## Before Committing Markdown Changes
+## Before Updating Agentmap
+
+**Check if agentmap is available first:**
+
+```bash
+which agentmap || command -v agentmap
+```
+
+If not found; look for:
+- A `Makefile` with an `agentmap` target
+- A `scripts/agentmap.sh` or similar wrapper script
+- The project may have agentmap as a submodule or local binary
+
+**Verify files have AGENT:NAV blocks before running update:**
+
+```bash
+head -30  | grep -c "AGENT:NAV"
+```
+
+If a file has no AGENT:NAV block; use `agentmap generate` instead of `agentmap update`.
+
+## Running agentmap update
 
 1. Run: `agentmap update <changed files>` — refreshes heading line numbers and flags content-changed or new sections.
 2. Edit each changed file's own nav block: update `purpose`; `about`; and `see` descriptions for any flagged sections.
