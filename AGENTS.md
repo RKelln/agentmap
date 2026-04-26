@@ -1,9 +1,10 @@
 <!-- agentmap:index -->
 <!-- AGENT:NAV
 purpose:project file index for agentmap
-files[7]{path,lines,about}:
+files[8]{path,lines,about}:
 testdata/
 code-fences.md,23,heading;code;content;real;another;blocks;fence;file
+design-clean.md,883,nav;block;line;file;agent;token;files;markdown
 error-policy.md,15,circuit;open;policy;retry;service;attempts;backoff;breaker
 tiny.md,7,file;nav;purpose;block;lines;min;threshold;tiny
 testdata/index-fixture/
@@ -27,6 +28,7 @@ Go 1.25+. Cobra CLI. Single binary; no runtime dependencies.
 - Use `context7` MCP server for external library docs
 - Act without confirmation unless blocked by missing info or irreversibility
 - When stuck (cryptic errors, multiple failed approaches): escalate via Task tool with `subagent_type: "diagnose"`
+- Don't commit before giving me (the user) a chance to review.
 
 ## Documentation First
 

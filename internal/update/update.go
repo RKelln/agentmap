@@ -516,8 +516,8 @@ func formatReport(path string, reports []ReportEntry) string {
 	hasAction := false
 	for _, r := range reports {
 		// Skip OK and shifted entries — they don't need agent attention
-	// (shifted is just line number changes, handled automatically)
-	if r.Type == ReportOK || r.Type == ReportShifted {
+		// (shifted is just line number changes, handled automatically)
+		if r.Type == ReportOK || r.Type == ReportShifted {
 			continue
 		}
 		hasAction = true
