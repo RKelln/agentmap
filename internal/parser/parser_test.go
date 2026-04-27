@@ -2,6 +2,7 @@ package parser
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -288,5 +289,17 @@ func TestParseHeadings_DuplicateHeadings(t *testing.T) {
 	got, _ := ParseHeadings(input, 3)
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("ParseHeadings() = %v, want %v", got, want)
+	}
+}
+
+func TestParseHeadings_DirtyFrontmatterClose(t *testing.T) {
+	input := "---\nfoo\n---<!-- AGENT:NAV\n# Heading\n"
+	want := []Heading{{Line: 4, Depth: 1, Text: "Heading"}}
+	got, warnings := ParseHeadings(input, 3)
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("ParseHeadings() = %v, want %v", got, want)
+	}
+	if len(warnings) != 1 || !strings.Contains(warnings[0], "frontmatter close delimiter has trailing content") {
+		t.Errorf("expected dirty frontmatter warning, got %v", warnings)
 	}
 }

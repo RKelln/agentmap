@@ -75,6 +75,89 @@ func TestNormalizeHeading(t *testing.T) {
 	}
 }
 
+func TestNormalizeHeading_StripsSuffixes(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "markdown attribute with space",
+			input: "## Title {: .page-break-before}",
+			want:  "Title",
+		},
+		{
+			name:  "markdown attribute without space",
+			input: "## Title {:class-name}",
+			want:  "Title",
+		},
+		{
+			name:  "parenthetical deprecated",
+			input: "## Title (deprecated)",
+			want:  "Title",
+		},
+		{
+			name:  "bracket link",
+			input: "## Title [link]",
+			want:  "Title",
+		},
+		{
+			name:  "multiple suffixes same type",
+			input: "## Title {: .class} (note)",
+			want:  "Title",
+		},
+		{
+			name:  "multiple different suffixes",
+			input: "## Title [link] (deprecated)",
+			want:  "Title",
+		},
+		{
+			name:  "nested parentheses handled gracefully",
+			input: "## Title (with (nested))",
+			want:  "Title",
+		},
+		{
+			name:  "no suffix preserved",
+			input: "## Title",
+			want:  "Title",
+		},
+		{
+			name:  "empty string",
+			input: "",
+			want:  "",
+		},
+		{
+			name:  "only hashes",
+			input: "##",
+			want:  "",
+		},
+		{
+			name:  "hash with suffix only",
+			input: "## {: .class}",
+			want:  "",
+		},
+		{
+			name:  "commas still stripped",
+			input: "## Title, Subtitle (deprecated)",
+			want:  "Title Subtitle",
+		},
+		{
+			name:  "bracket then attr",
+			input: "## Title [link]{: .class}",
+			want:  "Title",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := NormalizeHeading(tt.input)
+			if got != tt.want {
+				t.Errorf("NormalizeHeading(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestParseNavBlock_ReturnsParseResult(t *testing.T) {
 	// Verify ParseNavBlock returns a ParseResult struct (not bare multi-return).
 	tests := []struct {
@@ -913,6 +996,70 @@ func TestRenderFilesBlock_RoundTrip(t *testing.T) {
 		if got.Entries[i] != block.Entries[i] {
 			t.Errorf("Entries[%d] = %+v, want %+v", i, got.Entries[i], block.Entries[i])
 		}
+	}
+}
+
+func TestFindFrontmatterEnd(t *testing.T) {
+	tests := []struct {
+		name      string
+		lines     []string
+		wantEnd   int
+		wantDirty bool
+	}{
+		{
+			name:      "clean close",
+			lines:     []string{"---", "foo", "---", "# Heading"},
+			wantEnd:   2,
+			wantDirty: false,
+		},
+		{
+			name:      "dirty close with AGENT:NAV",
+			lines:     []string{"---", "foo", "---<!-- AGENT:NAV", "# Heading"},
+			wantEnd:   2,
+			wantDirty: true,
+		},
+		{
+			name:      "dirty close with text",
+			lines:     []string{"---", "foo", "---text", "# Heading"},
+			wantEnd:   2,
+			wantDirty: true,
+		},
+		{
+			name:      "four dashes not a close",
+			lines:     []string{"---", "foo", "----", "---", "# Heading"},
+			wantEnd:   3,
+			wantDirty: false,
+		},
+		{
+			name:      "no frontmatter",
+			lines:     []string{"# Heading"},
+			wantEnd:   -1,
+			wantDirty: false,
+		},
+		{
+			name:      "unclosed frontmatter",
+			lines:     []string{"---", "foo", "# Heading"},
+			wantEnd:   -1,
+			wantDirty: false,
+		},
+		{
+			name:      "whitespace after close",
+			lines:     []string{"---", "foo", "---   ", "# Heading"},
+			wantEnd:   2,
+			wantDirty: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotEnd, gotDirty := FindFrontmatterEnd(tt.lines)
+			if gotEnd != tt.wantEnd {
+				t.Errorf("FindFrontmatterEnd() end = %d, want %d", gotEnd, tt.wantEnd)
+			}
+			if gotDirty != tt.wantDirty {
+				t.Errorf("FindFrontmatterEnd() dirty = %v, want %v", gotDirty, tt.wantDirty)
+			}
+		})
 	}
 }
 
