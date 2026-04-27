@@ -257,6 +257,21 @@ func File(path string, cfg config.Config, dryRun, quiet bool, changedLines ...[]
 	} else {
 		fileChanges = getChangedLines(path)
 	}
+
+	// Filter out changes entirely within the nav block — those are description
+	// edits, not section content changes. Without this, freshly-generated or
+	// recently-edited nav blocks would incorrectly report every section as
+	// content-changed even when only the nav block itself was modified.
+	if len(fileChanges) > 0 && len(sections) > 0 && pr.Found {
+		firstContentLine := sections[0].Start
+		filtered := fileChanges[:0]
+		for _, cl := range fileChanges {
+			if cl.End >= firstContentLine {
+				filtered = append(filtered, cl)
+			}
+		}
+		fileChanges = filtered
+	}
 	entryReports := buildEntryReports(oldBlock.Nav, sections, fileChanges)
 
 	hasChanges := (oldBlock.Lines != 0 && oldBlock.Lines != totalLines)

@@ -119,7 +119,7 @@ func isGitRepo(dir string) bool {
 var hunkHeaderRE = regexp.MustCompile(`^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@`)
 
 func getChangedRanges(path string) ([]LineRange, error) {
-	cmd := exec.Command("git", "diff", "HEAD", "--", path)
+	cmd := exec.Command("git", "diff", "HEAD", "-U0", "--", path)
 	gitRoot := getGitRoot(path)
 	cmd.Dir = gitRoot
 	output, err := cmd.Output()
