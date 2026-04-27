@@ -567,8 +567,7 @@ func formatReport(path string, reports []ReportEntry) string {
 }
 
 const (
-	frontmatterDelim = "---"
-	navBlockEnd      = "-->"
+	navBlockEnd = "-->"
 )
 
 func insertNavBlock(content, blockText string) string {
@@ -609,17 +608,7 @@ func insertNavBlock(content, blockText string) string {
 		return cleanBlankLines(result)
 	}
 
-	fmEnd := -1
-	if len(lines) > 0 && strings.TrimSpace(lines[0]) == frontmatterDelim {
-		for i := 1; i < len(lines); i++ {
-			if strings.TrimSpace(lines[i]) == frontmatterDelim {
-				fmEnd = i
-				break
-			}
-		}
-	}
-
-	if fmEnd >= 0 {
+	if fmEnd, _ := navblock.FindFrontmatterEnd(lines); fmEnd >= 0 {
 		before := strings.Join(lines[:fmEnd+1], "\n")
 		after := strings.Join(lines[fmEnd+1:], "\n")
 		result := before + "\n" + blockText + "\n" + after
