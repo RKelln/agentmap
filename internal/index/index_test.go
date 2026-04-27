@@ -702,14 +702,15 @@ func TestWriteFilesBlock_InlineSmall(t *testing.T) {
 		t.Fatalf("read AGENTS.md: %v", err)
 	}
 	contents := string(data)
-	if !strings.Contains(contents, "<!-- agentmap:index -->") {
-		t.Error("AGENTS.md should contain opening agentmap:index marker")
-	}
-	if !strings.Contains(contents, "<!-- /agentmap:index -->") {
-		t.Error("AGENTS.md should contain closing /agentmap:index marker")
-	}
 	if !strings.Contains(contents, "<!-- AGENT:NAV") {
 		t.Error("AGENTS.md should contain files block")
+	}
+	if !strings.Contains(contents, "files[5]") {
+		t.Error("AGENTS.md files block should list 5 entries")
+	}
+	// Block should be at the end of the file.
+	if !strings.HasSuffix(strings.TrimSpace(contents), "-->") {
+		t.Error("AGENTS.md should end with files block closing -->")
 	}
 }
 
@@ -775,12 +776,9 @@ func TestWriteFilesBlock_IdempotentInline(t *testing.T) {
 	}
 	contents := string(data)
 
-	// Should not duplicate markers.
-	if count := strings.Count(contents, "<!-- agentmap:index -->"); count != 1 {
-		t.Errorf("found %d opening markers, want 1 (idempotent)", count)
-	}
-	if count := strings.Count(contents, "<!-- /agentmap:index -->"); count != 1 {
-		t.Errorf("found %d closing markers, want 1 (idempotent)", count)
+	// Should not duplicate the AGENT:NAV files block.
+	if count := strings.Count(contents, "files["); count != 1 {
+		t.Errorf("found %d files[ entries, want 1 (idempotent)", count)
 	}
 	// Updated purpose should be present.
 	if !strings.Contains(contents, "updated readme purpose") {

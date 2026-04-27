@@ -1,50 +1,3 @@
-<!-- AGENT:NAV
-purpose:~agentmap;nav;run;agent;files;update;file;block
-lines:238
-nav[18]{s,n,name,about}:
-48,191,#AGENTS.md,~agentmap;run;nav;agent;files
-52,9,##Defaults,~task;act;approaches;beads;blocked
-61,7,##Documentation First,~agentmap;design;block;cli;commands
-68,23,##Fast Path,~agent;run;scripts;build;lint
-91,6,##Benchmarks,~benchmarks;bench;run;baseline;comparison
-97,11,##Debugging,~file;found;generate;agentmap;authentication
-108,14,##Project Structure,~parser;agent;agentmap;markdown;nav
-122,11,##Conventions,~files;always;check;file;never
-133,12,##Key Design Constraints,~nav;files;block;agentmap;blocks
-145,12,##Reading Markdown Files,~nav;read;agent;agentmap;file
-157,13,##Before Committing Markdown Changes,~agentmap;nav;changed;update;block
-170,4,##Writing Nav Descriptions,~writing;agentmap;descriptions;fields;full
-174,7,##Before Committing Markdown Changes,~agentmap;run;committing;markdown;path
-181,13,##Commit Messages,~feat;generated;add;beads;begin
-194,19,##Beads Issue Tracker,~issue;work;beads;claim;close
-198,9,###Quick Reference,~work;claim;available;bash;close
-207,6,###Rules,~close;command;detailed;files;issues
-213,26,##Session Completion,~push;work;git;complete;session
--->
-
-<!-- agentmap:index -->
-<!-- AGENT:NAV
-purpose:project file index for agentmap
-files[12]{path,lines,about}:
-agentmap-design.md,982,CLI tool for AI agent navigation in markdown docs; nav block format spec; commands; agent workflow
-testdata/
-code-fences.md,23,heading;code;content;real;another;blocks;fence;file
-design-clean.md,883,nav;block;line;file;agent;token;files;markdown
-error-policy.md,15,circuit;open;policy;retry;service;attempts;backoff;breaker
-test-content.md,12,api;authentication;crud;key;oauth2;operations;reference;user
-test-content2.md,18,api;authentication;catalog;crud;key;management;oauth2;operations
-test-large.md,69,additional;content;line;purposes;testing;order;management;user
-tiny.md,7,file;nav;purpose;block;lines;min;threshold;tiny
-testdata/index-fixture/
-CONTRIBUTING.md,50,contribution guidelines; pull request workflow; dev environment setup
-testdata/index-fixture/docs/
-authentication.md,47,token lifecycle authentication; OAuth2 flows
-error-policy.md,51,error handling policy; retry strategy; circuit breaker configuration
-testdata/index-fixture/docs/api/
-rate-limiting.md,49,rate limit tiers; burst allowance; quota tracking
--->
-<!-- /agentmap:index -->
-
 # AGENTS.md
 
 Go 1.25+. Cobra CLI. Single binary; no runtime dependencies.
@@ -236,3 +189,12 @@ bd close <id>         # Complete work
 - NEVER say "ready to push when you are" - YOU must push
 - If push fails, resolve and retry until it succeeds
 <!-- END BEADS INTEGRATION -->
+
+<!-- AGENT:NAV
+purpose:Index of markdown files with agentmap nav blocks:
+files[4]{path,lines,about}:
+RELEASING.md,246,GoReleaser release pipeline; agentic and manual workflows; install and upgrade
+agentmap-design.md,982,CLI tool for AI agent navigation in markdown docs; nav block format spec; commands; agent workflow
+benchmarks.md,66,agentmap benchmark results; file processing throughput; keyword extraction
+tasks.md,521,implementation task list; vertical slice phases; generate update check index init
+-->

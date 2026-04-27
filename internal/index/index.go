@@ -435,11 +435,6 @@ func BuildFilesBlock(root string, cfg config.Config) ([]FileEntry, error) {
 	return entries, nil
 }
 
-const (
-	agentmapIndexOpen  = "<!-- agentmap:index -->"
-	agentmapIndexClose = "<!-- /agentmap:index -->"
-)
-
 // buildFilesBlockText converts FileEntry list to navblock.FilesBlock and renders it.
 // It reads each file to compute total line count (strings.Count("\n") — matches editor display).
 func buildFilesBlockText(root string, entries []FileEntry) string {
@@ -449,15 +444,8 @@ func buildFilesBlockText(root string, entries []FileEntry) string {
 // buildFilesBlockTextWithLines is like buildFilesBlockText but sets Lines on the FilesBlock.
 // Pass lines=0 to omit lines:N from the rendered output.
 func buildFilesBlockTextWithLines(root string, entries []FileEntry, lines int) string {
-	repoName := filepath.Base(filepath.Clean(root))
-	if repoName == "." || repoName == "" {
-		// Fallback: use absolute path base.
-		if abs, err := filepath.Abs(root); err == nil {
-			repoName = filepath.Base(abs)
-		}
-	}
 	fb := navblock.FilesBlock{
-		Purpose: "project file index for " + repoName,
+		Purpose: "Index of markdown files with agentmap nav blocks:",
 		Lines:   lines,
 	}
 	for _, e := range entries {
@@ -475,42 +463,45 @@ func buildFilesBlockTextWithLines(root string, entries []FileEntry, lines int) s
 	return navblock.RenderFilesBlock(fb)
 }
 
-// updateOrCreateAgentsMD writes or updates the inline agentmap:index block in AGENTS.md.
+// updateOrCreateAgentsMD writes or updates the inline files block in AGENTS.md.
+// The block is appended at the end. Any existing files block (or legacy
+// agentmap:index wrapper) is removed first.
 func updateOrCreateAgentsMD(agentsMDPath, blockText string, dryRun bool) error {
 	if dryRun {
 		return nil
 	}
 
-	var existingContent string
+	var content string
 	data, err := os.ReadFile(agentsMDPath)
 	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("read %s: %w", agentsMDPath, err)
 	} else if err == nil {
-		existingContent = string(data)
+		content = string(data)
 	}
 
-	newSection := agentmapIndexOpen + "\n" + blockText + "\n" + agentmapIndexClose
-
-	if strings.Contains(existingContent, agentmapIndexOpen) {
-		// Replace existing section.
-		start := strings.Index(existingContent, agentmapIndexOpen)
-		end := strings.Index(existingContent, agentmapIndexClose)
-		if end >= 0 {
-			end += len(agentmapIndexClose)
-		} else {
-			end = len(existingContent)
-		}
-		existingContent = existingContent[:start] + newSection + existingContent[end:]
-	} else {
-		// Prepend to file.
-		if existingContent == "" {
-			existingContent = newSection + "\n"
-		} else {
-			existingContent = newSection + "\n\n" + existingContent
+	// Remove existing AGENT:NAV files block if present.
+	if navIdx := strings.Index(content, "<!-- AGENT:NAV\n"); navIdx >= 0 {
+		if closeIdx := strings.Index(content[navIdx:], "\n-->"); closeIdx >= 0 {
+			closeIdx = navIdx + closeIdx + len("\n-->")
+			content = content[:navIdx] + content[closeIdx:]
 		}
 	}
 
-	return os.WriteFile(agentsMDPath, []byte(existingContent), 0o644)
+	// Clean up legacy agentmap:index wrappers (transitional).
+	for _, marker := range []string{"<!-- agentmap:index -->", "<!-- /agentmap:index -->"} {
+		content = strings.ReplaceAll(content, marker+"\n", "")
+		content = strings.ReplaceAll(content, "\n"+marker, "")
+		content = strings.ReplaceAll(content, marker, "")
+	}
+
+	// Normalize leading whitespace after cleanup.
+	content = strings.TrimLeft(content, "\n")
+
+	// Append block at end.
+	content = strings.TrimRight(content, "\n")
+	content += "\n\n" + blockText + "\n"
+
+	return os.WriteFile(agentsMDPath, []byte(content), 0o644)
 }
 
 // RefreshFilesBlock rebuilds the AGENTMAP.md (or AGENTS.md inline block) from the current
