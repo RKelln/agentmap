@@ -314,6 +314,102 @@ func FindFrontmatterEnd(lines []string) (int, bool) {
 	return -1, false // unclosed frontmatter — treat as no frontmatter
 }
 
+// IsFrontmatterCloseLine reports whether a trimmed line closes YAML frontmatter.
+// It mirrors the logic in FindFrontmatterEnd.
+// Returns (isClose, dirty) where dirty is true when the closing line has trailing content.
+func IsFrontmatterCloseLine(trimmed string) (isClose, dirty bool) {
+	if !strings.HasPrefix(trimmed, "---") {
+		return false, false
+	}
+	if len(trimmed) == 3 {
+		return true, false
+	}
+	if trimmed[3] == '-' {
+		return false, false
+	}
+	return true, true
+}
+
+const navBlockEnd = "-->"
+
+// InsertNavBlock inserts or replaces an AGENT:NAV block in the given content.
+// It uses LocateNavBlock to find existing blocks and FindFrontmatterEnd to locate frontmatter.
+func InsertNavBlock(content, blockText string) string {
+	lines := strings.Split(content, "\n")
+
+	blockStart, blockEnd := LocateNavBlock(lines)
+
+	if blockStart >= 0 && blockEnd >= 0 {
+		before := strings.Join(lines[:blockStart], "\n")
+		after := ""
+		if blockEnd+1 < len(lines) {
+			after = strings.Join(lines[blockEnd+1:], "\n")
+		}
+		var result string
+		if before != "" {
+			result = before + "\n" + blockText + "\n" + after
+		} else {
+			result = blockText + "\n" + after
+		}
+		result = CleanBlankLines(result)
+		return result
+	}
+
+	if fmEnd, _ := FindFrontmatterEnd(lines); fmEnd >= 0 {
+		before := strings.Join(lines[:fmEnd+1], "\n")
+		after := strings.Join(lines[fmEnd+1:], "\n")
+		result := before + "\n" + blockText + "\n" + after
+		result = CleanBlankLines(result)
+		return result
+	}
+
+	result := blockText + "\n" + content
+	result = CleanBlankLines(result)
+	return result
+}
+
+// CleanBlankLines ensures exactly one blank line between nav block and first heading.
+func CleanBlankLines(content string) string {
+	lines := strings.Split(content, "\n")
+
+	navEnd := -1
+	for i, line := range lines {
+		if strings.TrimSpace(line) == navBlockEnd {
+			navEnd = i
+			break
+		}
+	}
+
+	if navEnd < 0 {
+		return content
+	}
+
+	blankCount := 0
+	for i := navEnd + 1; i < len(lines); i++ {
+		if strings.TrimSpace(lines[i]) == "" {
+			blankCount++
+		} else {
+			break
+		}
+	}
+
+	if blankCount == 0 {
+		newLines := make([]string, 0, len(lines)+1)
+		newLines = append(newLines, lines[:navEnd+1]...)
+		newLines = append(newLines, "")
+		newLines = append(newLines, lines[navEnd+1:]...)
+		return strings.Join(newLines, "\n")
+	} else if blankCount > 1 {
+		newLines := make([]string, 0, len(lines)-blankCount+1)
+		newLines = append(newLines, lines[:navEnd+1]...)
+		newLines = append(newLines, "")
+		newLines = append(newLines, lines[navEnd+1+blankCount:]...)
+		return strings.Join(newLines, "\n")
+	}
+
+	return content
+}
+
 // LocateNavBlock returns the 0-indexed start and end lines of an AGENT:NAV block.
 //
 // A nav block is the first non-blank content after optional YAML frontmatter.

@@ -15,10 +15,6 @@ import (
 	"github.com/RKelln/agentmap/internal/parser"
 )
 
-const (
-	navBlockEnd = "-->"
-)
-
 // SkippedExisting is returned by File when a nav block already exists and force is false.
 const SkippedExisting = "skipped-existing"
 
@@ -168,7 +164,7 @@ func File(path string, cfg config.Config, dryRun, force bool, outputPath ...stri
 		return report, nil
 	}
 
-	newContent := insertNavBlock(string(content), blockText)
+	newContent := navblock.InsertNavBlock(string(content), blockText)
 
 	// Recompute lines:N from the final content so generate/update/index always agree.
 	// insertNavBlock may add a blank separator line for fresh files, changing the
@@ -179,7 +175,7 @@ func File(path string, cfg config.Config, dryRun, force bool, outputPath ...stri
 			old := fmt.Sprintf("lines:%d\n", totalLines)
 			repl := fmt.Sprintf("lines:%d\n", finalTotalLines)
 			blockText = strings.Replace(blockText, old, repl, 1)
-			newContent = insertNavBlock(string(content), blockText)
+			newContent = navblock.InsertNavBlock(string(content), blockText)
 		}
 	}
 
@@ -217,94 +213,8 @@ func findNavBlock(lines []string) (start, end int) {
 	return navblock.LocateNavBlock(lines)
 }
 
-// insertNavBlock inserts or replaces a nav block in file content.
-// Skips nav blocks inside fenced code blocks.
 func insertNavBlock(content, blockText string) string {
-	lines := strings.Split(content, "\n")
-
-	// Check for existing nav block using canonical detection.
-	blockStart, blockEnd := navblock.LocateNavBlock(lines)
-
-	if blockStart >= 0 && blockEnd >= 0 {
-		// Replace existing block
-		before := strings.Join(lines[:blockStart], "\n")
-		after := ""
-		if blockEnd+1 < len(lines) {
-			after = strings.Join(lines[blockEnd+1:], "\n")
-		}
-		// If before is non-empty it lacks a trailing newline (Join doesn't add one),
-		// so add one to prevent the nav block from being fused to the preceding line.
-		var result string
-		if before != "" {
-			result = before + "\n" + blockText + "\n" + after
-		} else {
-			result = blockText + "\n" + after
-		}
-		// Clean up extra blank lines
-		result = cleanBlankLines(result)
-		return result
-	}
-
-	// Check for frontmatter and insert after it if present
-	if fmEnd, _ := navblock.FindFrontmatterEnd(lines); fmEnd >= 0 {
-		before := strings.Join(lines[:fmEnd+1], "\n")
-		after := strings.Join(lines[fmEnd+1:], "\n")
-		result := before + "\n" + blockText + "\n" + after
-		result = cleanBlankLines(result)
-		return result
-	}
-
-	// Insert at line 1
-	result := blockText + "\n" + content
-	result = cleanBlankLines(result)
-	return result
-}
-
-// cleanBlankLines ensures exactly one blank line between nav block and first heading.
-func cleanBlankLines(content string) string {
-	lines := strings.Split(content, "\n")
-
-	// Find the nav block end
-	navEnd := -1
-	for i, line := range lines {
-		if strings.TrimSpace(line) == navBlockEnd {
-			navEnd = i
-			break
-		}
-	}
-
-	if navEnd < 0 {
-		return content
-	}
-
-	// Count blank lines after nav block
-	blankCount := 0
-	for i := navEnd + 1; i < len(lines); i++ {
-		if strings.TrimSpace(lines[i]) == "" {
-			blankCount++
-		} else {
-			break
-		}
-	}
-
-	// We want exactly one blank line
-	if blankCount == 0 {
-		// Insert a blank line
-		newLines := make([]string, 0, len(lines)+1)
-		newLines = append(newLines, lines[:navEnd+1]...)
-		newLines = append(newLines, "")
-		newLines = append(newLines, lines[navEnd+1:]...)
-		return strings.Join(newLines, "\n")
-	} else if blankCount > 1 {
-		// Remove extra blank lines
-		newLines := make([]string, 0, len(lines)-blankCount+1)
-		newLines = append(newLines, lines[:navEnd+1]...)
-		newLines = append(newLines, "")
-		newLines = append(newLines, lines[navEnd+1+blankCount:]...)
-		return strings.Join(newLines, "\n")
-	}
-
-	return content
+	return navblock.InsertNavBlock(content, blockText)
 }
 
 // buildNavEntries converts parser sections to nav entries with keyword descriptions.
