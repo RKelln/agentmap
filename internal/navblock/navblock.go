@@ -459,6 +459,36 @@ func LocateNavBlock(lines []string) (start, end int) {
 	return -1, -1 // unclosed block
 }
 
+// HasDuplicateNavBlock returns true if the file content contains more than one
+// AGENT:NAV block outside of code fences. Nav blocks inside fenced code blocks
+// (examples in documentation) are ignored. firstEnd is the 0-indexed line of
+// the first block's closing --> delimiter; scanning starts after it.
+func HasDuplicateNavBlock(lines []string, firstEnd int) bool {
+	inFence := false
+	for i := firstEnd + 1; i < len(lines); i++ {
+		trimmed := strings.TrimSpace(lines[i])
+
+		// Track code fence state
+		if strings.HasPrefix(trimmed, "```") || strings.HasPrefix(trimmed, "~~~") {
+			inFence = !inFence
+			continue
+		}
+		if inFence {
+			continue
+		}
+
+		// Single-line <!-- AGENT:NAV ... --> is a reference, not a real block
+		if strings.HasPrefix(trimmed, "<!-- AGENT:NAV") && strings.Contains(trimmed, "-->") {
+			continue
+		}
+
+		if strings.HasPrefix(trimmed, "<!-- AGENT:NAV") {
+			return true
+		}
+	}
+	return false
+}
+
 // RenderPurposeOnly produces a minimal nav block with a purpose and line count.
 func RenderPurposeOnly(purpose string, lines int) string {
 	s := "<!-- AGENT:NAV\npurpose:" + purpose + "\n"

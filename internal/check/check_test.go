@@ -561,3 +561,181 @@ Content.
 		t.Errorf("expected missing subsection hint warning, got: %v", warnings)
 	}
 }
+
+func TestCheckFile_DuplicateNavBlock(t *testing.T) {
+	tmpDir := t.TempDir()
+	content := `---
+title: Test
+---
+
+<!-- AGENT:NAV
+purpose:test file
+nav[1]{s,n,name,about}:
+12,5,#Test,test section
+-->
+
+# Test
+
+Some content.
+
+## Subtest
+
+More content.
+
+<!-- AGENT:NAV
+purpose:second block
+nav[1]{s,n,name,about}:
+22,3,##Subtest,sub section
+-->
+`
+	path := filepath.Join(tmpDir, "test.md")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := config.Defaults()
+	failed, report, warnings, err := CheckFile(path, cfg, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !failed {
+		t.Error("expected failure for duplicate AGENT:NAV block")
+	}
+	if !strings.Contains(report, "duplicate AGENT:NAV block") {
+		t.Errorf("report = %q, want 'duplicate AGENT:NAV block'", report)
+	}
+	if len(warnings) != 0 {
+		t.Errorf("expected no warnings, got %d", len(warnings))
+	}
+}
+
+func TestCheckFile_DuplicateNavBlock_InCodeFenceNotFlagged(t *testing.T) {
+	tmpDir := t.TempDir()
+	// Nav block covers lines 9-10 (#Test section).
+	// Lines: 1:---, 2:title, 3:---, 4:(blank), 5:opener, 6:purpose, 7:nav header,
+	// 8:entry, 9:-->, 10:(blank), 11:#Test, 12:(blank), 13:Some content.
+	// 14:(blank), 15:Here is..., 16:(blank), 17:```markdown, 18:example block
+	// 19:purpose, 20:nav, 21:1;3, 22:-->, 23:```, 24:(blank), 25:More text.
+	content := `---
+title: Test
+---
+
+<!-- AGENT:NAV
+purpose:test file
+nav[1]{s,n,name,about}:
+11,15,#Test,test section
+-->
+
+# Test
+
+Some content.
+
+Here is an example nav block:
+
+` + "```" + `markdown
+<!-- AGENT:NAV
+purpose:example
+nav[1]{s,n,name,about}:
+1,3,#Example,
+-->
+` + "```" + `
+
+More text.
+`
+	path := filepath.Join(tmpDir, "test.md")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := config.Defaults()
+	failed, report, warnings, err := CheckFile(path, cfg, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if failed {
+		t.Errorf("expected pass, got failure: %s", report)
+	}
+	if len(warnings) != 0 {
+		t.Errorf("expected no warnings, got %d", len(warnings))
+	}
+}
+
+func TestCheckFile_DuplicateNavBlock_SingleLineReferenceNotFlagged(t *testing.T) {
+	tmpDir := t.TempDir()
+	// Nav block covers lines 9-10 (#Test section).
+	// Lines: 1:---, 2:title, 3:---, 4:(blank), 5:opener, 6:purpose, 7:nav header,
+	// 8:entry, 9:-->, 10:(blank), 11:#Test, 12:(blank), 13:The block format...
+	content := `---
+title: Test
+---
+
+<!-- AGENT:NAV
+purpose:test file
+nav[1]{s,n,name,about}:
+11,3,#Test,test section
+-->
+
+# Test
+
+The block format is ` + "`<!-- AGENT:NAV purpose:example -->`" + ` for purpose-only files.
+`
+	path := filepath.Join(tmpDir, "test.md")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := config.Defaults()
+	failed, report, warnings, err := CheckFile(path, cfg, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if failed {
+		t.Errorf("expected pass, got failure: %s", report)
+	}
+	if len(warnings) != 0 {
+		t.Errorf("expected no warnings, got %d", len(warnings))
+	}
+}
+
+func TestCheckFile_SuspiciousProseGt(t *testing.T) {
+	tmpDir := t.TempDir()
+	// about contains "> prose" — space after > indicates prose, not hints.
+	content := `---
+title: Test
+---
+
+<!-- AGENT:NAV
+purpose:test file
+nav[1]{s,n,name,about}:
+11,3,#Test,> prose about this section
+-->
+
+# Test
+
+content
+`
+	path := filepath.Join(tmpDir, "test.md")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := config.Defaults()
+	failed, report, warnings, err := CheckFile(path, cfg, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if failed {
+		t.Errorf("expected pass, got failure: %s", report)
+	}
+
+	var foundWarning bool
+	for _, w := range warnings {
+		if strings.Contains(w, "'>' followed by space") {
+			foundWarning = true
+			break
+		}
+	}
+	if !foundWarning {
+		t.Errorf("expected warning about '>' followed by space in about, got warnings: %v", warnings)
+	}
+}

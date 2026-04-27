@@ -99,6 +99,13 @@ func CheckFile(path string, cfg config.Config, warnUnreviewed bool) (bool, strin
 		return false, "", nil, nil
 	}
 
+	// Detect duplicate nav blocks (only one AGENT:NAV block per file is allowed).
+	// Nav blocks inside code fences (examples) are ignored.
+	if navblock.HasDuplicateNavBlock(lines, pr.End-1) {
+		failures := append([]string(nil), "  duplicate AGENT:NAV block found; only one block per file is allowed")
+		return true, fmt.Sprintf("FAIL: %s\n%s", path, strings.Join(failures, "\n")), nil, nil
+	}
+
 	// Purpose-only blocks are valid (no nav entries to check)
 	if len(oldBlock.Nav) == 0 {
 		return false, "", nil, nil
@@ -198,8 +205,18 @@ func CheckFile(path string, cfg config.Config, warnUnreviewed bool) (bool, strin
 		}
 	}
 
+	// Warn if about text contains a `>` followed by a space — this looks like
+	// prose misinterpreted as a hint delimiter (e.g. "> suffix for...").
+	for _, e := range oldBlock.Nav {
+		if idx := strings.Index(e.About, ">"); idx >= 0 && idx+1 < len(e.About) {
+			if e.About[idx+1] == ' ' {
+				hintWarnings = append(hintWarnings, fmt.Sprintf("  %s: '>' followed by space in about — interpreted as hint delimiter; rewrite description to avoid leading '>' or position hints correctly", e.Name))
+			}
+		}
+	}
+
 	if len(failures) > 0 {
-		report := fmt.Sprintf("FAIL: %s\n%s", path, strings.Join(failures, "\n"))
+		report := fmt.Sprintf("FAIL: %s\n%s\n\n  Run: agentmap update %s", path, strings.Join(failures, "\n"), path)
 		return true, report, nil, nil
 	}
 

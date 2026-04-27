@@ -2219,3 +2219,86 @@ Silent rotation and expiry detection.
 			pr.Block.Lines, totalLines, pr.End-pr.Start+1)
 	}
 }
+
+// TestPruneNavEntries_HumanWrittenAboutNoHintDuplication verifies that
+// a human-written about which already contains >hints (as produced by
+// older agentmap versions) does not get NEW duplicate hints appended
+// when PruneNavEntries re-runs on the same structure.
+func TestPruneNavEntries_HumanWrittenAboutNoHintDuplication(t *testing.T) {
+	entries := []navblock.NavEntry{
+		{Start: 1, N: 200, Name: "#Top", About: "~top"},
+		// Human-written about with hints from an older agentmap run.
+		{
+			Start: 10, N: 63, Name: "##Workflow",
+			About: "round structure: independent review; synthesis; revision>Round 1;Informed Review;Subsequent Rounds;Revision Pass",
+		},
+		{Start: 20, N: 5, Name: "###Round 1", About: ""},
+		{Start: 30, N: 5, Name: "###Informed Review", About: ""},
+		{Start: 40, N: 5, Name: "###Subsequent Rounds", About: ""},
+		{Start: 50, N: 5, Name: "###Revision Pass", About: ""},
+	}
+	// cap=2 forces all 4 h3s to be pruned into the ##Workflow parent.
+	got := PruneNavEntries(entries, 10, 100, 2)
+	if len(got) != 2 {
+		t.Fatalf("len(got) = %d, want 2", len(got))
+	}
+
+	var parent *navblock.NavEntry
+	for i := range got {
+		if got[i].Name == "##Workflow" {
+			parent = &got[i]
+		}
+	}
+	if parent == nil {
+		t.Fatal("##Workflow entry not found after pruning")
+	}
+
+	// Each hint should appear exactly once in the about — no duplicates.
+	for _, hint := range []string{"Round 1", "Informed Review", "Subsequent Rounds", "Revision Pass"} {
+		count := strings.Count(parent.About, hint)
+		if count != 1 {
+			t.Errorf("%q appears %d times in About = %q; want 1 (no duplicate hints appended)", hint, count, parent.About)
+		}
+	}
+}
+
+// TestPruneNavEntries_AutoAboutHintStripHandlesKeywords verifies that
+// an auto-generated about with both keywords and existing hints
+// (e.g. "~some keywords>hint1;hint2") gets its hint suffix stripped
+// before regenerating, so re-running PruneNavEntries does not duplicate hints.
+func TestPruneNavEntries_AutoAboutHintStripHandlesKeywords(t *testing.T) {
+	entries := []navblock.NavEntry{
+		{Start: 1, N: 200, Name: "#Top", About: "~top"},
+		// Auto-generated about with keywords AND hints: "~keywords>hints".
+		{
+			Start: 10, N: 63, Name: "##Parent",
+			About: "~parent description>Child A;Child B;Child C",
+		},
+		{Start: 20, N: 5, Name: "###Child A", About: ""},
+		{Start: 30, N: 5, Name: "###Child B", About: ""},
+		{Start: 40, N: 5, Name: "###Child C", About: ""},
+	}
+	// cap=2 forces all 3 h3s to be pruned.
+	got := PruneNavEntries(entries, 10, 100, 2)
+	if len(got) != 2 {
+		t.Fatalf("len(got) = %d, want 2", len(got))
+	}
+
+	var parent *navblock.NavEntry
+	for i := range got {
+		if got[i].Name == "##Parent" {
+			parent = &got[i]
+		}
+	}
+	if parent == nil {
+		t.Fatal("##Parent entry not found after pruning")
+	}
+
+	// Each hint should appear exactly once.
+	for _, hint := range []string{"Child A", "Child B", "Child C"} {
+		count := strings.Count(parent.About, hint)
+		if count != 1 {
+			t.Errorf("%q appears %d times in About = %q; want 1 (hints were not properly stripped before regenerating)", hint, count, parent.About)
+		}
+	}
+}
