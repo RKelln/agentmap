@@ -1,6 +1,7 @@
 package update
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -1643,5 +1644,60 @@ Content C.
 	}
 	if strings.Contains(report, "shifted:") {
 		t.Errorf("report should NOT contain 'shifted:' (concise output), got: %s", report)
+	}
+}
+
+// TestFile_HintedNewEntriesSuppressed verifies that "new" entries which get
+// collapsed into >hints by PruneNavEntries are NOT reported as "new (no description)".
+// Reporting them is misleading since they don't need individual abouts.
+func TestFile_HintedNewEntriesSuppressed(t *testing.T) {
+	dir := t.TempDir()
+
+	// Build a document with many h2 sections and new h3 children that will
+	// exceed a tight MaxNavEntries budget and get collapsed into >hints.
+	var sb strings.Builder
+	sb.WriteString("<!-- AGENT:NAV\npurpose:test\nnav[3]{s,n,name,about}:\n")
+	sb.WriteString("9,200,#Doc,doc\n")
+	sb.WriteString("13,3,##Section A,desc A\n")
+	sb.WriteString("17,3,##Section B,desc B\n")
+	sb.WriteString("-->\n")
+	sb.WriteString("# Doc\n\nContent.\n\n")
+
+	// Add many h2 sections to push over MaxNavEntries when new h3s are added
+	for i := 0; i < 15; i++ {
+		fmt.Fprintf(&sb, "## Section %d\n\nContent.\n\n", i)
+	}
+
+	// Add new h3 children under a medium-sized parent (between sub_threshold and expand_threshold)
+	// so they get collapsed into hints rather than kept as entries.
+	sb.WriteString("## Medium Parent\n\nContent.\n")
+	for i := 0; i < 3; i++ {
+		fmt.Fprintf(&sb, "### New Child %c\n\nChild content.\n", 'A'+i)
+	}
+	sb.WriteString("End.\n")
+
+	content := sb.String()
+	path := writeTempFile(t, dir, "doc.md", content)
+
+	cfg := config.Defaults()
+	cfg.MaxDepth = 3
+	cfg.MaxNavEntries = 10 // tight budget — forces pruning of new h3s
+	cfg.SubThreshold = 1   // force hintable
+	cfg.ExpandThreshold = 999
+	cfg.MinLines = 5
+
+	report, err := File(path, cfg, false, false)
+	if err != nil {
+		t.Fatalf("File() error = %v", err)
+	}
+
+	// New h3 entries should NOT appear as "new:" since they were collapsed into hints.
+	if strings.Contains(report, "new: ###New Child") {
+		t.Errorf("hinted entries should NOT appear as 'new'; report:\n%s", report)
+	}
+
+	// The report should still show the file was updated (other changes like line shifts).
+	if !strings.Contains(report, "Updated:") {
+		t.Errorf("report should show file was updated, got: %s", report)
 	}
 }

@@ -290,6 +290,11 @@ func File(path string, cfg config.Config, dryRun, quiet bool, changedLines ...[]
 		blockText = navblock.RenderNavBlock(block)
 	}
 
+	// Remove "new" entries that were collapsed into >hints by PruneNavEntries.
+	// These entries don't need individual abouts — they're represented as hints
+	// on their parent entry. Reporting them as "new (no description)" is misleading.
+	entryReports = filterHintedNewEntries(entryReports, block.Nav)
+
 	if dryRun {
 		return formatReport(path, entryReports), nil
 	}
@@ -572,4 +577,24 @@ func formatReport(path string, reports []ReportEntry) string {
 	}
 
 	return strings.TrimSpace(b.String())
+}
+
+// filterHintedNewEntries removes "new" entries from the report that were
+// collapsed into >hints on parent entries by PruneNavEntries. These entries
+// don't need individual abouts and reporting them as "new (no description)"
+// is misleading — they're represented by hints.
+func filterHintedNewEntries(reports []ReportEntry, nav []navblock.NavEntry) []ReportEntry {
+	surviving := make(map[string]bool, len(nav))
+	for _, e := range nav {
+		surviving[e.Name] = true
+	}
+
+	filtered := reports[:0]
+	for _, r := range reports {
+		if r.Type == ReportNew && !surviving[r.Name] {
+			continue
+		}
+		filtered = append(filtered, r)
+	}
+	return filtered
 }

@@ -30,6 +30,15 @@ var rootCmd = &cobra.Command{
 	Long:  "agentmap generates and maintains compact navigation blocks at the top of markdown files.",
 }
 
+func init() {
+	rootCmd.SetHelpTemplate(rootCmd.HelpTemplate() + "\nQuick Tips:\n" +
+		"  > Use nav block s,n offsets to jump to sections — faster than grep\n" +
+		"  > '>' is reserved — never put it in about/purpose text (it's the hint delimiter)\n" +
+		"  > Don't hand-edit s,n line numbers; run 'agentmap update <path>' instead\n" +
+		"  > Run 'agentmap check <path>' before committing\n" +
+		"  > Run 'agentmap guide' for full nav writing instructions\n")
+}
+
 var guideCmd = &cobra.Command{
 	Use:   "guide",
 	Short: "Print the nav writing guide",
