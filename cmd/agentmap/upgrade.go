@@ -2,11 +2,14 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	selfupdate "github.com/creativeprojects/go-selfupdate"
 	"github.com/spf13/cobra"
 
@@ -59,6 +62,27 @@ func runUpgrade(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("checking for updates: %w", err)
 	}
 	if !found {
+		// DetectLatest may fail to find a release if GitHub's releases list
+		// index hasn't propagated yet (eventual consistency). Fall back to the
+		// /releases/latest endpoint which uses a separate, reliable index.
+		if info, err := fetchLatestFromAPI(ctx); err == nil {
+			latestVer, perr := semver.NewVersion(info.TagName)
+			if perr != nil {
+				return fmt.Errorf("no releases found for your platform")
+			}
+			curVer, cerr := semver.NewVersion(version)
+			if cerr != nil {
+				return fmt.Errorf("no releases found for your platform")
+			}
+			if latestVer.GreaterThan(curVer) {
+				return fmt.Errorf(
+					"update %s is available but GitHub's release index hasn't fully propagated yet; "+
+						"try again in a moment\nRelease notes: %s",
+					info.TagName, info.HTMLURL)
+			}
+			fmt.Printf("Already up to date (%s)\n", version)
+			return nil
+		}
 		return fmt.Errorf("no releases found for your platform")
 	}
 
@@ -98,6 +122,41 @@ func runUpgrade(cmd *cobra.Command, _ []string) error {
 // so upgrade checks can see newer prerelease builds as candidates.
 func shouldAllowPrerelease(currentVersion string) bool {
 	return strings.Contains(currentVersion, "-")
+}
+
+// latestReleaseInfo is a minimal subset of the /releases/latest JSON response.
+type latestReleaseInfo struct {
+	TagName string `json:"tag_name"`
+	HTMLURL string `json:"html_url"`
+}
+
+// fetchLatestFromAPI calls the GitHub API /releases/latest endpoint directly.
+// This endpoint uses a separate index from the paginated /releases list and is
+// not subject to the same eventual-consistency delays.
+func fetchLatestFromAPI(ctx context.Context) (*latestReleaseInfo, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
+		"https://api.github.com/repos/RKelln/agentmap/releases/latest", nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("github API returned %d", resp.StatusCode)
+	}
+
+	var info latestReleaseInfo
+	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
+		return nil, err
+	}
+	return &info, nil
 }
 
 // detectManagedInstall returns an error with upgrade instructions if the binary
