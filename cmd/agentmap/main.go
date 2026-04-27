@@ -142,17 +142,18 @@ var generateCmd = &cobra.Command{
 }
 
 var updateCmd = &cobra.Command{
-	Use:   "update [path]",
+	Use:   "update [path...]",
 	Short: "Refresh line numbers in existing nav blocks",
-	Long:  "Fast line-number refresh. Preserves all descriptions.\nFiles with no nav block are passed to generate automatically.",
-	Args:  cobra.MaximumNArgs(1),
+	Long:  "Fast line-number refresh. Preserves all descriptions.\nFiles with no nav block are passed to generate automatically.\nAccepts multiple files and/or directories.",
+	Args:  cobra.ArbitraryArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		root := "."
-		if len(args) > 0 {
-			root = args[0]
+		paths := args
+		if len(paths) == 0 {
+			paths = []string{"."}
 		}
 
-		cfgPath, err := config.FindConfig(root)
+		// Load config from cwd so it works for any path combination.
+		cfgPath, err := config.FindConfig(".")
 		if err != nil {
 			return fmt.Errorf("find config: %w", err)
 		}
@@ -169,37 +170,44 @@ var updateCmd = &cobra.Command{
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		quiet, _ := cmd.Flags().GetBool("quiet")
 
-		// If path is a single file, process it directly
-		info, err := os.Stat(root)
-		if err == nil && !info.IsDir() {
-			report, err := update.File(root, cfg, dryRun, quiet)
+		var lastError error
+
+		for _, path := range paths {
+			info, err := os.Stat(path)
 			if err != nil {
-				return err
+				lastError = fmt.Errorf("stat %s: %w", path, err)
+				continue
 			}
-			if !quiet && report != "" {
-				fmt.Println(report)
-			}
-			// Auto-check the task list entry if the file is now fully reviewed.
-			if !dryRun {
-				repoRoot := findRepoRoot(root, cfgPath)
-				if repoRoot != "" {
-					absFile, _ := filepath.Abs(root)
-					relPath, relErr := filepath.Rel(repoRoot, absFile)
-					if relErr == nil {
-						taskListPath := index.TaskListPath(repoRoot)
-						if err := index.CheckOffTaskEntry(taskListPath, absFile, relPath); err != nil {
-							fmt.Fprintf(os.Stderr, "warning: task list check-off: %v\n", err)
-						}
-					}
-					if err := index.RefreshFilesBlock(repoRoot, cfg, false); err != nil {
-						fmt.Fprintf(os.Stderr, "warning: refresh files block: %v\n", err)
-					}
+
+			if !info.IsDir() {
+				report, err := update.File(path, cfg, dryRun, quiet)
+				if err != nil {
+					lastError = err
+					continue
+				}
+				if !quiet && report != "" {
+					fmt.Println(report)
+				}
+			} else {
+				repoRoot := findRepoDirRoot(path, cfgPath)
+				if err := update.Update(path, repoRoot, cfg, dryRun, quiet); err != nil {
+					lastError = err
+					continue
 				}
 			}
-			return nil
 		}
 
-		return update.Update(root, findRepoDirRoot(root, cfgPath), cfg, dryRun, quiet)
+		// Refresh files block once at the end.
+		if !dryRun && !quiet {
+			repoRoot := findRepoRoot(".", cfgPath)
+			if repoRoot != "" {
+				if err := index.RefreshFilesBlock(repoRoot, cfg, false); err != nil {
+					fmt.Fprintf(os.Stderr, "warning: refresh files block: %v\n", err)
+				}
+			}
+		}
+
+		return lastError
 	},
 }
 
