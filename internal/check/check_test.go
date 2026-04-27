@@ -537,7 +537,7 @@ Content.
 
 	cfg := config.Defaults()
 	cfg.MaxNavEntries = 2
-	cfg.SubThreshold = 1   // make all sections hintable
+	cfg.SubThreshold = 1      // make all sections hintable
 	cfg.ExpandThreshold = 999 // prevent unkillable
 
 	failed, report, warnings, err := CheckFile(path, cfg, false)
