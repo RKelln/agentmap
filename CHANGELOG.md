@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.3.2] — Upgrade reliability fixes — 2026-04-27
+
+Patch release fixing two issues: a misleading upgrade message during the propagation
+window after a new GitHub release, and a CI Go version mismatch.
+
+### Fixed
+- `agentmap upgrade`: Add `/releases/latest` fallback when the paginated
+  `/releases` index hasn't caught up to a newly published release. Users no
+  longer see "no releases found for your platform" during the propagation
+  window — they now get a clear message with the release notes URL.
+
+### Infrastructure
+- Bump CI Go version from 1.25 to 1.26 to match `go.mod`.
+
 ## [v0.3.1] — Bug fixes and UX refinements — 2026-04-27
 
 Bug-fix release tightening up `update`, `index`, and `next` commands.
