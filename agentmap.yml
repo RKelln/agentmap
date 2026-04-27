@@ -17,3 +17,7 @@ max_depth: 3
 # Files/directories to exclude (in addition to .gitignore)
 exclude:
   - "CHANGELOG.md"
+  - "README.md"
+  - "docs/nav-writing-guide.md"
+  - "internal/guide/nav-writing-guide.md"
+  - "testdata/**"
