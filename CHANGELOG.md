@@ -4,6 +4,30 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.3.1] — Bug fixes and UX refinements — 2026-04-27
+
+Bug-fix release tightening up `update`, `index`, and `next` commands.
+
+### Added
+- `agentmap update` now accepts multiple file paths in a single invocation
+  (`agentmap update a.md b.md docs/`)
+
+### Fixed
+- `update`: nav-block-only edits (freshly generated blocks or description-only
+  changes) are no longer misreported as content changes
+- `index`: stale task lists and `next-state` files are now cleaned up when
+  excluded files leave zero tasks, preventing phantom task output
+- `next`: shows a friendly "no task list" message instead of an error when
+  there is nothing to work on
+
+### Changed
+- `index` uses a bare `AGENT:NAV` block in AGENTS.md instead of the
+  `<!-- agentmap:index -->` wrapper; `purpose:` is help text; files block is
+  now appended rather than prepended
+
+### Infrastructure
+- Bumped Go to 1.26.2
+
 ## [v0.3.0] — Hint dedup, duplicate detection, and guide improvements — 2026-04-27
 
 This release focuses on nav block robustness: fixing hint duplication across
