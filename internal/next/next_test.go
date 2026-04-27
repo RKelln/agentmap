@@ -540,3 +540,36 @@ func TestFlushState_MissingFileSkips(t *testing.T) {
 		t.Errorf("missing file should not block flush")
 	}
 }
+
+func TestFlushState_UnparseableNavBlock_WarnsAndSkips(t *testing.T) {
+	dir := t.TempDir()
+	taskListPath := makeTaskList(t, dir, []struct {
+		relPath string
+		checked bool
+	}{
+		{authMD, false},
+	})
+	// Write file with unclosed nav block (no -->).
+	writeFile(t, filepath.Join(dir, authMD), "<!-- AGENT:NAV\npurpose:test\n\n# Auth\n")
+
+	if err := next.WriteState(taskListPath, []string{authMD}); err != nil {
+		t.Fatalf("WriteState() error = %v", err)
+	}
+
+	result, err := next.FlushState(taskListPath, dir)
+	if err != nil {
+		t.Fatalf("FlushState() error = %v", err)
+	}
+	// Should not block (no ~ to review).
+	if result.Blocked {
+		t.Errorf("expected not blocked for unparseable nav block")
+	}
+	// Task should NOT be checked off.
+	data, _ := os.ReadFile(taskListPath)
+	if strings.Contains(string(data), "- [x]") {
+		t.Errorf("task should NOT be checked off when nav block is unparseable")
+	}
+	if !strings.Contains(string(data), "- [ ]") {
+		t.Errorf("task should still be unchecked")
+	}
+}

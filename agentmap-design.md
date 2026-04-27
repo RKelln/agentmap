@@ -723,9 +723,12 @@ If a document has multiple headings with the same text (e.g., two `## Examples` 
 
 ### 11.2 Headings with Special Characters
 
-Heading text is stored as-is in the `name` field, with two exceptions:
+Heading text is stored as-is in the `name` field, with these exceptions:
 - Commas are stripped (they would break CSV parsing).
 - Leading/trailing whitespace is stripped.
+- Markdown attribute syntax (`{: .class-name}`) is stripped.
+- Bracketed content (`[link]`, `[note]`) is stripped.
+- Parenthetical content (`(deprecated)`, `(draft)`) is stripped.
 
 ### 11.3 Empty Sections and Heading Clusters
 

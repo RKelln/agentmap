@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/RKelln/agentmap/internal/config"
+	"github.com/RKelln/agentmap/internal/gitutil"
 	"github.com/RKelln/agentmap/internal/navblock"
 	"github.com/RKelln/agentmap/internal/parser"
 )
@@ -1493,5 +1494,154 @@ OAuth2 flow.
 		if entry.Name == "##Exchange" && entry.About != "OAuth2 code flow" {
 			t.Errorf("Exchange description = %q, want %q", entry.About, "OAuth2 code flow")
 		}
+	}
+}
+
+// --- Content-changed detection tests (agentmap-8af) ---
+
+func TestFile_ContentChangedDetected(t *testing.T) {
+	dir := t.TempDir()
+
+	content := `<!-- AGENT:NAV
+purpose:test file
+nav[1]{s,n,name,about}:
+7,3,#Section,existing description
+-->
+
+# Section
+
+Content here.
+`
+
+	path := writeTempFile(t, dir, "doc.md", content)
+	cfg := config.Defaults()
+	cfg.MaxDepth = 3
+
+	changed := []gitutil.LineRange{{Start: 8, End: 8}}
+	report, err := File(path, cfg, true, false, changed)
+	if err != nil {
+		t.Fatalf("File() error = %v", err)
+	}
+
+	if !strings.Contains(report, "content-changed") {
+		t.Errorf("report should contain 'content-changed', got: %s", report)
+	}
+	if !strings.Contains(report, "existing description") {
+		t.Errorf("report should contain current description, got: %s", report)
+	}
+}
+
+func TestFile_ContentChangedPriorityOverShifted(t *testing.T) {
+	dir := t.TempDir()
+
+	// Nav block has stale line numbers (shifted) and changed lines overlap the section.
+	content := `<!-- AGENT:NAV
+purpose:test file
+nav[1]{s,n,name,about}:
+20,3,#Section,existing description
+-->
+
+# Section
+
+Content here.
+`
+
+	path := writeTempFile(t, dir, "doc.md", content)
+	cfg := config.Defaults()
+	cfg.MaxDepth = 3
+
+	changed := []gitutil.LineRange{{Start: 7, End: 8}}
+	report, err := File(path, cfg, true, false, changed)
+	if err != nil {
+		t.Fatalf("File() error = %v", err)
+	}
+
+	// Content-changed should take priority over shifted.
+	if !strings.Contains(report, "content-changed") {
+		t.Errorf("report should contain 'content-changed', got: %s", report)
+	}
+	if strings.Contains(report, "shifted:") {
+		t.Errorf("report should NOT contain 'shifted:' when content-changed takes priority, got: %s", report)
+	}
+}
+
+func TestFile_PurposeOnlyContentChanged(t *testing.T) {
+	dir := t.TempDir()
+
+	content := `<!-- AGENT:NAV
+purpose:small file
+-->
+
+Some content here.
+More content.
+`
+
+	path := writeTempFile(t, dir, "small.md", content)
+	cfg := config.Defaults()
+
+	changed := []gitutil.LineRange{{Start: 4, End: 5}}
+	report, err := File(path, cfg, true, false, changed)
+	if err != nil {
+		t.Fatalf("File() error = %v", err)
+	}
+
+	if !strings.Contains(report, "# (purpose-only)") {
+		t.Errorf("report should contain '# (purpose-only)', got: %s", report)
+	}
+	if !strings.Contains(report, "content-changed") {
+		t.Errorf("report should contain 'content-changed', got: %s", report)
+	}
+}
+
+func TestFile_ConciseOutputExcludesOKAndShifted(t *testing.T) {
+	dir := t.TempDir()
+
+	// Mix of shifted, content-changed, and new sections.
+	// Nav block has stale numbers for Section A and B; Section C is new.
+	content := `<!-- AGENT:NAV
+purpose:test file
+nav[2]{s,n,name,about}:
+20,3,#Section A,desc A
+25,3,#Section B,desc B
+-->
+
+# Section A
+
+Content A.
+
+# Section B
+
+Content B.
+
+## Section C
+
+Content C.
+`
+
+	path := writeTempFile(t, dir, "doc.md", content)
+	cfg := config.Defaults()
+	cfg.MaxDepth = 3
+
+	// Changed lines overlap Section A only.
+	changed := []gitutil.LineRange{{Start: 8, End: 9}}
+	report, err := File(path, cfg, true, false, changed)
+	if err != nil {
+		t.Fatalf("File() error = %v", err)
+	}
+
+	// Should show content-changed (Section A) and new (Section C).
+	if !strings.Contains(report, "content-changed") {
+		t.Errorf("report should contain 'content-changed', got: %s", report)
+	}
+	if !strings.Contains(report, "new:") {
+		t.Errorf("report should contain 'new:', got: %s", report)
+	}
+
+	// Should NOT show OK or shifted entries.
+	if strings.Contains(report, "OK:") {
+		t.Errorf("report should NOT contain 'OK:' (concise output), got: %s", report)
+	}
+	if strings.Contains(report, "shifted:") {
+		t.Errorf("report should NOT contain 'shifted:' (concise output), got: %s", report)
 	}
 }
