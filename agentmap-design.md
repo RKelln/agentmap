@@ -333,7 +333,7 @@ No changes: docs/glossary.md
    a. Parse the nav block.
    b. Reparse the markdown headings and line numbers.
    c. Compare: do nav entries match current headings (by text) with correct line numbers?
-3. Report mismatches.
+   d. Validate that `>` subsection hints on parent entries match what `PruneNavEntries` would produce (warn if hints are missing).
 
 **Output on failure:**
 ```
@@ -583,7 +583,7 @@ The parser extracts headings from markdown files to build the nav block.
 - Only track h1-h3 (1-3 `#` characters). Ignore h4+.
 - Headings inside fenced code blocks (``` ``` ```) are not headings. Track code fence state.
 - Headings inside HTML comments (`<!-- -->`) are not headings.
-- The heading text is everything after `# ` (strip leading/trailing whitespace).
+- The heading text is everything after `# ` (strip leading/trailing whitespace, then strip trailing markdown attributes `{:...}`, bracketed content `[...]`, and parenthetical content `(...)`).
 
 **Section boundaries:**
 - A section starts at the heading line.
@@ -612,6 +612,7 @@ To parse an existing nav block:
 
 **Matching existing entries to current headings:**
 - Strip `#` prefixes from `name` field to get plain heading text.
+- Apply the same heading text normalization as `NormalizeHeading`: strip commas, whitespace, markdown attributes, brackets, and parentheses.
 - Match by exact text comparison (case-sensitive).
 - If a heading appears multiple times in the document (duplicate headings), match in order of appearance.
 
@@ -619,7 +620,7 @@ To parse an existing nav block:
 
 When writing/updating the nav block:
 
-1. If YAML frontmatter exists (file starts with `---`), find the closing `---` and insert after it.
+1. If YAML frontmatter exists (file starts with `---`), find the closing `---` and insert after it. The close delimiter is recognized even when it has trailing content on the same line (e.g. `---<!-- AGENT:NAV` — a common small-model mistake), with a warning emitted.
 2. If an existing `<!-- AGENT:NAV ... -->` block exists, replace it in place.
 3. If no existing block and no frontmatter, insert at line 1.
 4. Ensure exactly one blank line between the nav block and the first heading.
