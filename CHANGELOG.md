@@ -4,6 +4,52 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.2.0] — Nav block reliability and update improvements — 2026-04-26
+
+This release hardens the `update` command and the nav block pipeline.
+The main themes are: fixing `update` to auto-generate missing descriptions,
+eliminating hint duplication across repeated runs, more robust nav/frontmatter
+parsing, and improved `check` and `next` command behaviour.
+
+### Added
+- **`update` now auto-fills empty `about` fields** with `~keyword` descriptions
+  (same output as `generate`). Human-written abouts — those without the `~`
+  prefix — are never overwritten.
+- **`check` validates subsection hints**: warns when a nav block is missing
+  the `>hints` that `generate` would have produced, making hint drift visible
+  before committing.
+- **`next` handles corrupted nav blocks gracefully**: distinguishes an
+  unparseable nav block from a missing one; skips corrupted files with a
+  warning instead of crashing.
+
+### Fixed
+- **Hint duplication on repeated `update` runs**: `PruneNavEntries` now strips
+  previously-generated `~>hints` before rebuilding them, so running `update`
+  multiple times no longer grows the hints string indefinitely.
+- **Frontmatter handling**: `insertNavBlock` now uses `FindFrontmatterEnd` so
+  nav blocks are inserted correctly in files with dirty or non-standard
+  frontmatter close delimiters.
+- **Heading normalisation in nav entries**: markdown attributes, brackets, and
+  parenthetical suffixes are stripped from heading text when building nav entry
+  names, giving cleaner output.
+
+### Changed
+- **`update` output is more concise**: OK and shifted entries are suppressed by
+  default; only new, changed, and auto-generated entries are shown.
+- **`update` flags auto-generated descriptions** in its report so agents know
+  which entries still need human-written descriptions.
+- Git diff integration for content-change detection is now used by `update` to
+  flag sections whose content has changed since the last commit.
+
+### Infrastructure
+- Consolidated duplicate `InsertNavBlock`, `CleanBlankLines`, and
+  `IsFrontmatterCloseLine` helpers into the `navblock` package; removed
+  duplicates from `generate` and `update`.
+- Expanded test coverage: content-change detection, hint validation, `next`
+  edge cases, and navblock helpers.
+
+---
+
 ## [v0.1.0] — Initial public release — 2026-04-11
 
 agentmap is a CLI tool that writes and maintains `AGENT:NAV` blocks in Markdown
