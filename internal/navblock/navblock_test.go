@@ -75,6 +75,89 @@ func TestNormalizeHeading(t *testing.T) {
 	}
 }
 
+func TestNormalizeHeading_StripsSuffixes(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "markdown attribute with space",
+			input: "## Title {: .page-break-before}",
+			want:  "Title",
+		},
+		{
+			name:  "markdown attribute without space",
+			input: "## Title {:class-name}",
+			want:  "Title",
+		},
+		{
+			name:  "parenthetical deprecated",
+			input: "## Title (deprecated)",
+			want:  "Title",
+		},
+		{
+			name:  "bracket link",
+			input: "## Title [link]",
+			want:  "Title",
+		},
+		{
+			name:  "multiple suffixes same type",
+			input: "## Title {: .class} (note)",
+			want:  "Title",
+		},
+		{
+			name:  "multiple different suffixes",
+			input: "## Title [link] (deprecated)",
+			want:  "Title",
+		},
+		{
+			name:  "nested parentheses handled gracefully",
+			input: "## Title (with (nested))",
+			want:  "Title",
+		},
+		{
+			name:  "no suffix preserved",
+			input: "## Title",
+			want:  "Title",
+		},
+		{
+			name:  "empty string",
+			input: "",
+			want:  "",
+		},
+		{
+			name:  "only hashes",
+			input: "##",
+			want:  "",
+		},
+		{
+			name:  "hash with suffix only",
+			input: "## {: .class}",
+			want:  "",
+		},
+		{
+			name:  "commas still stripped",
+			input: "## Title, Subtitle (deprecated)",
+			want:  "Title Subtitle",
+		},
+		{
+			name:  "bracket then attr",
+			input: "## Title [link]{: .class}",
+			want:  "Title",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := NormalizeHeading(tt.input)
+			if got != tt.want {
+				t.Errorf("NormalizeHeading(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestParseNavBlock_ReturnsParseResult(t *testing.T) {
 	// Verify ParseNavBlock returns a ParseResult struct (not bare multi-return).
 	tests := []struct {

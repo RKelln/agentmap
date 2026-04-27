@@ -4,6 +4,7 @@ package navblock
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -32,14 +33,51 @@ type SeeEntry struct {
 	Why  string // reason to read it
 }
 
+var (
+	attrRe    = regexp.MustCompile(`\s*\{:[^}]*\}$`)
+	bracketRe = regexp.MustCompile(`\s*\[[^\]]*\]$`)
+)
+
+// stripTrailingParens removes a trailing parenthetical expression from text.
+// It handles nested parentheses by finding the matching '(' for the final ')'.
+func stripTrailingParens(text string) string {
+	if !strings.HasSuffix(text, ")") {
+		return text
+	}
+	depth := 1
+	i := len(text) - 2
+	for i >= 0 && depth > 0 {
+		switch text[i] {
+		case ')':
+			depth++
+		case '(':
+			depth--
+		}
+		i--
+	}
+	if depth != 0 {
+		return text
+	}
+	parenPos := i + 1
+	// Strip whitespace before the parenthetical.
+	j := parenPos
+	for j > 0 && text[j-1] == ' ' {
+		j--
+	}
+	return text[:j]
+}
+
 // NormalizeHeading converts a raw heading name (with optional leading # characters
 // and commas) into a canonical lookup key: strips leading '#' chars, strips
-// leading/trailing whitespace, and removes all commas.
+// leading/trailing whitespace, removes trailing markdown attributes, bracketed
+// text, and parenthetical content, then removes all commas.
 //
 // Examples:
 //
 //	"##Setup, Configuration" → "Setup Configuration"
 //	"#Authentication"        → "Authentication"
+//	"## Title {: .class}"    → "Title"
+//	"## Title (deprecated)"  → "Title"
 func NormalizeHeading(text string) string {
 	// Strip leading # characters
 	for strings.HasPrefix(text, "#") {
@@ -47,6 +85,23 @@ func NormalizeHeading(text string) string {
 	}
 	// Strip leading/trailing whitespace
 	text = strings.TrimSpace(text)
+	// Strip trailing suffixes: markdown attrs, brackets, parens
+	changed := true
+	for changed {
+		changed = false
+		if attrRe.MatchString(text) {
+			text = attrRe.ReplaceAllString(text, "")
+			changed = true
+		}
+		if bracketRe.MatchString(text) {
+			text = bracketRe.ReplaceAllString(text, "")
+			changed = true
+		}
+		if stripped := stripTrailingParens(text); stripped != text {
+			text = stripped
+			changed = true
+		}
+	}
 	// Strip commas
 	text = strings.ReplaceAll(text, ",", "")
 	return text
