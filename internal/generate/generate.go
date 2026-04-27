@@ -130,7 +130,7 @@ func File(path string, cfg config.Config, dryRun, force bool, outputPath ...stri
 		separatorLines := 0
 		if oldBlockLines == 0 {
 			separatorLines = 1
-			if fmEnd := navblock.FindFrontmatterEnd(lines); fmEnd >= 0 {
+			if fmEnd, _ := navblock.FindFrontmatterEnd(lines); fmEnd >= 0 {
 				// Frontmatter path: nav block inserted after closing ---.
 				// If a blank line already follows the ---, cleanBlankLines
 				// will collapse the two blanks (separator + existing) into one.
@@ -246,7 +246,7 @@ func insertNavBlock(content, blockText string) string {
 	}
 
 	// Check for frontmatter and insert after it if present
-	if fmEnd := navblock.FindFrontmatterEnd(lines); fmEnd >= 0 {
+	if fmEnd, _ := navblock.FindFrontmatterEnd(lines); fmEnd >= 0 {
 		before := strings.Join(lines[:fmEnd+1], "\n")
 		after := strings.Join(lines[fmEnd+1:], "\n")
 		result := before + "\n" + blockText + "\n" + after

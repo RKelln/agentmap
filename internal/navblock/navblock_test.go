@@ -999,6 +999,70 @@ func TestRenderFilesBlock_RoundTrip(t *testing.T) {
 	}
 }
 
+func TestFindFrontmatterEnd(t *testing.T) {
+	tests := []struct {
+		name      string
+		lines     []string
+		wantEnd   int
+		wantDirty bool
+	}{
+		{
+			name:      "clean close",
+			lines:     []string{"---", "foo", "---", "# Heading"},
+			wantEnd:   2,
+			wantDirty: false,
+		},
+		{
+			name:      "dirty close with AGENT:NAV",
+			lines:     []string{"---", "foo", "---<!-- AGENT:NAV", "# Heading"},
+			wantEnd:   2,
+			wantDirty: true,
+		},
+		{
+			name:      "dirty close with text",
+			lines:     []string{"---", "foo", "---text", "# Heading"},
+			wantEnd:   2,
+			wantDirty: true,
+		},
+		{
+			name:      "four dashes not a close",
+			lines:     []string{"---", "foo", "----", "---", "# Heading"},
+			wantEnd:   3,
+			wantDirty: false,
+		},
+		{
+			name:      "no frontmatter",
+			lines:     []string{"# Heading"},
+			wantEnd:   -1,
+			wantDirty: false,
+		},
+		{
+			name:      "unclosed frontmatter",
+			lines:     []string{"---", "foo", "# Heading"},
+			wantEnd:   -1,
+			wantDirty: false,
+		},
+		{
+			name:      "whitespace after close",
+			lines:     []string{"---", "foo", "---   ", "# Heading"},
+			wantEnd:   2,
+			wantDirty: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotEnd, gotDirty := FindFrontmatterEnd(tt.lines)
+			if gotEnd != tt.wantEnd {
+				t.Errorf("FindFrontmatterEnd() end = %d, want %d", gotEnd, tt.wantEnd)
+			}
+			if gotDirty != tt.wantDirty {
+				t.Errorf("FindFrontmatterEnd() dirty = %v, want %v", gotDirty, tt.wantDirty)
+			}
+		})
+	}
+}
+
 // --- LocateNavBlock tests ---
 
 func TestLocateNavBlock_FindsBlockAtTop(t *testing.T) {
