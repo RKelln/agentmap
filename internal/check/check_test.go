@@ -503,3 +503,61 @@ func TestCheckFile_TotalLinesOffByOne(t *testing.T) {
 		t.Errorf("expected pass (no off-by-one), got failures:\n%s", report)
 	}
 }
+
+func TestCheckFile_MissingHintWarning(t *testing.T) {
+	// File with h2 + 2 h3s; max_nav_entries=2 forces pruning of h3s into > hints.
+	content := `<!-- AGENT:NAV
+purpose:test
+nav[2]{s,n,name,about}:
+8,14,#Title,
+10,12,##Parent,parent description
+-->
+
+# Title
+
+## Parent
+
+Content line one.
+Content line two.
+
+### Child One
+
+Content.
+
+### Child Two
+
+Content.
+`
+
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "test.md")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := config.Defaults()
+	cfg.MaxNavEntries = 2
+	cfg.SubThreshold = 1   // make all sections hintable
+	cfg.ExpandThreshold = 999 // prevent unkillable
+
+	failed, report, warnings, err := CheckFile(path, cfg, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if failed {
+		t.Errorf("expected pass but got failure: %s", report)
+	}
+	if len(warnings) == 0 {
+		t.Errorf("expected hint warning, got no warnings")
+	}
+	foundHintWarning := false
+	for _, w := range warnings {
+		if strings.Contains(w, "missing subsection hint") {
+			foundHintWarning = true
+			break
+		}
+	}
+	if !foundHintWarning {
+		t.Errorf("expected missing subsection hint warning, got: %v", warnings)
+	}
+}
