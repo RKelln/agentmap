@@ -4,6 +4,38 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.3.0] — Hint dedup, duplicate detection, and guide improvements — 2026-04-27
+
+This release focuses on nav block robustness: fixing hint duplication across
+repeated `update` runs, detecting duplicate `AGENT:NAV` blocks, and improving
+the onboarding experience with a Quick Tips footer and a Common Gotchas guide.
+
+### Added
+- **Duplicate nav block detection**: `check` now fails with a clear message
+  when a file contains multiple `AGENT:NAV` blocks (outside code fences).
+- **Quick Tips footer**: `agentmap --help` now prints a condensed Quick Tips
+  section covering the most-used workflows.
+- **Update suggestion on check failure**: when `check` reports issues, the
+  output now ends with `Run: agentmap update <path>` so users know what to
+  do next.
+
+### Fixed
+- **Hint duplication on repeated `update`**: entries with `~keywords>hints`
+  format no longer produce duplicate hint text when `PruneNavEntries` runs
+  multiple times. Human-written `about` fields are never touched.
+- **Suppressed "new" entries for hinted subsections**: subsections collapsed
+  into `>hints` no longer appear as "new" in `update` output, since they
+  don't need individual `about` descriptions.
+
+### Documentation
+- **Common Gotchas section** added to the nav-writing guide, covering six
+  failures agents hit regularly (hint delimiter misuse, commas in about
+  fields, hand-editing `s;n` counts, etc.).
+- **Design spec updated**: `>` added to reserved characters in nav block field
+  values (S3.6); hint preservation rules clarified (S3.8, S5.5).
+- **Agent template clarified**: `>` is documented as the hint delimiter;
+  commit workflow now includes `agentmap check` step.
+
 ## [v0.2.0] — Nav block reliability and update improvements — 2026-04-26
 
 This release hardens the `update` command and the nav block pipeline.
