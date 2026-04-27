@@ -1,7 +1,32 @@
+<!-- AGENT:NAV
+purpose:~agentmap;nav;run;agent;files;update;file;block
+lines:238
+nav[18]{s,n,name,about}:
+48,191,#AGENTS.md,~agentmap;run;nav;agent;files
+52,9,##Defaults,~task;act;approaches;beads;blocked
+61,7,##Documentation First,~agentmap;design;block;cli;commands
+68,23,##Fast Path,~agent;run;scripts;build;lint
+91,6,##Benchmarks,~benchmarks;bench;run;baseline;comparison
+97,11,##Debugging,~file;found;generate;agentmap;authentication
+108,14,##Project Structure,~parser;agent;agentmap;markdown;nav
+122,11,##Conventions,~files;always;check;file;never
+133,12,##Key Design Constraints,~nav;files;block;agentmap;blocks
+145,12,##Reading Markdown Files,~nav;read;agent;agentmap;file
+157,13,##Before Committing Markdown Changes,~agentmap;nav;changed;update;block
+170,4,##Writing Nav Descriptions,~writing;agentmap;descriptions;fields;full
+174,7,##Before Committing Markdown Changes,~agentmap;run;committing;markdown;path
+181,13,##Commit Messages,~feat;generated;add;beads;begin
+194,19,##Beads Issue Tracker,~issue;work;beads;claim;close
+198,9,###Quick Reference,~work;claim;available;bash;close
+207,6,###Rules,~close;command;detailed;files;issues
+213,26,##Session Completion,~push;work;git;complete;session
+-->
+
 <!-- agentmap:index -->
 <!-- AGENT:NAV
 purpose:project file index for agentmap
-files[11]{path,lines,about}:
+files[12]{path,lines,about}:
+agentmap-design.md,1010,nav;block;file;agent;line;token;entries;lines
 testdata/
 code-fences.md,23,heading;code;content;real;another;blocks;fence;file
 design-clean.md,883,nav;block;line;file;agent;token;files;markdown
@@ -109,7 +134,7 @@ testdata/           -- sample markdown files for tests
 
 - No commas in nav block field values (`about`; `why`; `purpose`; subsection hints) -- use semicolons as separators
 - No quoting or escaping in nav blocks
-- `update` never writes descriptions -- only refreshes line numbers; delegates to `generate` for files with no nav block
+- `update` auto-fills empty `about` fields with `~keyword` descriptions; never overwrites human-written (non-`~`) descriptions; refreshes line numbers; delegates to `generate` for files with no nav block
 - `check` never modifies files -- only validates
 - `generate` skips files that already have a nav block by default; use `--force` to overwrite
 - Nav entries capped at ~20 (`max_nav_entries`); `max_depth` and `sub/expand_threshold` are heuristics toward that budget

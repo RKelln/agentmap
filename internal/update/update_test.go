@@ -563,8 +563,8 @@ Content.
 	}
 
 	for _, entry := range block.Nav {
-		if entry.Name == "##Section" && entry.About != "" {
-			t.Errorf("empty description should remain empty, got %q", entry.About)
+		if entry.Name == "##Section" && !strings.HasPrefix(entry.About, "~") {
+			t.Errorf("empty description should be auto-filled with ~keywords, got %q", entry.About)
 		}
 	}
 }

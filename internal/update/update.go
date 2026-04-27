@@ -496,11 +496,19 @@ func buildUpdatedBlock(oldBlock navblock.NavBlock, sections []parser.Section, _ 
 		oldEntry, found := sectionToEntry[i]
 
 		if found {
+			about := oldEntry.About
+			// Fill empty About fields with auto-generated keywords so that entries
+			// which were never described (or were created by an older generate run)
+			// get ~keyword descriptions. Human-written abouts (no ~ prefix) are
+			// never touched.
+			if about == "" {
+				about = generate.BuildAboutFromLines(lines, s.Start, s.Start+s.Len()-1)
+			}
 			newNav = append(newNav, navblock.NavEntry{
 				Start:     s.Start,
 				N:         s.Len(),
 				Name:      prefix + navblock.NormalizeHeading(s.Text),
-				About:     oldEntry.About,
+				About:     about,
 				WordCount: wc,
 			})
 		} else {

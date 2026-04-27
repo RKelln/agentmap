@@ -1,3 +1,34 @@
+<!-- AGENT:NAV
+purpose:~nav;block;file;agent;line;token;entries;lines
+lines:1010
+nav[25]{s,n,name,about}:
+32,979,#agentmap: Navigation Maps for AI Agents,~nav;block;file;agent;line
+62,6,##Design Document v0.1,~design;complete;document;implementation;ready
+68,12,##1. Problem,~file;line;tokens;files;markdown
+80,10,##2. Solution,~agents;block;file;read;files
+90,178,##3. Format Specification,~nav;entries;lines;block;token
+92,13,###3.1 Nav Block Structure,~description;nav;path;agent;block
+105,33,###3.2 Field Definitions,~line;file;block;number;agent
+138,21,###3.3 Heading Depth Convention,~depth;token;entries;heading;markdown
+159,35,###3.4 Complete Example,~token;lifecycle;lines;authentication;revocation
+194,6,###3.5 Placement Rules,~nav;block;frontmatter;lines;agents
+200,7,###3.6 Constraints,~field;block;comma;nav;descriptions
+207,12,###3.7 Purpose-Only Block,~purpose;agent;block;file;line
+219,49,###3.8 Subsection Hints,~entry;hints;entries;full;subsection
+268,119,##4. CLI Commands,~nav;block;file;headings;threshold>4.3 `agentmap check [path]`;4.1 `agentmap generate [path]`;4.2 `agentmap update [path]`
+387,87,##5. Description Authoring,~descriptions;agent;token;description;nav>5.5 Description Preservation Rules;5.1 Tier 0: Empty;5.4 Tier 3: LLM-Generated;5.3 Tier 2: Agent-Written;5.2 Tier 1: Keyword Extraction
+474,46,##6. Git Integration,~git;agentmap;commit;update;check
+520,86,##7. Agent Workflow,~agent;nav;token;agentmap;read>7.3 Agent Skill;7.1 AGENTS.md Instructions;7.2 Detailed Agent Workflow
+606,53,##8. Parser Specification,~line;nav;heading;block;headings>8.3 Nav Block Writer;8.2 Nav Block Parser;8.1 Markdown Heading Parser
+659,28,##9. Keyword Extraction,~stopwords;extraction;keyword;markdown;tokens
+687,63,##10. Configuration,~entries;threshold;files;gitignore;file>10.3 Defaults;10.2 File Discovery and Ignore Rules;10.1 Config File
+750,78,##11. Edge Cases,~nav;depth;block;entries;headings>11.1 Duplicate Headings;11.5 Files Without Headings;11.6 Nav Block Corruption;11.2 Headings with Special Characters;11.4 Very Large Files;11.3 Empty Sections and Heading Clusters
+828,45,##12. Implementation Notes,~git;markdown;parser;tests;integration
+873,42,##13. Future Work,~file;files;markdown;nav;docs
+915,39,##Appendix A: Token Budget Analysis,~token;nav;tokens;000;block
+954,57,##Appendix B: Design Decisions and Rationale,~nav;hints;block;subsection;agent>Why HTML comments not YAML frontmatter?;Why `#` for heading depth instead of indentation or relative markers?;Why no quoting or escaping?;Why `check` in the hook not `update`?;Why git diff for change detection not stored hashes?;Why `>` subsection hints instead of always expanding?
+-->
+
 # agentmap: Navigation Maps for AI Agents
 
 <!-- AGENT:NAV
@@ -435,9 +466,9 @@ This requires LLM configuration (API key, model selection). It's optional and ne
 ### 5.5 Description Preservation Rules
 
 - `generate` writes descriptions (overwrites existing).
-- `update` never writes descriptions. Never. It only modifies `s,n` values and `[N]` counts.
+- `update` never overwrites human-written descriptions (those without the `~` prefix). It does auto-fill `about` fields that are empty with `~keyword` descriptions, the same way `generate` would. `s,n` values and `[N]` counts are always refreshed.
 - `check` never writes anything.
-- Descriptions are anchored to heading text. If a heading is renamed, the old description is lost and the new heading gets an empty description.
+- Descriptions are anchored to heading text. If a heading is renamed, the old description is lost and the new heading gets an empty description (which `update` will auto-fill with `~keywords`).
 - The `~` prefix survives `update` unchanged since update preserves descriptions as-is.
 
 ## 6. Git Integration
