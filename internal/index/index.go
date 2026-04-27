@@ -377,6 +377,14 @@ func BuildIndex(root string, cfg config.Config, dryRun, force bool) (Result, err
 			return Result{}, fmt.Errorf("index: write task list: %w", err)
 		}
 		result.TaskPath = taskPath
+	} else if !dryRun {
+		// No tasks: remove stale task list and next-state so excluded
+		// files don't leak into future `agentmap next` runs.
+		agentmapDir := filepath.Join(root, ".agentmap")
+		taskPath := filepath.Join(agentmapDir, "index-tasks.md")
+		statePath := filepath.Join(agentmapDir, "next-state")
+		_ = os.Remove(taskPath)
+		_ = os.Remove(statePath)
 	}
 
 	return result, nil

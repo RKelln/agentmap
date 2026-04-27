@@ -540,7 +540,8 @@ Use --count N to emit prompts for N consecutive unchecked files.`,
 			}
 			taskListPath, err = next.FindTaskList(cwd)
 			if err != nil {
-				return err
+				fmt.Println("All files reviewed — no tasks remaining.")
+				return nil
 			}
 		}
 
