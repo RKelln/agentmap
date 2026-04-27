@@ -8,7 +8,8 @@ read a files first 50 lines then use AGENT:NAV to target reads.
 
 - If purpose does not match your task stop reading.
 - Use s;n ranges: Read(offset=s; limit=n).
-- `>` is a hint for subsections that are not listed directly in the nav.
+- `>` is a hint delimiter: text after `>` lists subsections not directly in the nav. Do not use `>` in about/purpose prose.
+- **Use the nav block instead of grep.** When you need a specific section; read the nav block's s;n offsets directly — no search required. Grep costs a tool-call round-trip; the nav block costs zero.
 
 ## After Editing or Creating Markdown Files
 
@@ -16,4 +17,5 @@ read a files first 50 lines then use AGENT:NAV to target reads.
 1. Run: `agentmap update <changed files>` — refreshes line numbers; adds nav blocks to new files; flags auto-generated descriptions
 2. For entries with "(auto-generated; needs review)" — rewrite the description in the nav block to remove the `~` prefix
 3. Run: `agentmap update <files>` again — syncs AGENTMAP.md index with your descriptions
-4. Commit
+4. Run: `agentmap check <files>` — validates nav blocks are in sync before committing
+5. Commit

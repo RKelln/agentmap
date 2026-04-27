@@ -84,6 +84,8 @@ relative/path.md,linked file purpose relative to this file
 
 **Order is strict:** `purpose` first, then `nav[...]` and its entries, then optional `see[...]` and its entries, then closing `-->`.
 
+**Reserved characters:** commas are prohibited in all field values (use semicolons). `>` is reserved as the subsection-hint delimiter — it cannot appear in `about` or `purpose` text.
+
 ---
 
 ## 1. Before You Write
@@ -238,7 +240,8 @@ The bad-trim example removed meaning to hit a word count — `phase-1` tells the
 - 1-2 words per hint; no commas (use hyphens for compound terms).
 - Each hint must be a short label that distinguishes the subsection from its siblings — not a number, not a copy of the full heading, not a sentence fragment.
 - The description before `>` must still pass the anti-restatement rule on its own.
-- `agentmap update` preserves the full `about` value (description and hints) unchanged.
+- `agentmap update` preserves human-written `about` values (no `~` prefix) unchanged — description and hints. Auto-generated abouts (`~`-prefixed) may have their hints regenerated during entry pruning to prevent duplication.
+- The `>` character is **reserved** as the hint delimiter. It cannot appear in the description text. `"> suffix for..."` will be parsed as an empty description with prose after `>` interpreted as hints — do not start a description with `>` or use it in prose.
 
 ---
 
@@ -289,7 +292,63 @@ Do not remove `~` from a description you haven't actually improved — that defe
 
 ---
 
-## 7. Quality Checklist
+## 7. Common Gotchas
+
+Agents (and humans) hit these regularly. Internalize them once; save rounds of debugging.
+
+### `>` silently eats your description
+
+The `>` character is the hint delimiter — **any `>` in `about` or `purpose` text is parsed as the start of subsection hints**, not as prose.
+
+```
+Bad:  > suffix for unrepresented subsections; three-tier threshold logic
+      ↑ this is parsed as an empty description with prose-mistaken-as-hints
+
+Good: hint separator and subsection suffix; three-tier threshold logic
+      ↑ no `>` in the description; hints appended by agentmap after it
+```
+
+If you need to say "greater than" or use `>` as notation, rephrase. If `agentmap check` warns about `">' followed by space"`, you've hit this — rewrite the description.
+
+### Using grep/search instead of the nav block
+
+The nav block gives you exact `s,n` line ranges. Use them:
+
+```
+Bad:  grep for "### 3.6 Constraints" → read the file
+Good: nav says 170,7 → Read(offset=170, limit=7)
+```
+
+The nav block is the map; grep is asking for directions from a stranger. Read the first 50 lines of any markdown file, get the nav block, then jump directly.
+
+### Hand-editing `s,n` values
+
+Never edit line numbers or `nav[N]` / `see[N]` counts by hand. They're managed by `agentmap update`. Hand-editing produces stale offsets that look correct but are silently wrong.
+
+### Forgetting to remove `~`
+
+After rewriting a description, remove the `~` prefix. If you leave it, `agentmap check` warns the file is unreviewed, and the index task list never marks the file done. Only remove `~` after writing a real description.
+
+### Forgetting to run `agentmap check` before committing
+
+`agentmap update` refreshes numbers; `agentmap check` validates. Run both before committing:
+
+```
+agentmap update <files>
+# rewrite ~ descriptions
+agentmap update <files>    # refresh line numbers
+agentmap check <files>     # validate before commit
+```
+
+If check fails, the message tells you which files and what went wrong — run `agentmap update` on those files and check again.
+
+### Vertigo from the "new" entries in `update` output
+
+When you write a nav block with `>hints`, `agentmap update` may show subsections as "new" at first — but if they were collapsed back into hints by PruneNavEntries, they won't appear in the final report. If you see "new" entries that disappear on the next `update`, they were hinted — no action needed.
+
+---
+
+## 8. Quality Checklist
 
 Before committing a description, check:
 

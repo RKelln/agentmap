@@ -1,67 +1,37 @@
 <!-- AGENT:NAV
-purpose:~nav;block;file;agent;line;token;entries;lines
-lines:1010
+purpose:CLI tool for AI agent navigation in markdown docs; nav block format spec; commands; agent workflow
+lines:982
 nav[25]{s,n,name,about}:
-32,979,#agentmap: Navigation Maps for AI Agents,~nav;block;file;agent;line
-62,6,##Design Document v0.1,~design;complete;document;implementation;ready
-68,12,##1. Problem,~file;line;tokens;files;markdown
-80,10,##2. Solution,~agents;block;file;read;files
-90,178,##3. Format Specification,~nav;entries;lines;block;token
-92,13,###3.1 Nav Block Structure,~description;nav;path;agent;block
-105,33,###3.2 Field Definitions,~line;file;block;number;agent
-138,21,###3.3 Heading Depth Convention,~depth;token;entries;heading;markdown
-159,35,###3.4 Complete Example,~token;lifecycle;lines;authentication;revocation
-194,6,###3.5 Placement Rules,~nav;block;frontmatter;lines;agents
-200,7,###3.6 Constraints,~field;block;comma;nav;descriptions
-207,12,###3.7 Purpose-Only Block,~purpose;agent;block;file;line
-219,49,###3.8 Subsection Hints,~entry;hints;entries;full;subsection
-268,119,##4. CLI Commands,~nav;block;file;headings;threshold>4.3 `agentmap check [path]`;4.1 `agentmap generate [path]`;4.2 `agentmap update [path]`
-387,87,##5. Description Authoring,~descriptions;agent;token;description;nav>5.5 Description Preservation Rules;5.1 Tier 0: Empty;5.4 Tier 3: LLM-Generated;5.3 Tier 2: Agent-Written;5.2 Tier 1: Keyword Extraction
-474,46,##6. Git Integration,~git;agentmap;commit;update;check
-520,86,##7. Agent Workflow,~agent;nav;token;agentmap;read>7.3 Agent Skill;7.1 AGENTS.md Instructions;7.2 Detailed Agent Workflow
-606,53,##8. Parser Specification,~line;nav;heading;block;headings>8.3 Nav Block Writer;8.2 Nav Block Parser;8.1 Markdown Heading Parser
-659,28,##9. Keyword Extraction,~stopwords;extraction;keyword;markdown;tokens
-687,63,##10. Configuration,~entries;threshold;files;gitignore;file>10.3 Defaults;10.2 File Discovery and Ignore Rules;10.1 Config File
-750,78,##11. Edge Cases,~nav;depth;block;entries;headings>11.1 Duplicate Headings;11.5 Files Without Headings;11.6 Nav Block Corruption;11.2 Headings with Special Characters;11.4 Very Large Files;11.3 Empty Sections and Heading Clusters
-828,45,##12. Implementation Notes,~git;markdown;parser;tests;integration
-873,42,##13. Future Work,~file;files;markdown;nav;docs
-915,39,##Appendix A: Token Budget Analysis,~token;nav;tokens;000;block
-954,57,##Appendix B: Design Decisions and Rationale,~nav;hints;block;subsection;agent>Why HTML comments not YAML frontmatter?;Why `#` for heading depth instead of indentation or relative markers?;Why no quoting or escaping?;Why `check` in the hook not `update`?;Why git diff for change detection not stored hashes?;Why `>` subsection hints instead of always expanding?
+32,951,#agentmap: Navigation Maps for AI Agents,compact nav block with line ranges; section index; cross-file references
+34,4,##Design Document v0.1,status: design complete; ready for implementation
+38,12,##1. Problem,AI agents waste tokens reading full markdown files to find sections
+50,10,##2. Solution,compact nav block at file top with s;n line ranges for targeted reads
+60,179,##3. Format Specification,AGENT:NAV block structure; fields; depth; constraints; examples
+62,13,###3.1 Nav Block Structure,HTML comment wrapper; purpose; nav; see block layout
+75,33,###3.2 Field Definitions,purpose; nav entries (s;n;name;about); optional see block
+108,21,###3.3 Heading Depth Convention,# count mirrors markdown depth; absolute hierarchy
+129,35,###3.4 Complete Example,full nav block with three-tier demo; subsection hints
+164,6,###3.5 Placement Rules,after frontmatter; before first heading; 40-line budget
+170,8,###3.6 Constraints,no commas in field values; no quoting; descriptions optional
+178,12,###3.7 Purpose-Only Block,minimal purpose-only block for files under min_lines
+190,49,###3.8 Subsection Hints,subsection and hint separator suffix; three-tier threshold logic
+239,119,##4. CLI Commands,command reference: generate; update; check — flags and behavior>generate;update;check
+358,88,##5. Description Authoring,tiered: keyword extraction; agent-written; LLM-generated>tier0-empty;tier1-keywords;tier2-agent;tier3-llm;preservation
+446,46,##6. Git Integration,git diff change detection; pre-commit hook setup
+492,86,##7. Agent Workflow,AGENTS.md instructions; reading and editing flows>instructions;workflow;skill
+578,53,##8. Parser Specification,heading parser; nav block parser and writer specs>heading-parser;block-parser;block-writer
+631,28,##9. Keyword Extraction,offline TF-IDF; stopword filtering; purpose generation
+659,63,##10. Configuration,agentmap.yml; file discovery; ignore rules; defaults>config-file;discovery;defaults
+722,78,##11. Edge Cases,duplicate headings; special chars; empty sections; corruption>duplicates;special-chars;empty-sections;large-files;no-headings;corruption
+800,45,##12. Implementation Notes,project structure; testing strategy; performance targets
+845,42,##13. Future Work,out of scope: project index; see auto-population; staleness
+887,39,##Appendix A: Token Budget Analysis,token cost; savings per navigation; break-even math
+926,57,##Appendix B: Design Decisions and Rationale,rationale for key design choices made in the spec>html-vs-yaml;#-depth;no-escaping;check-vs-update;git-diff;subsection-hints
 -->
 
 # agentmap: Navigation Maps for AI Agents
 
-<!-- AGENT:NAV
-purpose:design spec for agentmap CLI tool; nav block format; commands; agent workflow
-nav[23]{s,n,name,about}:
-37,12,##1. Problem,agents waste tokens navigating markdown
-49,10,##2. Solution,compact nav block with line ranges at file top
-59,158,##3. Format Specification,block structure; fields; depth; constraints; examples
-61,13,###3.1 Nav Block Structure,HTML comment wrapper; field layout
-74,28,###3.2 Field Definitions,purpose; nav header; entries; see block
-102,21,###3.3 Heading Depth Convention,# count mirrors markdown; absolute depth
-123,35,###3.4 Complete Example,full nav block with three-tier demo
-158,7,###3.5 Placement Rules,after frontmatter; first 40 lines; 40-line budget rationale
-164,7,###3.6 Constraints,no commas; no escaping; descriptions optional
-171,12,###3.7 Purpose-Only Block,minimal block for small files
-183,34,###3.8 Subsection Hints,> suffix; three-tier threshold logic
-217,114,##4. CLI Commands,command behavior and flags>generate;update;check
-331,64,##5. Description Authoring,tiered: empty; keywords; agent-written; LLM>empty;keywords;agent-written;LLM;preservation
-395,46,##6. Git Integration,change detection via diff; pre-commit hook setup
-441,82,##7. Agent Workflow,AGENTS.md instructions; reading and editing flows>instructions;workflow;skill
-523,52,##8. Parser Specification,heading parser; nav block parser/writer rules>heading-parser;block-parser;block-writer
-575,28,##9. Keyword Extraction (Tier 1),offline TF-IDF; stopwords; purpose generation
-603,60,##10. Configuration,agentmap.yml; file discovery; ignore rules; defaults>config-file;discovery;defaults
-663,33,##11. Edge Cases,duplicates; special chars; empty sections; corruption
-696,45,##12. Implementation Notes,Python project structure; testing; performance
-741,42,##13. Future Work (Out of Scope for v0.1),project index; cross-file see; staleness
-783,40,##Appendix A: Token Budget Analysis,token cost; savings per navigation; break-even math
-823,55,##Appendix B: Design Decisions and Rationale,HTML comments; # depth; no escaping; check in hook>HTML-comments;#-depth;no-escaping;check-in-hook;git-diff;subsection-hints
--->
-
 ## Design Document v0.1
-
-### Status: Design complete, ready for implementation
 
 ---
 
@@ -200,6 +170,7 @@ This example shows all three tiers from section 3.8:
 ### 3.6 Constraints
 
 - **No commas in nav block field values** — this applies to `about`, `why`, `purpose`, and subsection hints (the `>` suffix). These fields are parsed as CSV; a comma would be treated as a field delimiter and corrupt the entry. Use **semicolons** as the preferred separator — they read naturally in both lists ("rotation; expiry; revocation") and descriptions ("silent rotation and expiry detection"). The generator should warn (not error) if a nav field contains a comma. This constraint is scoped to nav block fields only; regular markdown content, headings, body text, and code examples are unaffected.
+- **No `>` in description text** — the `>` character is reserved as the subsection-hint delimiter. Any `>` appearing in `about` or `purpose` is parsed as the start of a hint suffix; any text before it is the description and any text after is the semicolon-separated hint list. This means `>` must not appear in description prose (e.g. `"> suffix for..."` is not valid — the `>` will be interpreted as a hint delimiter, leaving the description empty).
 - **No quoting or escaping.** Simplicity over flexibility. The comma restriction eliminates the need for any escape mechanism.
 - **Descriptions are optional.** A new or ungenerated entry may have an empty `about` field: `12,45,#Authentication,`
 - **`see` block is optional.** Omit it entirely (not `see[0]:`) if there are no related files.
@@ -262,7 +233,7 @@ the description and the hints have been reviewed.
 - No commas in subsection names (same constraint as `about`).
 - Subsection names should be 1-2 words — abbreviate to the most useful label.
 - One hint per subsection that has no nav entry of its own — count matches the unrepresented subsections.
-- `agentmap update` preserves the full `about` value (description and hints) unchanged.
+- `agentmap update` preserves human-written `about` values (those without a `~` prefix) unchanged — neither the description nor any existing hints are modified. Auto-generated abouts (`~`-prefixed) may have their `>hints` suffix regenerated during entry pruning (see §11.4) to prevent duplicate hints from accumulating across repeated updates.
 - If a section has no unrepresented subsections, no `>` suffix appears.
 
 ## 4. CLI Commands
@@ -467,6 +438,7 @@ This requires LLM configuration (API key, model selection). It's optional and ne
 
 - `generate` writes descriptions (overwrites existing).
 - `update` never overwrites human-written descriptions (those without the `~` prefix). It does auto-fill `about` fields that are empty with `~keyword` descriptions, the same way `generate` would. `s,n` values and `[N]` counts are always refreshed.
+- `update` never appends subsection hints (`>...`) to human-written abouts. Hints are only auto-managed for auto-generated (`~`-prefixed) abouts.
 - `check` never writes anything.
 - Descriptions are anchored to heading text. If a heading is renamed, the old description is lost and the new heading gets an empty description (which `update` will auto-fill with `~keywords`).
 - The `~` prefix survives `update` unchanged since update preserves descriptions as-is.

@@ -26,7 +26,7 @@ nav[18]{s,n,name,about}:
 <!-- AGENT:NAV
 purpose:project file index for agentmap
 files[12]{path,lines,about}:
-agentmap-design.md,1010,nav;block;file;agent;line;token;entries;lines
+agentmap-design.md,982,CLI tool for AI agent navigation in markdown docs; nav block format spec; commands; agent workflow
 testdata/
 code-fences.md,23,heading;code;content;real;another;blocks;fence;file
 design-clean.md,883,nav;block;line;file;agent;token;files;markdown
