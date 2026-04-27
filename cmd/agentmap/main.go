@@ -582,8 +582,8 @@ Use --count N to emit prompts for N consecutive unchecked files.`,
 func init() {
 	// generate flags
 	generateCmd.Flags().Int("min-lines", 50, "Minimum file size for full nav block")
-	generateCmd.Flags().Int("sub-threshold", 50, "Minimum section size for subsection info")
-	generateCmd.Flags().Int("expand-threshold", 150, "Section size for full h3 entries")
+	generateCmd.Flags().Int("sub-threshold", 50, "Pruning threshold: sections under this size lose subsection info when max_nav_entries is exceeded")
+	generateCmd.Flags().Int("expand-threshold", 150, "Pruning threshold: sections over this size become unkillable full entries when max_nav_entries is exceeded")
 	generateCmd.Flags().Bool("dry-run", false, "Print without writing files")
 	generateCmd.Flags().BoolP("force", "f", false, "Overwrite existing nav blocks")
 	generateCmd.Flags().StringP("output", "o", "", "Write output to file instead of modifying source")
