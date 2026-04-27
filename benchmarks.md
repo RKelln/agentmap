@@ -1,3 +1,16 @@
+<!-- AGENT:NAV
+purpose:agentmap benchmark results; file processing throughput; keyword extraction
+lines:66
+nav[7]{s,n,name,about}:
+14,53,#Benchmarks,x86_64 Linux baseline; April 2026; file-level and keyword benchmarks
+18,7,##Commands,commands to reproduce benchmark results locally
+25,37,##Results,throughput and keyword extraction benchmark data
+27,11,###File-level throughput,ms per file; synthetic and real doc fixtures
+38,11,###Keyword helpers,text-level keyword extraction; not full files
+49,13,###Raw benchmark data,go test -bench output for copy-paste comparison
+62,5,##Notes,append new benchmarks; never edit existing data by hand
+-->
+
 # Benchmarks
 
 Baseline captured on 2026-04-01 on `x86_64` / `Linux 6.17.0-19-generic`.

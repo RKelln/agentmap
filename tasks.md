@@ -1,3 +1,26 @@
+<!-- AGENT:NAV
+purpose:implementation task list; vertical slice phases; generate update check index init
+lines:521
+nav[17]{s,n,name,about}:
+24,498,#agentmap Implementation Tasks,vertical slice breakdown; each phase delivers working CLI command
+28,30,##Phase 1: `generate` -- Headings to Nav Block,headings to nav block parser; code-fence aware
+58,19,##Phase 2: `generate` -- Keyword Descriptions,TF-IDF keyword extraction for auto-generated descriptions
+77,24,##Phase 3: `update` -- Line Number Refresh,refreshes line numbers; flags changed and new sections
+101,17,##Phase 4: `check` -- Validation,validates nav block sync with headings; exit codes for CI
+118,18,##Phase 5: Configuration + File Discovery,agentmap.yml loader; git-aware markdown file discovery
+136,14,##Phase 6: Polish + Pre-Commit Hook,error messages; progress output; pre-commit integration
+150,372,##Phase 7: Distribution + Agent Onboarding,distribution pipeline; agent tool onboarding instructions
+154,19,###7.1 GoReleaser + Release Workflow,multi-platform builds; Homebrew and Scoop formula push
+173,39,###7.2 Install Scripts -- Curl + PowerShell Installers,curl and PowerShell one-liners; platform detection
+212,15,###7.3 `agentmap upgrade` -- Self-Update Command,binary self-update from GitHub Releases checksums
+227,116,###7.4 `agentmap init` -- Project Onboarding,init command; project setup; AGENTS.md injection
+343,43,###7.5 Agent Skill Files,embedded agent skill templates; written by init
+386,14,###7.6 README Agent Section,add agent usage section to project README
+400,23,###7.7 Package Manager Support,Homebrew formula and Scoop manifest generation
+423,54,###7.8 `agentmap uninit` + `agentmap uninstall` -- Clean Removal,uninit removes project config; uninstall removes binary
+477,45,###7.9 GitHub Action -- `agentmap-check` Reusable Action,reusable GitHub Action for CI nav block validation
+-->
+
 # agentmap Implementation Tasks
 
 Vertical slices -- each phase delivers a working CLI command with tests.

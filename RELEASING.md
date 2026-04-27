@@ -1,3 +1,23 @@
+<!-- AGENT:NAV
+purpose:GoReleaser release pipeline; agentic and manual workflows; install and upgrade
+lines:246
+nav[14]{s,n,name,about}:
+21,226,#Releasing agentmap,release workflow overview; GoReleaser; agentic; manual; install; upgrade
+27,12,##Agentic release,release via /release slash command in OpenCode
+39,36,##Prerequisites,one-time GitHub repo and PAT secret setup; Homebrew tap; Scoop bucket
+75,20,##Manual release,git tag and push fallback when agentic flow unavailable
+95,21,##What GoReleaser does on tag push,multi-platform builds; archives; checksums; Homebrew and Scoop publishing
+116,12,##Verifying locally,goreleaser config validation without pushing a tag
+128,61,##Testing a release,pre-release smoke tests; four verification levels
+132,21,###1. Binary smoke test,compiled binary smoke test against real testdata; no extra tools
+153,11,###2. GoReleaser snapshot,full goreleaser pipeline locally without publishing; all platforms
+164,12,###3. Install script smoke test,install script end-to-end test in Docker container
+176,13,###4. Pre-release tag,push release candidate to verify full workflow before final tag
+189,20,##Installing from a release,Homebrew; Scoop; shell script; PowerShell; go install
+209,29,##Upgrade path,self-update behaviour; binary replacement; no migrations
+238,9,##Changelog,auto-generated from conventional commits on release
+-->
+
 # Releasing agentmap
 
 How to cut a release. GoReleaser handles builds, archives, checksums, GitHub
