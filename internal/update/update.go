@@ -216,7 +216,7 @@ func File(path string, cfg config.Config, dryRun, quiet bool, changedLines ...[]
 		if dryRun {
 			return fmt.Sprintf("Updated: %s\n  lines-updated: %d -> %d", path, oldLinesCount, totalLines), nil
 		}
-		newContent := insertNavBlock(string(content), blockText)
+		newContent := navblock.InsertNavBlock(string(content), blockText)
 		if err := os.WriteFile(path, []byte(newContent), 0o644); err != nil {
 			return "", fmt.Errorf("update: write file: %w", err)
 		}
@@ -240,7 +240,7 @@ func File(path string, cfg config.Config, dryRun, quiet bool, changedLines ...[]
 		if dryRun {
 			return fmt.Sprintf("Updated: %s\n  lines-updated: %d -> %d", path, oldLinesCount, totalLines), nil
 		}
-		newContent := insertNavBlock(string(content), blockText)
+		newContent := navblock.InsertNavBlock(string(content), blockText)
 		if err := os.WriteFile(path, []byte(newContent), 0o644); err != nil {
 			return "", fmt.Errorf("update: write file: %w", err)
 		}
@@ -294,7 +294,7 @@ func File(path string, cfg config.Config, dryRun, quiet bool, changedLines ...[]
 		return formatReport(path, entryReports), nil
 	}
 
-	newContent := insertNavBlock(string(content), blockText)
+	newContent := navblock.InsertNavBlock(string(content), blockText)
 	if err := os.WriteFile(path, []byte(newContent), 0o644); err != nil {
 		return "", fmt.Errorf("update: write file: %w", err)
 	}
@@ -564,98 +564,4 @@ func formatReport(path string, reports []ReportEntry) string {
 	}
 
 	return strings.TrimSpace(b.String())
-}
-
-const (
-	navBlockEnd = "-->"
-)
-
-func insertNavBlock(content, blockText string) string {
-	lines := strings.Split(content, "\n")
-
-	blockStart := -1
-	blockEnd := -1
-	inFence := false
-	for i, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "```") || strings.HasPrefix(trimmed, "~~~") {
-			inFence = !inFence
-			continue
-		}
-		if inFence {
-			continue
-		}
-		if strings.Contains(line, "<!-- AGENT:NAV") {
-			blockStart = i
-		}
-		if blockStart >= 0 && trimmed == navBlockEnd {
-			blockEnd = i
-			break
-		}
-	}
-
-	if blockStart >= 0 && blockEnd >= 0 {
-		before := strings.Join(lines[:blockStart], "\n")
-		after := ""
-		if blockEnd+1 < len(lines) {
-			after = strings.Join(lines[blockEnd+1:], "\n")
-		}
-		sep := ""
-		if before != "" {
-			sep = "\n"
-		}
-		result := before + sep + blockText + "\n" + after
-		return cleanBlankLines(result)
-	}
-
-	if fmEnd, _ := navblock.FindFrontmatterEnd(lines); fmEnd >= 0 {
-		before := strings.Join(lines[:fmEnd+1], "\n")
-		after := strings.Join(lines[fmEnd+1:], "\n")
-		result := before + "\n" + blockText + "\n" + after
-		return cleanBlankLines(result)
-	}
-
-	result := blockText + "\n" + content
-	return cleanBlankLines(result)
-}
-
-func cleanBlankLines(content string) string {
-	lines := strings.Split(content, "\n")
-
-	navEnd := -1
-	for i, line := range lines {
-		if strings.TrimSpace(line) == navBlockEnd {
-			navEnd = i
-			break
-		}
-	}
-
-	if navEnd < 0 {
-		return content
-	}
-
-	blankCount := 0
-	for i := navEnd + 1; i < len(lines); i++ {
-		if strings.TrimSpace(lines[i]) == "" {
-			blankCount++
-		} else {
-			break
-		}
-	}
-
-	if blankCount == 0 {
-		newLines := make([]string, 0, len(lines)+1)
-		newLines = append(newLines, lines[:navEnd+1]...)
-		newLines = append(newLines, "")
-		newLines = append(newLines, lines[navEnd+1:]...)
-		return strings.Join(newLines, "\n")
-	} else if blankCount > 1 {
-		newLines := make([]string, 0, len(lines)-blankCount+1)
-		newLines = append(newLines, lines[:navEnd+1]...)
-		newLines = append(newLines, "")
-		newLines = append(newLines, lines[navEnd+1+blankCount:]...)
-		return strings.Join(newLines, "\n")
-	}
-
-	return content
 }

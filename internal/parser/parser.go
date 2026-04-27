@@ -5,6 +5,8 @@ import (
 	"bufio"
 	"fmt"
 	"strings"
+
+	"github.com/RKelln/agentmap/internal/navblock"
 )
 
 // Heading represents a markdown heading (h1-h3) with its line number and text.
@@ -12,21 +14,6 @@ type Heading struct {
 	Line  int    // 1-indexed line number
 	Depth int    // 1 for #, 2 for ##, 3 for ###
 	Text  string // heading text without # prefix
-}
-
-// isFrontmatterClose reports whether a trimmed line closes YAML frontmatter.
-// It mirrors the logic in navblock.FindFrontmatterEnd.
-func isFrontmatterClose(trimmed string) (isClose, dirty bool) {
-	if !strings.HasPrefix(trimmed, "---") {
-		return false, false
-	}
-	if len(trimmed) == 3 {
-		return true, false
-	}
-	if trimmed[3] == '-' {
-		return false, false
-	}
-	return true, true
 }
 
 // ParseHeadings extracts h1-h3 headings from markdown content.
@@ -54,7 +41,7 @@ func ParseHeadings(content string, maxDepth int) ([]Heading, []string) {
 			for scanner.Scan() {
 				lineNum++
 				text := scanner.Text()
-				if isClose, dirty := isFrontmatterClose(strings.TrimSpace(text)); isClose {
+				if isClose, dirty := navblock.IsFrontmatterCloseLine(strings.TrimSpace(text)); isClose {
 					if dirty {
 						warnings = append(warnings, fmt.Sprintf("frontmatter close delimiter has trailing content: %q", text))
 					}
