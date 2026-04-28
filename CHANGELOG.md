@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.4.0] — Fuzzy search and headings listing — 2026-04-27
+
+Two new discovery commands: `search` for fuzzy lookup across indexed markdown
+files, and `headings` for a quick project-wide table of contents.
+
+### Added
+- `agentmap search <query>`: token-based fuzzy matching across all indexed
+  markdown files. Handles word reordering, partial matches, and typos using
+  edit-ratio per token with a substring guard. Returns matching section content
+  with s,n offsets ready for targeted reads.
+- `agentmap headings`: dumps nav block entries from all indexed files with
+  dynamic column alignment. Faster than grep — you get curated `about`
+  descriptions, not raw heading strings.
+
 ## [v0.3.2] — Upgrade reliability fixes — 2026-04-27
 
 Patch release fixing two issues: a misleading upgrade message during the propagation
