@@ -76,22 +76,33 @@ func CheckOffTaskEntry(taskListPath, filePath, relPath string) error {
 	taskContent := string(taskData)
 
 	// Find the entry header for this file: "## relPath (" anywhere in the file.
-	// Use a forward-search to locate the entry, then find the first "- [ ]" after it.
 	entryHeader := "## " + relPath + " ("
 	entryIdx := strings.Index(taskContent, entryHeader)
 	if entryIdx < 0 {
 		return nil // entry not in task list
 	}
 
-	// Find the next "- [ ]" after the entry header.
-	after := taskContent[entryIdx:]
-	checkboxIdx := strings.Index(after, "- [ ]")
+	// Find the range belonging to this entry: from the entry header to the
+	// next "## " heading (or end of file). This prevents accidentally
+	// checking off the wrong entry's checkbox when this entry is already
+	// checked.
+	afterHeader := taskContent[entryIdx:]
+	nextHeader := strings.Index(afterHeader[len(entryHeader):], "\n## ")
+	var entryRange string
+	if nextHeader >= 0 {
+		entryRange = afterHeader[:len(entryHeader)+nextHeader]
+	} else {
+		entryRange = afterHeader
+	}
+
+	// Find "- [ ]" within this entry's range only.
+	checkboxIdx := strings.Index(entryRange, "- [ ]")
 	if checkboxIdx < 0 {
 		return nil // already checked or no checkbox found
 	}
 
-	// Replace the first "- [ ]" after the entry header with "- [x]".
-	newTask := taskContent[:entryIdx] + after[:checkboxIdx] + "- [x]" + after[checkboxIdx+5:]
+	// Replace the "- [ ]" within this entry with "- [x]".
+	newTask := taskContent[:entryIdx] + entryRange[:checkboxIdx] + "- [x]" + entryRange[checkboxIdx+5:] + taskContent[entryIdx+len(entryRange):]
 	if err := os.WriteFile(taskListPath, []byte(newTask), 0o644); err != nil {
 		return fmt.Errorf("check off: write task list: %w", err)
 	}

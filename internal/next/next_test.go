@@ -560,9 +560,12 @@ func TestFlushState_UnparseableNavBlock_WarnsAndSkips(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FlushState() error = %v", err)
 	}
-	// Should not block (no ~ to review).
-	if result.Blocked {
-		t.Errorf("expected not blocked for unparseable nav block")
+	// Unclosed nav block: should now be treated as corrupted and block progress.
+	if !result.Blocked {
+		t.Errorf("expected blocked for unparseable nav block")
+	}
+	if result.BlockedPath != authMD {
+		t.Errorf("BlockedPath = %q, want %q", result.BlockedPath, authMD)
 	}
 	// Task should NOT be checked off.
 	data, _ := os.ReadFile(taskListPath)

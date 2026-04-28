@@ -97,8 +97,7 @@ func FlushState(taskListPath, repoRoot string) (FlushResult, error) {
 		// Check if file still has ~ descriptions.
 		hasAuto, _, corrupted := hasRemainingAuto(absPath)
 		if corrupted {
-			fmt.Fprintf(os.Stderr, "warning: %s: nav block is corrupted — check manually\n", relPath)
-			continue
+			return FlushResult{Blocked: true, BlockedPath: relPath}, nil
 		}
 		if hasAuto {
 			return FlushResult{Blocked: true, BlockedPath: relPath}, nil
