@@ -171,6 +171,7 @@ var updateCmd = &cobra.Command{
 
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		quiet, _ := cmd.Flags().GetBool("quiet")
+		verbose, _ := cmd.Flags().GetBool("verbose")
 
 		var lastError error
 
@@ -182,17 +183,17 @@ var updateCmd = &cobra.Command{
 			}
 
 			if !info.IsDir() {
-				report, err := update.File(path, cfg, dryRun, quiet)
+				report, err := update.File(path, cfg, dryRun, quiet, verbose)
 				if err != nil {
 					lastError = err
 					continue
 				}
-				if !quiet && report != "" {
+				if !quiet && report != "" && report != "no-changes" {
 					fmt.Println(report)
 				}
 			} else {
 				repoRoot := findRepoDirRoot(path, cfgPath)
-				if err := update.Update(path, repoRoot, cfg, dryRun, quiet); err != nil {
+				if err := update.Update(path, repoRoot, cfg, dryRun, quiet, verbose); err != nil {
 					lastError = err
 					continue
 				}
@@ -601,8 +602,8 @@ Use --count N to emit prompts for N consecutive unchecked files.`,
 
 var searchCmd = &cobra.Command{
 	Use:   "search <query> [path]",
-	Short: "Fuzzy search headers across indexed markdown files",
-	Long:  "Search all agentmapped markdown files for heading text matching the query. Uses fuzzy token matching that handles word reordering, partial matches, and typos.\n\nReturns file path, heading, line range, match score, and section content for each match above the threshold.",
+	Short: "Fuzzy search headings to surface associated content across agentmapped files",
+	Long:  "Fuzzy match headings across agentmapped markdown files and return each match's section content. Uses token-based fuzzy matching that handles word reordering, partial matches, and typos.\n\nReturns file path, heading, line range, match score, and section content for each match above the threshold. Use --no-content to show only file paths and headings.",
 	Args:  cobra.RangeArgs(1, 2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		query := args[0]
@@ -806,6 +807,7 @@ func init() {
 	// update flags
 	updateCmd.Flags().Bool("quiet", false, "Suppress report output")
 	updateCmd.Flags().Bool("dry-run", false, "Print without writing files")
+	updateCmd.Flags().BoolP("verbose", "v", false, "Show unchanged files in output")
 
 	// check flags
 	checkCmd.Flags().Bool("warn-unreviewed", false, "Warn about auto-generated descriptions that haven't been reviewed")

@@ -170,6 +170,8 @@ Hook handling in `init`:
 | `agentmap check [path]` | Validate nav blocks are in sync |
 | `agentmap index [path]` | Bulk index files and generate task list |
 | `agentmap next` | Auto-update previous file, check it off, print prompt for the next |
+| `agentmap search <query> [path]` | Fuzzy search headings to surface associated content across agentmapped files |
+| `agentmap headings [path]` | Print all agentmapped files with purposes and nav entries |
 | `agentmap guide` | Print the nav writing guide |
 | `agentmap init [path]` | Configure your agent tool to use agentmap |
 | `agentmap uninit [path]` | Remove agentmap configuration injected by init |

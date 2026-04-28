@@ -84,7 +84,7 @@ Silent rotation and sliding-window expiry.
 	cfg := config.Defaults()
 	cfg.MaxDepth = 3
 
-	report, err := File(path, cfg, false, false)
+	report, err := File(path, cfg, false, false, false)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -145,7 +145,7 @@ Logout and forced invalidation.
 	cfg := config.Defaults()
 	cfg.MaxDepth = 3
 
-	report, err := File(path, cfg, false, false)
+	report, err := File(path, cfg, false, false, false)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -208,7 +208,7 @@ OAuth2 code-for-token flow.
 	cfg := config.Defaults()
 	cfg.MaxDepth = 3
 
-	report, err := File(path, cfg, false, false)
+	report, err := File(path, cfg, false, false, false)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -256,7 +256,7 @@ OAuth2 flow.
 	cfg := config.Defaults()
 	cfg.MinLines = 5
 
-	report, err := File(path, cfg, false, false)
+	report, err := File(path, cfg, false, false, false)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -291,7 +291,7 @@ Some helper utilities.
 
 	cfg := config.Defaults()
 
-	report, err := File(path, cfg, false, false)
+	report, err := File(path, cfg, false, false, false)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -324,7 +324,7 @@ Content here.
 	cfg := config.Defaults()
 	cfg.MaxDepth = 3
 
-	_, err := File(path, cfg, true, false)
+	_, err := File(path, cfg, true, false, false)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -362,7 +362,7 @@ Silent rotation.
 	cfg := config.Defaults()
 	cfg.MaxDepth = 3
 
-	_, err := File(path, cfg, false, false)
+	_, err := File(path, cfg, false, false, false)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -420,7 +420,7 @@ Content C.
 	cfg := config.Defaults()
 	cfg.MaxDepth = 3
 
-	report, err := File(path, cfg, false, false)
+	report, err := File(path, cfg, false, false, false)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -457,7 +457,7 @@ Second examples section.
 	cfg := config.Defaults()
 	cfg.MaxDepth = 3
 
-	report, err := File(path, cfg, false, false)
+	report, err := File(path, cfg, false, false, false)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -503,7 +503,7 @@ Content.
 	cfg := config.Defaults()
 	cfg.MaxDepth = 3
 
-	report, err := File(path, cfg, false, true)
+	report, err := File(path, cfg, false, true, false)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -547,7 +547,7 @@ Content.
 	cfg := config.Defaults()
 	cfg.MaxDepth = 3
 
-	report, err := File(path, cfg, false, false)
+	report, err := File(path, cfg, false, false, false)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -597,7 +597,7 @@ New content.
 	cfg := config.Defaults()
 	cfg.MaxDepth = 3
 
-	report, err := File(path, cfg, false, false)
+	report, err := File(path, cfg, false, false, false)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -654,7 +654,7 @@ Description here.
 	cfg := config.Defaults()
 	cfg.MaxDepth = 3
 
-	_, err := File(path, cfg, false, false)
+	_, err := File(path, cfg, false, false, false)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -704,7 +704,7 @@ Description here.
 	cfg := config.Defaults()
 	cfg.MaxDepth = 3
 
-	_, err := File(path, cfg, false, false)
+	_, err := File(path, cfg, false, false, false)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -744,7 +744,7 @@ Content.
 	cfg := config.Defaults()
 	cfg.MaxDepth = 3
 
-	report, err := File(path, cfg, false, false)
+	report, err := File(path, cfg, false, false, false)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -797,7 +797,7 @@ OAuth2 code-for-token flow.
 	cfg := config.Defaults()
 	cfg.MaxDepth = 3
 
-	report, err := File(path, cfg, false, false)
+	report, err := File(path, cfg, false, false, false)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -855,7 +855,7 @@ func TestFile_TotalLinesOffByOne(t *testing.T) {
 	cfg := config.Defaults()
 	cfg.MaxDepth = 3
 
-	report, err := File(path, cfg, false, false)
+	report, err := File(path, cfg, false, false, false)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -902,7 +902,7 @@ func TestFile_NewH3IncludedAndPruned(t *testing.T) {
 	cfg.ExpandThreshold = 150
 	cfg.MaxNavEntries = 20 // well above 7 total sections → no pruning expected
 
-	report, err := File(path, cfg, false, false)
+	report, err := File(path, cfg, false, false, false)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -948,7 +948,7 @@ func TestFile_PurposeOnlyBelowMinLines(t *testing.T) {
 	const content = "<!-- AGENT:NAV\npurpose:test\nlines:10\n-->\n\n# Admin UI Guide\n\nThis document has been split.\n\nSee sub-docs.\n"
 	path := writeTempFile(t, dir, "short.md", content)
 
-	report, err := File(path, cfg, true /* dry-run */, false)
+	report, err := File(path, cfg, true /* dry-run */, false, false)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -960,7 +960,7 @@ func TestFile_PurposeOnlyBelowMinLines(t *testing.T) {
 	const contentStale = "<!-- AGENT:NAV\npurpose:test\nlines:99\n-->\n\n# Admin UI Guide\n\nThis document has been split.\n\nSee sub-docs.\n"
 	path2 := writeTempFile(t, dir, "short2.md", contentStale)
 
-	report2, err := File(path2, cfg, false /* not dry-run */, false)
+	report2, err := File(path2, cfg, false /* not dry-run */, false, false)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -1039,7 +1039,7 @@ func TestFile_DuplicateHeadingMatching(t *testing.T) {
 	cfg := config.Defaults()
 	cfg.MaxDepth = 2
 
-	report, err := File(path, cfg, true /* dry-run */, false)
+	report, err := File(path, cfg, true /* dry-run */, false, false)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -1252,7 +1252,7 @@ End.
 	path := writeTempFile(t, dir, "test.md", content)
 	cfg := config.Defaults()
 
-	_, err := File(path, cfg, false, false)
+	_, err := File(path, cfg, false, false, false)
 	if err != nil {
 		t.Fatalf("File() error: %v", err)
 	}
@@ -1306,7 +1306,7 @@ Environment variables and config file.
 	cfg := config.Defaults()
 	cfg.MinLines = 5
 
-	report, err := File(path, cfg, false, false)
+	report, err := File(path, cfg, false, false, false)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -1358,7 +1358,7 @@ More content for the file.
 	cfg.IndexInlineMax = 20 // small project → inline AGENTS.md
 
 	// Call Update with the subdir as root but repoRoot as the repo root.
-	if err := Update(subdir, repoRoot, cfg, false, true); err != nil {
+	if err := Update(subdir, repoRoot, cfg, false, true, false); err != nil {
 		t.Fatalf("Update() error = %v", err)
 	}
 
@@ -1417,7 +1417,7 @@ Second section content.
 	cfg := config.Defaults()
 	cfg.MinLines = 5
 
-	if err := Update(dir, "", cfg, false, true); err != nil {
+	if err := Update(dir, "", cfg, false, true, false); err != nil {
 		t.Fatalf("Update() error = %v", err)
 	}
 
@@ -1457,7 +1457,7 @@ OAuth2 flow.
 	cfg := config.Defaults()
 	cfg.MaxDepth = 3
 
-	_, err := File(path, cfg, false, false)
+	_, err := File(path, cfg, false, false, false)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -1519,7 +1519,7 @@ Content here.
 	cfg.MaxDepth = 3
 
 	changed := []gitutil.LineRange{{Start: 8, End: 8}}
-	report, err := File(path, cfg, true, false, changed)
+	report, err := File(path, cfg, true, false, false, changed)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -1552,7 +1552,7 @@ Content here.
 	cfg.MaxDepth = 3
 
 	changed := []gitutil.LineRange{{Start: 7, End: 8}}
-	report, err := File(path, cfg, true, false, changed)
+	report, err := File(path, cfg, true, false, false, changed)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -1581,7 +1581,7 @@ More content.
 	cfg := config.Defaults()
 
 	changed := []gitutil.LineRange{{Start: 4, End: 5}}
-	report, err := File(path, cfg, true, false, changed)
+	report, err := File(path, cfg, true, false, false, changed)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -1625,7 +1625,7 @@ Content C.
 
 	// Changed lines overlap Section A only.
 	changed := []gitutil.LineRange{{Start: 8, End: 9}}
-	report, err := File(path, cfg, true, false, changed)
+	report, err := File(path, cfg, true, false, false, changed)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -1686,7 +1686,7 @@ func TestFile_HintedNewEntriesSuppressed(t *testing.T) {
 	cfg.ExpandThreshold = 999
 	cfg.MinLines = 5
 
-	report, err := File(path, cfg, false, false)
+	report, err := File(path, cfg, false, false, false)
 	if err != nil {
 		t.Fatalf("File() error = %v", err)
 	}
@@ -1699,5 +1699,34 @@ func TestFile_HintedNewEntriesSuppressed(t *testing.T) {
 	// The report should still show the file was updated (other changes like line shifts).
 	if !strings.Contains(report, "Updated:") {
 		t.Errorf("report should show file was updated, got: %s", report)
+	}
+}
+
+// TestFile_DuplicateNameFiltering verifies filterHintedNewEntries correctly
+// uses (Name, Start) keys to disambiguate duplicate heading names. When multiple
+// new headings share the same name (e.g. ###gpt-4o appears 5 times), only the
+// instances that actually survive in the pruned nav should appear as "new".
+// Previously the Name-only matching would leak all instances if any one survived.
+func TestFile_DuplicateNameFiltering(t *testing.T) {
+	// Directly test filterHintedNewEntries with duplicate names.
+	reports := []ReportEntry{
+		{Type: ReportNew, Name: "###gpt-4o", NewStart: 50, NewEnd: 60},
+		{Type: ReportNew, Name: "###gpt-4o", NewStart: 80, NewEnd: 90},
+		{Type: ReportNew, Name: "###gpt-4o", NewStart: 110, NewEnd: 120},
+	}
+
+	// Only the entry at Start=80 survives in the nav.
+	survivingNav := []navblock.NavEntry{
+		{Start: 80, Name: "###gpt-4o"},
+	}
+
+	result := filterHintedNewEntries(reports, survivingNav)
+
+	// Only 1 entry should survive the filter (Start=80).
+	if len(result) != 1 {
+		t.Errorf("filterHintedNewEntries returned %d entries, want 1; result=%v", len(result), result)
+	}
+	if len(result) == 1 && result[0].NewStart != 80 {
+		t.Errorf("surviving entry has NewStart=%d, want 80", result[0].NewStart)
 	}
 }

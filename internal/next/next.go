@@ -106,7 +106,7 @@ func FlushState(taskListPath, repoRoot string) (FlushResult, error) {
 
 		// File is clean: run update to refresh line numbers.
 		if _, statErr := os.Stat(absPath); statErr == nil {
-			if _, updErr := update.File(absPath, cfg, false, true); updErr != nil {
+			if _, updErr := update.File(absPath, cfg, false, true, false); updErr != nil {
 				// Non-fatal: warn via stderr but continue.
 				fmt.Fprintf(os.Stderr, "warning: %s: update: %v\n", relPath, updErr)
 			}
