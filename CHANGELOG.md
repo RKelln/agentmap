@@ -4,6 +4,30 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.4.1] — Smarter update output and duplicate filtering — 2026-04-28
+
+Fixes misleading `new` reports when headings with duplicate names (e.g. multiple
+`###gpt-4o`) are pruned by the nav budget, and cleans up `update` output by
+hiding unchanged files by default and showing the auto-gen review warning only once.
+
+### Fixed
+- `update` no longer shows false `new` reports for headings with duplicate names
+  that were dropped by `PruneNavEntries`. The `filterHintedNewEntries` function now
+  uses `(Name, Start)` keys instead of Name-only to correctly disambiguate entries.
+- Single-file `update` path no longer prints the internal `no-changes` sentinel
+  string to stdout.
+
+### Changed
+- `update` now hides unchanged files by default. Add `--verbose` / `-v` to restore
+  the previous behaviour of showing `Updated: path (no changes)` for every file.
+- The `⚠ Auto-generated descriptions need review` warning now prints once at the
+  end of `update` output instead of repeating after each file.
+
+### Documentation
+- Added `agentmap search` and `agentmap headings` to the README Commands table.
+- Clarified `search --help` text: headings are the fuzzy-match key, but the full
+  section content is returned in results.
+
 ## [v0.4.0] — Fuzzy search and headings listing — 2026-04-27
 
 Two new discovery commands: `search` for fuzzy lookup across indexed markdown
