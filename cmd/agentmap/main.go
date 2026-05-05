@@ -601,15 +601,17 @@ Use --count N to emit prompts for N consecutive unchecked files.`,
 }
 
 var searchCmd = &cobra.Command{
-	Use:   "search <query> [path]",
+	Use:   "search <query> [path...]",
 	Short: "Fuzzy search headings to surface associated content across agentmapped files",
-	Long:  "Fuzzy match headings across agentmapped markdown files and return each match's section content. Uses token-based fuzzy matching that handles word reordering, partial matches, and typos.\n\nReturns file path, heading, line range, match score, and section content for each match above the threshold. Use --no-content to show only file paths and headings.",
-	Args:  cobra.RangeArgs(1, 2),
+	Long:  "Fuzzy match headings across agentmapped markdown files and return each match's section content. Uses token-based fuzzy matching that handles word reordering, partial matches, and typos. Pipe (|) acts as OR: \"budget|timeline|schedule\" matches any of those terms.\n\nReturns file path, heading, line range, match score, and section content for each match above the threshold. Use --no-content to show only file paths and headings.\n\nMultiple file/directory paths are accepted. Shell globs work: agentmap search \"heading\" dir/startswith*",
+	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		query := args[0]
 		root := "."
+		var paths []string
 		if len(args) > 1 {
-			root = args[1]
+			paths = args[1:]
+			root = "."
 		}
 
 		cfgPath, err := config.FindConfig(root)
@@ -629,6 +631,17 @@ var searchCmd = &cobra.Command{
 		threshold, _ := cmd.Flags().GetFloat64("threshold")
 		maxResults, _ := cmd.Flags().GetInt("max-results")
 		noContent, _ := cmd.Flags().GetBool("no-content")
+		summary, _ := cmd.Flags().GetBool("summary")
+
+		var resolvedPaths []string
+		if len(paths) == 0 {
+			resolvedPaths, err = discovery.DiscoverFiles(root, cfg.Exclude)
+		} else {
+			resolvedPaths, err = discovery.ResolvePaths(root, paths, cfg.Exclude)
+		}
+		if err != nil {
+			return fmt.Errorf("resolve paths: %w", err)
+		}
 
 		opts := search.Options{
 			Query:      query,
@@ -637,11 +650,17 @@ var searchCmd = &cobra.Command{
 			MaxDepth:   cfg.MaxDepth,
 			Root:       root,
 			Exclude:    cfg.Exclude,
+			Paths:      resolvedPaths,
 		}
 
 		results, err := search.Search(opts)
 		if err != nil {
 			return err
+		}
+
+		if summary {
+			printSearchSummary(results, resolvedPaths, threshold, opts.Query)
+			return nil
 		}
 
 		if len(results) == 0 {
@@ -668,14 +687,15 @@ var searchCmd = &cobra.Command{
 }
 
 var headingsCmd = &cobra.Command{
-	Use:   "headings [path]",
+	Use:   "headings [path...]",
 	Short: "Dump table of contents from nav blocks of indexed files",
-	Long:  "Print every agentmapped file with its purpose, followed by each nav entry section name, s,n offsets, and about description.\n\nUseful for agents to scan what's documented where, then jump to sections via Read(offset=s, limit=n). Better than grep: returns curated about descriptions, not just raw heading strings.",
-	Args:  cobra.MaximumNArgs(1),
+	Long:  "Print every agentmapped file with its purpose, followed by each nav entry section name, s,n offsets, and about description.\n\nUseful for agents to scan what's documented where, then jump to sections via Read(offset=s, limit=n). Better than grep: returns curated about descriptions, not just raw heading strings.\n\nMultiple file/directory paths are accepted. Shell globs work: agentmap headings dir/startswith*",
+	Args:  cobra.ArbitraryArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		root := "."
-		if len(args) > 0 {
-			root = args[0]
+		paths := args
+		if len(paths) == 0 {
+			paths = []string{"."}
 		}
 
 		cfgPath, err := config.FindConfig(root)
@@ -696,9 +716,9 @@ var headingsCmd = &cobra.Command{
 		noAbout, _ := cmd.Flags().GetBool("no-about")
 		filesOnly, _ := cmd.Flags().GetBool("files-only")
 
-		files, err := discovery.DiscoverFiles(root, cfg.Exclude)
+		files, err := discovery.ResolvePaths(root, paths, cfg.Exclude)
 		if err != nil {
-			return fmt.Errorf("headings: discover files: %w", err)
+			return fmt.Errorf("headings: resolve paths: %w", err)
 		}
 
 		type row struct {
@@ -842,6 +862,7 @@ func init() {
 	searchCmd.Flags().Float64("threshold", 0.3, "Minimum match score (0.0-1.0)")
 	searchCmd.Flags().Int("max-results", 50, "Maximum number of results to display")
 	searchCmd.Flags().Bool("no-content", false, "Show only file paths and headings, not section content")
+	searchCmd.Flags().Bool("summary", false, "Show only score distribution and top headings (for tuning threshold)")
 
 	// headings flags
 	headingsCmd.Flags().Int("depth", 3, "Maximum heading depth to show (1=h1, 2=up to h2, 3=up to h3)")
@@ -900,5 +921,51 @@ func findRepoDirRoot(dirPath, cfgPath string) string {
 			return ""
 		}
 		dir = parent
+	}
+}
+
+// printSearchSummary shows a score-distribution summary to help tune threshold.
+func printSearchSummary(results []search.Result, paths []string, threshold float64, query string) {
+	fmt.Printf("Query: %s\n", query)
+	fmt.Printf("Files searched: %d\n", len(paths))
+	fmt.Printf("Threshold: %.2f\n", threshold)
+	fmt.Println()
+
+	if len(results) == 0 {
+		fmt.Println("No matches found at this threshold. Try lowering with --threshold.")
+		return
+	}
+
+	fmt.Printf("Matches above threshold: %d\n\n", len(results))
+
+	var above80, above60, above40 int
+	for _, r := range results {
+		switch {
+		case r.Score >= 0.8:
+			above80++
+		case r.Score >= 0.6:
+			above60++
+		case r.Score >= 0.4:
+			above40++
+		}
+	}
+
+	fmt.Println("Score distribution:")
+	fmt.Printf("  >= 0.80: %d\n", above80)
+	fmt.Printf("  0.60-0.79: %d\n", above60)
+	fmt.Printf("  0.40-0.59: %d\n", above40)
+	fmt.Printf("  < 0.40: %d\n", len(results)-above80-above60-above40)
+	fmt.Println()
+
+	fmt.Println("Top matches:")
+	limit := 10
+	if len(results) < limit {
+		limit = len(results)
+	}
+	for i := 0; i < limit; i++ {
+		r := results[i]
+		prefix := strings.Repeat("#", r.Depth)
+		percent := int(r.Score * 100)
+		fmt.Printf("  %d%%  %s  %s%s\n", percent, r.FilePath, prefix, r.Heading)
 	}
 }

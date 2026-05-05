@@ -32,13 +32,22 @@ type Options struct {
 	MaxDepth   int
 	Root       string
 	Exclude    []string
+	Paths      []string
 }
 
 // Search discovers indexed markdown files and returns fuzzy-matched heading sections.
+// If Options.Paths is non-nil, those specific files are searched; otherwise all
+// .md files under Options.Root are discovered.
 func Search(opts Options) ([]Result, error) {
-	files, err := discovery.DiscoverFiles(opts.Root, opts.Exclude)
-	if err != nil {
-		return nil, fmt.Errorf("search: discover files: %w", err)
+	var files []string
+	if opts.Paths != nil {
+		files = opts.Paths
+	} else {
+		var err error
+		files, err = discovery.DiscoverFiles(opts.Root, opts.Exclude)
+		if err != nil {
+			return nil, fmt.Errorf("search: discover files: %w", err)
+		}
 	}
 
 	var results []Result
@@ -92,7 +101,30 @@ func Search(opts Options) ([]Result, error) {
 // Score computes how well a query matches a heading.
 // Uses fuzzy token matching: each query token is matched to its best heading token by edit ratio.
 // Substring containment is only a bonus when the strings share at least one exact token.
+//
+// Pipe (|) acts as OR: "budget|timeline|schedule" scores each variant independently
+// and returns the best match. Spaces around pipes are trimmed (both "a|b" and "a | b" work).
 func Score(query, heading string) float64 {
+	if strings.Contains(query, "|") {
+		variants := strings.Split(query, "|")
+		best := 0.0
+		for _, v := range variants {
+			v = strings.TrimSpace(v)
+			if v == "" {
+				continue
+			}
+			s := scoreSingle(v, heading)
+			if s > best {
+				best = s
+			}
+		}
+		return best
+	}
+	return scoreSingle(query, heading)
+}
+
+// scoreSingle scores a single (non-OR) query against a heading.
+func scoreSingle(query, heading string) float64 {
 	q := normalize(query)
 	h := normalize(heading)
 
@@ -107,8 +139,6 @@ func Score(query, heading string) float64 {
 		return 0
 	}
 
-	// Substring containment bonus: only apply when the strings share at least one
-	// exact token. Prevents "get" matching "Budget Justification" at 0.95.
 	if strings.Contains(h, q) || strings.Contains(q, h) {
 		if sharesExactToken(qTokens, hTokens) {
 			return 0.95

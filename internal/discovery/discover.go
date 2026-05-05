@@ -40,7 +40,81 @@ func DiscoverFiles(root string, excludePatterns []string) ([]string, error) {
 		}
 	}
 
-	// Filter to .md files and apply exclude patterns
+	return filterMDFiles(files, excludePatterns), nil
+}
+
+// ResolvePaths takes a root directory and a list of paths (files or directories)
+// and returns a sorted, deduplicated list of .md file paths relative to root.
+// Directories are expanded to all .md files within them. Non-.md files are skipped.
+// Shell globs should already be expanded by the caller (e.g. dir/start* → individual file args).
+func ResolvePaths(root string, paths, excludePatterns []string) ([]string, error) {
+	absRoot, err := filepath.Abs(root)
+	if err != nil {
+		return nil, fmt.Errorf("discovery: resolve root: %w", err)
+	}
+
+	seen := make(map[string]bool)
+	var result []string
+
+	for _, p := range paths {
+		absPath := p
+		if !filepath.IsAbs(p) {
+			absPath = filepath.Join(absRoot, p)
+		}
+		info, err := os.Stat(absPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "warning: skip %s: %v\n", p, err)
+			continue
+		}
+		if info.IsDir() {
+			files, err := DiscoverFiles(absPath, excludePatterns)
+			if err != nil {
+				return nil, fmt.Errorf("resolve %s: %w", p, err)
+			}
+			relDir, _ := filepath.Rel(absRoot, absPath)
+			for _, f := range files {
+				relPath := filepath.ToSlash(filepath.Join(relDir, f))
+				if !seen[relPath] {
+					seen[relPath] = true
+					result = append(result, relPath)
+				}
+			}
+		} else if strings.HasSuffix(info.Name(), ".md") {
+			relPath, err := filepath.Rel(absRoot, absPath)
+			if err != nil {
+				relPath = p
+			}
+			relPath = filepath.ToSlash(relPath)
+			if !seen[relPath] {
+				seen[relPath] = true
+				result = append(result, relPath)
+			}
+		}
+	}
+
+	sort.Strings(result)
+	return result, nil
+}
+
+// ResolvePathsAbsolute is like ResolvePaths but returns absolute paths.
+func ResolvePathsAbsolute(root string, paths, excludePatterns []string) ([]string, error) {
+	rel, err := ResolvePaths(root, paths, excludePatterns)
+	if err != nil {
+		return nil, err
+	}
+	absRoot, err := filepath.Abs(root)
+	if err != nil {
+		return nil, fmt.Errorf("discovery: resolve absolute root: %w", err)
+	}
+	var result []string
+	for _, r := range rel {
+		result = append(result, filepath.Join(absRoot, r))
+	}
+	return result, nil
+}
+
+// filterMDFiles applies extension, hidden dir, and exclude filters.
+func filterMDFiles(files, excludePatterns []string) []string {
 	var result []string
 	for _, f := range files {
 		if !strings.HasSuffix(f, ".md") {
@@ -54,9 +128,8 @@ func DiscoverFiles(root string, excludePatterns []string) ([]string, error) {
 		}
 		result = append(result, f)
 	}
-
 	sort.Strings(result)
-	return result, nil
+	return result
 }
 
 // hasHiddenDir reports whether path contains a hidden directory segment.

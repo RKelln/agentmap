@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"testing"
 )
@@ -213,6 +214,128 @@ func TestMatchesExclude(t *testing.T) {
 				t.Errorf("matchesExclude(%q, %v) = %v, want %v", tt.path, tt.patterns, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestFilterMDFiles(t *testing.T) {
+	dir := t.TempDir()
+
+	writeFile(t, dir, "README.md", "# Root")
+	writeFile(t, dir, "notes.txt", "some notes")
+	writeFile(t, dir, "src/main.go", "package main")
+	writeFile(t, dir, ".hidden/secret.md", "# Secret")
+
+	files := []string{"README.md", "notes.txt", "src/main.go", ".hidden/secret.md"}
+	got := filterMDFiles(files, nil)
+
+	if len(got) != 1 {
+		t.Fatalf("got %d files, want 1: %v", len(got), got)
+	}
+	if got[0] != "README.md" {
+		t.Errorf("files[0] = %q, want %q", got[0], "README.md")
+	}
+}
+
+func TestResolvePaths_SingleDir(t *testing.T) {
+	dir := t.TempDir()
+
+	writeFile(t, dir, "README.md", "# Root")
+	writeFile(t, dir, "docs/a.md", "# A")
+	writeFile(t, dir, "docs/b.md", "# B")
+
+	got, err := ResolvePaths(dir, []string{"."}, nil)
+	if err != nil {
+		t.Fatalf("ResolvePaths() error = %v", err)
+	}
+
+	if len(got) != 3 {
+		t.Errorf("got %d files, want 3: %v", len(got), got)
+	}
+}
+
+func TestResolvePaths_MixedFileAndDir(t *testing.T) {
+	dir := t.TempDir()
+
+	writeFile(t, dir, "README.md", "# Root")
+	writeFile(t, dir, "docs/guide.md", "# Guide")
+	writeFile(t, dir, "docs/spec.md", "# Spec")
+
+	got, err := ResolvePaths(dir, []string{"README.md", "docs"}, nil)
+	if err != nil {
+		t.Fatalf("ResolvePaths() error = %v", err)
+	}
+
+	sort.Strings(got)
+	expected := []string{"README.md", "docs/guide.md", "docs/spec.md"}
+	if !reflect.DeepEqual(got, expected) {
+		t.Errorf("ResolvePaths() = %v, want %v", got, expected)
+	}
+}
+
+func TestResolvePaths_Dedup(t *testing.T) {
+	dir := t.TempDir()
+
+	writeFile(t, dir, "README.md", "# Root")
+
+	got, err := ResolvePaths(dir, []string{"README.md", "."}, nil)
+	if err != nil {
+		t.Fatalf("ResolvePaths() error = %v", err)
+	}
+
+	if len(got) != 1 {
+		t.Errorf("got %d files, want 1 (dedup): %v", len(got), got)
+	}
+}
+
+func TestResolvePaths_NonMdFilesSkipped(t *testing.T) {
+	dir := t.TempDir()
+
+	writeFile(t, dir, "README.md", "# Root")
+	writeFile(t, dir, "notes.txt", "notes")
+	writeFile(t, dir, "main.go", "package main")
+
+	got, err := ResolvePaths(dir, []string{"README.md", "notes.txt", "main.go"}, nil)
+	if err != nil {
+		t.Fatalf("ResolvePaths() error = %v", err)
+	}
+
+	if len(got) != 1 {
+		t.Errorf("got %d files, want 1: %v", len(got), got)
+	}
+	if got[0] != "README.md" {
+		t.Errorf("files[0] = %q, want %q", got[0], "README.md")
+	}
+}
+
+func TestResolvePaths_Empty(t *testing.T) {
+	dir := t.TempDir()
+
+	got, err := ResolvePaths(dir, nil, nil)
+	if err != nil {
+		t.Fatalf("ResolvePaths() error = %v", err)
+	}
+
+	if len(got) != 0 {
+		t.Errorf("got %d files, want 0", len(got))
+	}
+}
+
+func TestResolvePaths_WithExclude(t *testing.T) {
+	dir := t.TempDir()
+
+	writeFile(t, dir, "README.md", "# Root")
+	writeFile(t, dir, "CHANGELOG.md", "# Changelog")
+
+	got, err := ResolvePaths(dir, []string{"."}, []string{"CHANGELOG.md"})
+	if err != nil {
+		t.Fatalf("ResolvePaths() error = %v", err)
+	}
+
+	if len(got) != 1 {
+		t.Errorf("got %d files, want 1: %v", len(got), got)
+	}
+	if got[0] != "README.md" {
+		t.Errorf("files[0] = %q, want %q", got[0], "README.md")
 	}
 }
 

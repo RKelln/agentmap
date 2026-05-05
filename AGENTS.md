@@ -1,5 +1,7 @@
 # AGENTS.md
 
+*Linebreak is a combat/simulation engine.*
+
 Go 1.25+. Cobra CLI. Single binary; no runtime dependencies.
 
 ## Defaults
@@ -123,13 +125,6 @@ read a files first 50 lines then use AGENT:NAV to target reads.
 ## Writing Nav Descriptions
 
 Run `agentmap guide` for full instructions on writing `purpose`, `about`, and `see` fields.
-
-## Before Committing Markdown Changes
-
-1. For first-pass indexing, run: `agentmap index .` from repo root (or `agentmap generate <path>` for targeted generation).
-2. Review and refine nav descriptions (`purpose`; `about`; `see`) with agent/human judgment.
-3. Run: `agentmap update <changed markdown files>` to refresh line numbers only.
-4. Run: `agentmap check <path>` before committing.
 
 ## Commit Messages
 

@@ -230,6 +230,89 @@ func TestScore_NoMatch(t *testing.T) {
 	}
 }
 
+func TestScore_ORTerms(t *testing.T) {
+	tests := []struct {
+		name    string
+		query   string
+		heading string
+		wantMin float64
+		wantMax float64
+	}{
+		{
+			name:    "first term matches exactly",
+			query:   "budget|timeline|schedule",
+			heading: "Budget Justification",
+			wantMin: 0.90,
+		},
+		{
+			name:    "second term matches",
+			query:   "alpha|budget|gamma",
+			heading: "Budget Justification",
+			wantMin: 0.90,
+		},
+		{
+			name:    "exact match via OR",
+			query:   "alpha|Budget Justification|gamma",
+			heading: "Budget Justification",
+			wantMin: 0.90,
+		},
+		{
+			name:    "second term matches",
+			query:   "alpha|budget|gamma",
+			heading: "Budget Justification",
+			wantMin: 0.60,
+		},
+		{
+			name:    "exact match via OR",
+			query:   "alpha|Budget Justification|gamma",
+			heading: "Budget Justification",
+			wantMin: 0.90,
+		},
+		{
+			name:    "no variant matches",
+			query:   "xyzzy|quux|flob",
+			heading: "Budget Justification",
+			wantMax: 0.18,
+		},
+		{
+			name:    "spaces around pipes",
+			query:   "alpha | budget | gamma",
+			heading: "Budget Justification",
+			wantMin: 0.90,
+		},
+		{
+			name:    "trailing pipe",
+			query:   "budget|",
+			heading: "Budget Justification",
+			wantMin: 0.90,
+		},
+		{
+			name:    "only pipe",
+			query:   "|",
+			heading: "Budget",
+			wantMax: 0.0,
+		},
+		{
+			name:    "OR fallback: only second variant has moderate match",
+			query:   "xyzzy|justifcation",
+			heading: "Budget Justification",
+			wantMin: 0.75,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Score(tt.query, tt.heading)
+			if tt.wantMin > 0 && got < tt.wantMin {
+				t.Errorf("Score(%q, %q) = %v, want >= %v", tt.query, tt.heading, got, tt.wantMin)
+			}
+			if tt.wantMax > 0 && got > tt.wantMax {
+				t.Errorf("Score(%q, %q) = %v, want <= %v", tt.query, tt.heading, got, tt.wantMax)
+			}
+		})
+	}
+}
+
 func TestScore_Empty(t *testing.T) {
 	if got := Score("", "Budget"); got != 0 {
 		t.Errorf("Score empty query = %v, want 0", got)

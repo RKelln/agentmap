@@ -45,6 +45,10 @@ linters:
           - revive
         path: _test\.go
         text: "dot-imports"
+      # Allow repeated string literals in tests
+      - linters:
+          - goconst
+        path: _test\.go
 
 formatters:
   enable:
