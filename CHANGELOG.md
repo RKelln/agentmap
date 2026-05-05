@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.4.3] — Search usability improvements — 2026-05-05
+
+Smarter `search` with OR-terms, globbing-friendly multi-file paths, and a `--summary` flag for threshold tuning.
+
+### Added
+- `search` queries support `|` as OR separator: `"budget|timeline|schedule"` matches headings containing any of the three terms
+- `search <query> [path...]` and `headings [path...]` now accept multiple file/directory arguments, enabling shell globbing (`agentmap search "heading" docs/startswith*`)
+- `search --summary` shows score distribution and top matches without full content, helping agents tune `--threshold`
+- `ResolvePaths` discovery helper resolves mixed file+directory lists into a deduplicated, root-relative `.md` file list
+
+### Changed
+- `search` and `headings` now use `ResolvePaths` for path resolution instead of single-root discovery
+- Non-existent paths in search/headings emit warnings to stderr instead of failing silently
+- goconst lint exemption added for test files
+
 ## [v0.4.2] — next workflow bug fixes — 2026-04-28
 
 Fixes four bugs in the `agentmap next` workflow that could cause agents to loop
